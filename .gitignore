@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS files
+.DS_Store
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Logs and traces
+logs/*.log
+logs/trace.zip
+
+# Caches and coverage
+.cache/
+pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Environment variables
+.env
+
+# Playwright / Browser user data
+.firefox-user-data/
+.firefox-user-data-temp/
+.firefox-profile/
+.chromium-user-data/
+
+# Misc
+*.sqlite
+
