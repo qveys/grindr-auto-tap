@@ -1,0 +1,36 @@
+selectors:
+  login:
+    apple_login_button: "text=Log In with Apple"
+    lets_go_button: "#beta-dismiss-btn"
+    cascade: "#cascade"
+
+  apple_auth:
+    email_field: "#account_name_text_field"
+    password_field: "#password_text_field"
+    sign_in_button: "#sign-in"
+    continue_password_button: "#continue-password"
+    continue_button: "button:has-text('Continue'), button[aria-label*='Continue'], #continue"
+
+  profile_actions:
+    tap_buttons:
+      css:
+        - "button[aria-label='Tap']"
+        - "button[aria-label*='Tap' i]"
+        - "button[data-testid*='tap' i]"
+        - "[role='button'][aria-label*='Tap' i]"
+      xpath:
+        - "//button[@aria-label='Tap']"
+        - "//button[contains(translate(@aria-label,'TAP','tap'),'tap')]"
+        - "//*[@role='button' and contains(translate(@aria-label,'TAP','tap'),'tap')]"
+
+    next_buttons:
+      css:
+        - "div[aria-label='Next Profile']"
+        - "img[alt='Next Profile']"
+        - "button[aria-label*='Next' i]"
+        - ".ProfileV2__RightButtonOverlay-sc-14zklci-2[aria-label='Next Profile']"
+      xpath:
+        - "//div[@aria-label='Next Profile']"
+        - "//div[@aria-label='Next Profile']//img"
+        - "//img[@alt='Next Profile']"
+        - "//button[contains(translate(@aria-label,'NEXT','next'),'next')]"

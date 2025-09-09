@@ -1,0 +1,24 @@
+app:
+  max_cycles: 1000
+  base_url: "https://web.grindr.com"
+  timeouts:
+    page_load: 10000
+    element_wait: 5000
+    click_timeout: 800
+    popup_timeout: 10000
+
+browser:
+  viewport:
+    width: 1280
+    height: 800
+  locale: "fr-FR"
+  geolocation:
+    latitude: 50.84685
+    longitude: 4.35721
+  headless: false
+
+retry:
+  max_attempts: 3
+  backoff_factor: 2
+  element_location: 3
+  click_action: 2
