@@ -15,13 +15,8 @@ selectors:
     tap_buttons:
       css:
         - "button[aria-label='Tap']"
-        - "button[aria-label*='Tap' i]"
-        - "button[data-testid*='tap' i]"
-        - "[role='button'][aria-label*='Tap' i]"
       xpath:
         - "//button[@aria-label='Tap']"
-        - "//button[contains(translate(@aria-label,'TAP','tap'),'tap')]"
-        - "//*[@role='button' and contains(translate(@aria-label,'TAP','tap'),'tap')]"
 
     next_buttons:
       css:

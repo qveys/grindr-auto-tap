@@ -3,7 +3,7 @@ app:
   base_url: "https://web.grindr.com"
   timeouts:
     page_load: 10000
-    element_wait: 5000
+    element_wait: 2000
     click_timeout: 800
     popup_timeout: 10000
 
@@ -13,12 +13,15 @@ browser:
     height: 800
   locale: "fr-FR"
   geolocation:
-    latitude: 50.84685
-    longitude: 4.35721
+    # Brussels Belgium (4.35721, 50.84685)
+    # Mouscron Belgium (3.19962, 50.72858)
+    # Lille France (3.057256, 50.62925)
+    latitude: 50.72858
+    longitude: 3.19962
   headless: false
 
 retry:
   max_attempts: 3
   backoff_factor: 2
-  element_location: 3
+  element_location: 1
   click_action: 2
