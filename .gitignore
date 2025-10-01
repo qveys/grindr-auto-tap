@@ -40,6 +40,11 @@ htmlcov/
 .firefox-profile/
 .chromium-user-data/
 
+# Docker
+docker/node_modules/
+
 # Misc
 *.sqlite
 
+/node_modules
+/docker/node_modules
