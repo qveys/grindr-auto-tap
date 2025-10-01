@@ -1,0 +1,52 @@
+services:
+  playwright-headful:
+    container_name: playwright-hi1g3s
+    build: ../files/.
+    shm_size: 2gb
+    user: pwuser
+    environment:
+      - DISPLAY=:99
+    restart: unless-stopped
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.http.routers.playwright-playwright-hi1g3s-40-web.rule=Host(`playwright.quentinveys.be`)
+      - traefik.http.routers.playwright-playwright-hi1g3s-40-web.entrypoints=web
+      - traefik.http.services.playwright-playwright-hi1g3s-40-web.loadbalancer.server.port=3000
+      - traefik.http.routers.playwright-playwright-hi1g3s-40-web.service=playwright-playwright-hi1g3s-40-web
+      - traefik.http.routers.playwright-playwright-hi1g3s-40-web.middlewares=redirect-to-https@file
+      - traefik.http.routers.playwright-playwright-hi1g3s-40-websecure.rule=Host(`playwright.quentinveys.be`)
+      - traefik.http.routers.playwright-playwright-hi1g3s-40-websecure.entrypoints=websecure
+      - traefik.http.services.playwright-playwright-hi1g3s-40-websecure.loadbalancer.server.port=3000
+      - traefik.http.routers.playwright-playwright-hi1g3s-40-websecure.service=playwright-playwright-hi1g3s-40-websecure
+      - traefik.http.routers.playwright-playwright-hi1g3s-40-websecure.tls.certresolver=quentinveys.be
+      - traefik.swarm.network=dokploy-network
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-web.rule=Host(`vnc.quentinveys.be`)
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-web.entrypoints=web
+      - traefik.http.services.playwright-playwright-hi1g3s-39-web.loadbalancer.server.port=7900
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-web.service=playwright-playwright-hi1g3s-39-web
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-web.middlewares=redirect-to-https@file
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-websecure.rule=Host(`vnc.quentinveys.be`)
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-websecure.entrypoints=websecure
+      - traefik.http.services.playwright-playwright-hi1g3s-39-websecure.loadbalancer.server.port=7900
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-websecure.service=playwright-playwright-hi1g3s-39-websecure
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-websecure.tls.certresolver=quentinveys.be
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.cdp.rule=Host(`cdp.quentinveys.be`)
+      - traefik.http.routers.cdp.entrypoints=websecure
+      - traefik.http.routers.cdp.tls=true
+      - traefik.http.routers.cdp.service=cdp
+      - traefik.http.services.cdp.loadbalancer.server.port=9223
+      - traefik.http.services.cdp.loadbalancer.server.scheme=http
+      - traefik.http.services.cdp.loadbalancer.passhostheader=false
+      - traefik.http.middlewares.vnc-redirect.redirectregex.regex=^https://vnc\.quentinveys\.be/?$
+      - traefik.http.middlewares.vnc-redirect.redirectregex.replacement=https://vnc.quentinveys.be/vnc.html
+      - traefik.http.middlewares.vnc-redirect.redirectregex.permanent=true
+      - traefik.http.middlewares.fa-vnc.forwardauth.address=http://authelia:9091/api/authz/forward-auth?rd=https%3A%2F%2Fvnc.quentinveys.be%2Fvnc.html
+      - traefik.http.middlewares.fa-vnc.forwardauth.trustforwardheader=true
+      - traefik.http.middlewares.fa-vnc.forwardauth.authresponseheaders=Remote-User,Remote-Groups,Remote-Name,Remote-Email
+      - traefik.http.routers.playwright-playwright-hi1g3s-39-websecure.middlewares=vnc-redirect,fa-vnc@docker
+networks:
+  dokploy-network:
+    external: true

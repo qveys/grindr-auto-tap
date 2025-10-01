@@ -1,0 +1,20 @@
+# Assure-toi d'être bien sur l'image Playwright
+FROM mcr.microsoft.com/playwright:v1.55.0-jammy
+
+# Installer VNC, serveur X virtuel et un bureau minimal
+RUN apt-get update && apt-get install -y \
+    tigervnc-standalone-server \
+    fluxbox \
+    x11-apps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Définir mot de passe VNC
+RUN mkdir -p /root/.vnc && \
+    echo "123456" | vncpasswd -f > /root/.vnc/passwd && \
+    chmod 600 /root/.vnc/passwd
+
+# Script de démarrage
+CMD ["sh", "-c", "vncserver :1 -geometry 1280x800 -depth 24 && tail -f /root/.vnc/*.log"]
+
+# Exposer port VNC
+EXPOSE 5901
