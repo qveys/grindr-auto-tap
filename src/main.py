@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -187,10 +188,14 @@ def main() -> None:
             if not args.dry_run:
                 while cycles_done < config.app.max_cycles:
                     r1 = invoker.run(TapCommand(page=page, navigator=navigator))
+                    emit("TAP_RESULT", "Tap command executed", {"success": r1.success, "message": r1.message, "data": r1.data})
+                    time.sleep(1)
                     r2 = invoker.run(NextProfileCommand(page=page, navigator=navigator))
+                    emit("NEXT_RESULT", "Next profile command executed", {"success": r2.success, "message": r2.message, "data": r2.data})
                     if not r2.success:
                         break
                     cycles_done += 1
+                    time.sleep(1)
 
             logger.info(f"Profile navigation completed: {cycles_done} cycles processed")
             emit("CYCLES_DONE", "Profile navigation completed", {"cycles": cycles_done})
