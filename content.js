@@ -1097,3 +1097,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+// ============================================================================
+// AUTO-START
+// ============================================================================
+
+if (window.location.hostname.includes('web.grindr.com')) {
+  chrome.storage.local.get(['autoStart', 'minDelayHours'], (result) => {
+    const autoStart = result.autoStart !== false;
+    const minDelayHours = result.minDelayHours !== undefined ? result.minDelayHours : DEFAULTS.MIN_DELAY_HOURS;
+
+    if (autoStart) {
+      const startIfNeeded = () => {
+        if (window.__grindrRunning || window.__grindrStopped) {
+          return;
+        }
+
+        const minDelayMs = minDelayHours * 60 * 60 * 1000;
+
+        if (window.__grindrLastRun && (Date.now() - window.__grindrLastRun) < minDelayMs) {
+          const remainingMs = minDelayMs - (Date.now() - window.__grindrLastRun);
+          const remainingHours = (remainingMs / (60 * 60 * 1000)).toFixed(1);
+          logger('info', 'Content', `ℹ️ Script récemment terminé, attente de ${remainingHours}h avant relancement automatique`);
+          return;
+        }
+        initAndRun();
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          setTimeout(startIfNeeded, DELAYS.TWO_SECONDS);
+        });
+      } else {
+        setTimeout(startIfNeeded, DELAYS.TWO_SECONDS);
+      }
+    }
+  });
+}
