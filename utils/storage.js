@@ -52,3 +52,27 @@ export function removeStorage(keys) {
     });
   });
 }
+
+/**
+ * Get credentials from storage
+ * @returns {Promise<Object>} Promise resolving to credentials object
+ */
+export async function getCredentials() {
+  const result = await getStorage(['loginMethod', 'grindrEmail', 'grindrPassword', 'autoLogin']);
+  return {
+    loginMethod: result.loginMethod || 'email',
+    email: result.grindrEmail || null,
+    password: result.grindrPassword || null,
+    autoLogin: result.autoLogin !== false, // true by default
+  };
+}
+
+/**
+ * Get webhook URL from storage
+ * @param {string} defaultUrl - Default URL if not found in storage
+ * @returns {Promise<string>} Promise resolving to webhook URL
+ */
+export async function getWebhookURL(defaultUrl) {
+  const result = await getStorage(['n8nWebhookURL']);
+  return result.n8nWebhookURL || defaultUrl;
+}
