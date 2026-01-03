@@ -8,5 +8,11 @@
     "scripting",
     "storage",
     "activeTab"
+  ],
+  "host_permissions": [
+    "*://web.grindr.com/*",
+    "*://*.apple.com/*",
+    "*://*.appleid.apple.com/*",
+    "*://*.idmsa.apple.com/*"
   ]
 }
