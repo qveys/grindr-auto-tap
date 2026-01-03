@@ -90,3 +90,22 @@ function recordFailedTap(stats) {
   });
   return stats;
 }
+
+/**
+ * Finalize statistics and calculate duration
+ * @param {Object} stats - Statistics object
+ * @returns {Object} Finalized statistics object
+ */
+function finalizeStats(stats) {
+  stats.endTime = Date.now();
+  stats.duration = stats.endTime - stats.startTime;
+  stats.successRate = stats.totalTaps > 0 ? (stats.successfulTaps / stats.totalTaps * 100).toFixed(2) : 0;
+  logger('info', 'finalizeStats', 'Statistics finalized', {
+    duration: stats.duration,
+    total: stats.totalTaps,
+    successful: stats.successfulTaps,
+    failed: stats.failedTaps,
+    successRate: stats.successRate
+  });
+  return stats;
+}
