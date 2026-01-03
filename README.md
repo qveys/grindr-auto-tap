@@ -5,7 +5,7 @@ Extension Firefox pour automatiser les actions sur Grindr et envoyer les statist
 ## Fonctionnalités
 
 - ✅ Détection automatique des onglets web.grindr.com
-- ✅ Authentification automatique avec identifiants sauvegardés
+- ✅ Authentification automatique avec identifiants sauvegardés (email, Apple, Facebook, Google)
 - ✅ Exécution automatique du script de tap
 - ✅ Envoi des statistiques vers n8n (contourne la CSP)
 - ✅ Interface de configuration via popup
@@ -24,14 +24,15 @@ Extension Firefox pour automatiser les actions sur Grindr et envoyer les statist
 ### 1. Ajouter les identifiants
 
 1. Cliquer sur l'icône de l'extension dans la barre d'outils
-2. Entrer votre email et mot de passe
+2. Entrer votre email et mot de passe (ou choisir une autre méthode de connexion)
 3. Cocher "Connexion automatique" si souhaité
 4. Cliquer sur "Sauvegarder les identifiants"
 
 ### 2. Configurer l'URL du webhook n8n
 
-1. Dans le popup, entrer l'URL de votre webhook n8n
-2. Cliquer sur "Sauvegarder l'URL"
+1. Dans le popup, aller à l'onglet "Webhook"
+2. Entrer l'URL de votre webhook n8n
+3. Cliquer sur "Sauvegarder l'URL"
 
 ## Utilisation
 
@@ -65,13 +66,37 @@ window.grindrAutoTap.checkStatus();
 
 ## Structure des fichiers
 
-- `manifest.json` - Configuration de l'extension
-- `background.js` - Service worker pour gestion des onglets, requêtes n8n et storage
-- `content.js` - Script principal adapté depuis autoTapGrindr.js avec authentification
-- `auth.js` - Module d'authentification (référence, fonctions intégrées dans content.js)
-- `popup.html` - Interface utilisateur
-- `popup.js` - Logique du popup
-- `icons/` - Dossier pour les icônes de l'extension
+```
+extension/
+├── manifest.json          # Configuration de l'extension
+├── background.js          # Service worker (gestion onglets, webhooks n8n, storage)
+├── content.js             # Point d'entrée principal (orchestration)
+│
+├── utils/                 # Utilitaires partagés
+│   ├── constants.js       # Constantes (délais, timeouts, selectors, etc.)
+│   ├── logger.js          # Système de logging centralisé
+│   ├── formatters.js      # Formatage de dates et durées
+│   └── dom-helpers.js     # Helpers DOM (delay, getTextNodes, etc.)
+│
+├── modules/               # Modules fonctionnels
+│   ├── auth.js            # Module d'authentification (email, Apple, Facebook, Google)
+│   ├── profile-opener.js  # Ouverture du premier profil
+│   ├── stats.js           # Gestion des statistiques et envoi webhook
+│   └── auto-tap.js        # Boucle principale de tap automatique
+│
+├── popup.html             # Interface utilisateur
+├── popup.js               # Logique du popup
+└── icons/                 # Icônes de l'extension
+```
+
+### Architecture modulaire
+
+Le code est organisé en modules séparés pour une meilleure maintenabilité :
+- **Utils** : Fonctions utilitaires réutilisables
+- **Modules** : Logique métier organisée par responsabilité (SOLID)
+- **Content.js** : Point d'entrée qui orchestre les modules
+
+Les modules sont chargés dans l'ordre de dépendance via `manifest.json`.
 
 ## Sécurité
 
@@ -79,10 +104,32 @@ window.grindrAutoTap.checkStatus();
 - Les identifiants ne sont jamais synchronisés avec le cloud
 - Les identifiants ne sont jamais exposés dans les logs
 - L'extension ne fonctionne que sur web.grindr.com
+- Les requêtes webhook passent par le background script (contourne CSP)
+
+## Dépannage
+
+### L'extension ne se charge pas
+- Vérifier que tous les fichiers sont présents
+- Vérifier la console d'erreur dans `about:debugging`
+- Vérifier que les icônes sont présentes dans le dossier `icons/`
+
+### Le script ne démarre pas automatiquement
+- Vérifier que "Connexion automatique" est cochée dans le popup
+- Vérifier que les identifiants sont sauvegardés
+- Vérifier la console du navigateur pour les erreurs (F12)
+
+### Les requêtes vers n8n échouent
+- Vérifier que l'URL du webhook est correcte (onglet Webhook dans le popup)
+- Vérifier que le webhook n8n est actif
+- Vérifier la console du background script dans `about:debugging`
+
+### L'authentification échoue
+- Vérifier que les identifiants sont corrects
+- Vérifier s'il y a un captcha (nécessite action manuelle)
+- Vérifier la console pour les messages d'erreur détaillés
 
 ## Notes
 
-- Les icônes doivent être ajoutées dans le dossier `icons/` (16x16, 48x48, 128x128 pixels)
 - L'extension nécessite les permissions `tabs`, `scripting`, `storage` et `activeTab`
 - L'extension fonctionne uniquement sur `*://web.grindr.com/*`
-
+- Architecture modulaire compatible Manifest V3 (partage via `window.*`)
