@@ -3,258 +3,169 @@
  * Handles UI interactions and settings management
  */
 
-// Get DOM elements
-const startButton = document.getElementById('startButton');
-const stopButton = document.getElementById('stopButton');
-const saveButton = document.getElementById('saveButton');
-const clearLogsButton = document.getElementById('clearLogsButton');
-const statusIndicator = document.getElementById('statusIndicator');
-const statusText = document.getElementById('statusText');
-const logsContainer = document.getElementById('logsContainer');
+// Initialize edit mode managers (external from edit-mode.js)
+let editModeManagers = null;
 
-// Settings elements
-const loginMethodSelect = document.getElementById('loginMethod');
-const emailInput = document.getElementById('email');
-const passwordInput = document.getElementById('password');
-const autoLoginCheckbox = document.getElementById('autoLogin');
-const webhookURLInput = document.getElementById('webhookURL');
+// Tab management
+const tabs = {
+  script: { tab: document.getElementById('tabScript'), content: document.getElementById('contentScript') },
+  settings: { tab: document.getElementById('tabSettings'), content: document.getElementById('contentSettings') },
+  webhook: { tab: document.getElementById('tabWebhook'), content: document.getElementById('contentWebhook') },
+  logs: { tab: document.getElementById('tabLogs'), content: document.getElementById('contentLogs') }
+};
 
-// Stats elements
-const totalTapsSpan = document.getElementById('totalTaps');
-const durationSpan = document.getElementById('duration');
-
-let isRunning = false;
-let logsPoller = null;
+// Current active tab
+let activeTab = 'script';
 
 /**
  * Initialize popup when DOM is ready
  */
 document.addEventListener('DOMContentLoaded', async () => {
-  loadSettings();
-  updateUI();
-  pollLogs();
+  // Initialize edit mode managers
+  if (typeof createEditModeManagers === 'function') {
+    editModeManagers = createEditModeManagers();
+  }
+
+  // Setup tab navigation
+  setupTabs();
+
+  // Load initial data
+  await loadSavedData();
+
+  // Check script status
+  await checkScriptStatus();
 });
 
 /**
- * Load settings from storage
+ * Setup tab navigation
  */
-async function loadSettings() {
-  try {
-    const result = await chrome.storage.local.get([
-      'loginMethod',
-      'grindrEmail',
-      'grindrPassword',
-      'autoLogin',
-      'n8nWebhookURL'
-    ]);
-
-    if (result.loginMethod) loginMethodSelect.value = result.loginMethod;
-    if (result.grindrEmail) emailInput.value = result.grindrEmail;
-    if (result.grindrPassword) passwordInput.value = result.grindrPassword;
-    if (result.autoLogin !== undefined) autoLoginCheckbox.checked = result.autoLogin;
-    if (result.n8nWebhookURL) webhookURLInput.value = result.n8nWebhookURL;
-  } catch (error) {
-    console.error('Failed to load settings:', error);
-  }
-}
-
-/**
- * Save settings to storage
- */
-async function saveSettings() {
-  try {
-    const settings = {
-      loginMethod: loginMethodSelect.value,
-      grindrEmail: emailInput.value,
-      grindrPassword: passwordInput.value,
-      autoLogin: autoLoginCheckbox.checked,
-      n8nWebhookURL: webhookURLInput.value
-    };
-
-    await chrome.storage.local.set(settings);
-    showNotification('Settings saved successfully', 'success');
-  } catch (error) {
-    console.error('Failed to save settings:', error);
-    showNotification('Failed to save settings', 'error');
-  }
-}
-
-/**
- * Update UI state based on running status
- */
-function updateUI() {
-  startButton.disabled = isRunning;
-  stopButton.disabled = !isRunning;
-
-  if (isRunning) {
-    statusIndicator.classList.add('active');
-    statusText.textContent = 'Running';
-  } else {
-    statusIndicator.classList.remove('active');
-    statusText.textContent = 'Ready';
-  }
-}
-
-/**
- * Start auto-tap
- */
-async function handleStartClick() {
-  try {
-    const tab = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab[0]) {
-      showNotification('No active tab found', 'error');
-      return;
+function setupTabs() {
+  // Add click listeners to all tabs
+  Object.keys(tabs).forEach(tabKey => {
+    const tabElement = tabs[tabKey].tab;
+    if (tabElement) {
+      tabElement.addEventListener('click', () => switchTab(tabKey));
     }
-
-    isRunning = true;
-    updateUI();
-
-    chrome.tabs.sendMessage(tab[0].id, { action: 'startAutoTap' }).catch(err => {
-      console.error('Failed to start auto-tap:', err);
-      isRunning = false;
-      updateUI();
-      showNotification('Failed to start auto-tap', 'error');
-    });
-  } catch (error) {
-    console.error('Failed to start:', error);
-    showNotification('Failed to start auto-tap', 'error');
-  }
+  });
 }
 
 /**
- * Stop auto-tap
+ * Switch to a different tab
+ * @param {string} tabKey - Key of the tab to switch to
  */
-async function handleStopClick() {
-  try {
-    const tab = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab[0]) {
-      showNotification('No active tab found', 'error');
-      return;
+function switchTab(tabKey) {
+  // Cancel any active edit mode
+  cancelEditMode();
+
+  // Remove active class from all tabs and content
+  Object.keys(tabs).forEach(key => {
+    if (tabs[key].tab) {
+      tabs[key].tab.classList.remove('active');
     }
+    if (tabs[key].content) {
+      tabs[key].content.classList.remove('active');
+    }
+  });
 
-    isRunning = false;
-    updateUI();
+  // Add active class to selected tab and content
+  if (tabs[tabKey] && tabs[tabKey].tab) {
+    tabs[tabKey].tab.classList.add('active');
+  }
+  if (tabs[tabKey] && tabs[tabKey].content) {
+    tabs[tabKey].content.classList.add('active');
+  }
 
-    chrome.tabs.sendMessage(tab[0].id, { action: 'stopAutoTap' }).catch(err => {
-      console.error('Failed to stop auto-tap:', err);
-      showNotification('Failed to stop auto-tap', 'error');
-    });
-  } catch (error) {
-    console.error('Failed to stop:', error);
-    showNotification('Failed to stop auto-tap', 'error');
+  activeTab = tabKey;
+
+  // Load data on-demand when activating specific tabs
+  if (tabKey === 'webhook') {
+    loadWebhookDisplay();
+  } else if (tabKey === 'logs') {
+    loadLogs();
   }
 }
 
 /**
- * Poll for logs periodically
+ * Cancel edit mode for all sections
  */
-function pollLogs() {
-  const pollFn = async () => {
-    try {
-      chrome.runtime.sendMessage({ action: 'getLogs' }, (response) => {
-        if (response && response.logs) {
-          displayLogs(response.logs);
+function cancelEditMode() {
+  if (editModeManagers) {
+    Object.values(editModeManagers).forEach(manager => {
+      if (manager && typeof manager.cancel === 'function') {
+        manager.cancel();
+      }
+    });
+  }
+}
+
+/**
+ * Load saved data on popup open
+ */
+async function loadSavedData() {
+  // Load auth, auto-start, min delay
+  // Skip webhook loading initially (loaded on-demand)
+  await loadAuthDisplay();
+  await loadMinDelayDisplay();
+  await loadAutoStart();
+}
+
+/**
+ * Check script status and update buttons
+ */
+async function checkScriptStatus() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0] && tabs[0].url && tabs[0].url.includes('web.grindr.com')) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'getStatus' }, (response) => {
+        if (chrome.runtime.lastError) {
+          updateScriptButtons(false);
+        } else {
+          updateScriptButtons(response && response.isRunning);
         }
       });
-    } catch (error) {
-      console.error('Failed to fetch logs:', error);
+    } else {
+      updateScriptButtons(false);
     }
+  } catch (error) {
+    logger('error', 'checkScriptStatus', 'Failed to check script status', { error: error.message });
+    updateScriptButtons(false);
+  }
+}
+
+/**
+ * Update script control buttons visibility
+ * @param {boolean} isRunning - Whether script is running
+ */
+function updateScriptButtons(isRunning) {
+  const startButton = document.getElementById('startButton');
+  const stopButton = document.getElementById('stopButton');
+
+  if (isRunning) {
+    if (startButton) startButton.classList.add('hidden');
+    if (stopButton) stopButton.classList.remove('hidden');
+  } else {
+    if (startButton) startButton.classList.remove('hidden');
+    if (stopButton) stopButton.classList.add('hidden');
+  }
+}
+
+/**
+ * Logger function for popup
+ */
+function logger(level, location, message, data = null) {
+  const logEntry = {
+    timestamp: Date.now(),
+    level: level,
+    location: location || 'Popup',
+    message: message,
+    data: data
   };
 
-  // Poll every 500ms
-  logsPoller = setInterval(pollFn, 500);
-  pollFn(); // Call immediately
-}
-
-/**
- * Display logs in the UI
- * @param {Array} logs - Array of log entries
- */
-function displayLogs(logs) {
-  logsContainer.innerHTML = '';
-
-  const visibleLogs = logs.slice(-50); // Show last 50 logs
-
-  visibleLogs.forEach(log => {
-    const logEntry = document.createElement('div');
-    logEntry.className = `log-entry ${log.level}`;
-    logEntry.textContent = `[${log.level.toUpperCase()}] ${log.location}: ${log.message}`;
-    logsContainer.appendChild(logEntry);
-  });
-
-  // Auto-scroll to bottom
-  logsContainer.scrollTop = logsContainer.scrollHeight;
-}
-
-/**
- * Clear logs
- */
-function handleClearLogs() {
-  chrome.runtime.sendMessage({ action: 'clearLogs' }, () => {
-    logsContainer.innerHTML = '';
-    showNotification('Logs cleared', 'success');
+  // Send to background for storage
+  chrome.runtime.sendMessage({
+    action: 'addLog',
+    logEntry: logEntry
+  }).catch(err => {
+    console.error('Failed to send log to background:', err);
   });
 }
-
-/**
- * Show notification
- * @param {string} message - Notification message
- * @param {string} type - 'success' or 'error'
- */
-function showNotification(message, type) {
-  // Create notification element
-  const notification = document.createElement('div');
-  notification.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    padding: 12px 16px;
-    border-radius: 4px;
-    color: white;
-    font-size: 13px;
-    z-index: 1000;
-    animation: slideIn 0.3s ease-out;
-  `;
-
-  if (type === 'success') {
-    notification.style.background = '#51cf66';
-  } else {
-    notification.style.background = '#ff6b6b';
-  }
-
-  notification.textContent = message;
-  document.body.appendChild(notification);
-
-  // Remove after 3 seconds
-  setTimeout(() => {
-    notification.style.animation = 'slideOut 0.3s ease-out';
-    setTimeout(() => notification.remove(), 300);
-  }, 3000);
-}
-
-// Add CSS for notifications
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes slideIn {
-    from { transform: translateX(400px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-  }
-  @keyframes slideOut {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(400px); opacity: 0; }
-  }
-`;
-document.head.appendChild(style);
-
-// Event listeners
-startButton.addEventListener('click', handleStartClick);
-stopButton.addEventListener('click', handleStopClick);
-saveButton.addEventListener('click', saveSettings);
-clearLogsButton.addEventListener('click', handleClearLogs);
-
-// Clean up on popup close
-window.addEventListener('unload', () => {
-  if (logsPoller) {
-    clearInterval(logsPoller);
-  }
-});

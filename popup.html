@@ -4,71 +4,182 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Grindr Auto Tap</title>
-  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="styles/popup.css">
 </head>
 <body>
+  <div id="status" class="status"></div>
   <div class="container">
     <div class="header">
-      <h1>Grindr Auto Tap</h1>
-      <p class="version">v1.0.0</p>
+      <h1 class="header-title">Grindr Auto Tap</h1>
     </div>
-    <div class="status-section">
-      <div class="status-indicator" id="statusIndicator"></div>
-      <div class="status-text" id="statusText">Ready</div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" id="tabScript">Script</button>
+      <button class="tab" id="tabSettings">Settings</button>
+      <button class="tab" id="tabWebhook">Webhook</button>
+      <button class="tab" id="tabLogs">Logs</button>
     </div>
-    <div class="controls-section">
-      <button id="startButton" class="btn btn-primary">Start</button>
-      <button id="stopButton" class="btn btn-secondary" disabled>Stop</button>
-    </div>
-    <div class="settings-section">
-      <div class="setting">
-        <label for="loginMethod">Login Method:</label>
-        <select id="loginMethod">
-          <option value="email">Email</option>
-          <option value="facebook">Facebook</option>
-          <option value="google">Google</option>
-          <option value="apple">Apple</option>
-        </select>
-      </div>
-      <div class="setting">
-        <label for="email">Email (if using email login):</label>
-        <input type="email" id="email" placeholder="your@email.com">
-      </div>
-      <div class="setting">
-        <label for="password">Password (if using email login):</label>
-        <input type="password" id="password" placeholder="Password">
-      </div>
-      <div class="setting">
-        <label for="autoLogin">
-          <input type="checkbox" id="autoLogin" checked>
-          Auto-login on startup
-        </label>
-      </div>
-      <div class="setting">
-        <label for="webhookURL">Webhook URL (N8N):</label>
-        <input type="text" id="webhookURL" placeholder="https://n8n.example.com/webhook/grindr-stats">
-      </div>
-      <button id="saveButton" class="btn btn-secondary">Save Settings</button>
-    </div>
-    <div class="stats-section">
-      <h3>Statistics</h3>
-      <div class="stat-row">
-        <span class="stat-label">Total Taps:</span>
-        <span class="stat-value" id="totalTaps">0</span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Duration:</span>
-        <span class="stat-value" id="duration">0s</span>
+
+    <!-- Tab Content: Script -->
+    <div class="tab-content active" id="contentScript">
+      <div class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Control</h3>
+          </div>
+          <div class="section-actions">
+            <button id="startButton" class="btn btn-primary btn-action">Start</button>
+            <button id="stopButton" class="btn btn-secondary btn-action hidden">Stop</button>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="logs-section">
-      <div class="logs-header">
-        <h3>Logs</h3>
-        <button id="clearLogsButton" class="btn btn-small">Clear</button>
+
+    <!-- Tab Content: Settings -->
+    <div class="tab-content" id="contentSettings">
+      <div class="tab-panel">
+        <!-- Authentication Section -->
+        <div class="card">
+          <div class="section-header">
+            <h3 class="section-title">Authentication</h3>
+            <button class="btn btn-icon" id="editAuth" title="Edit">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </button>
+          </div>
+          <div id="authDisplay">
+            <div class="info-row">
+              <span class="info-label">Method:</span>
+              <span class="info-value" id="authMethodDisplay">-</span>
+            </div>
+            <div class="info-row credentials-fields" id="authEmailDisplay" style="display: none;">
+              <span class="info-label">Email:</span>
+              <span class="info-value" id="authEmailValue">-</span>
+            </div>
+            <div class="info-row">
+              <div class="checkbox-row">
+                <label for="autoLoginDisplay">Auto-login</label>
+                <input type="checkbox" id="autoLoginDisplay" disabled>
+              </div>
+            </div>
+          </div>
+          <div id="authEdit" class="hidden">
+            <div class="edit-row">
+              <label>Method:</label>
+              <select id="loginMethod">
+                <option value="email">Email</option>
+                <option value="facebook">Facebook</option>
+                <option value="google">Google</option>
+                <option value="apple">Apple</option>
+              </select>
+            </div>
+            <div class="edit-row credentials-fields" id="authEmailEdit">
+              <label>Email:</label>
+              <input type="email" id="email" placeholder="your@email.com">
+            </div>
+            <div class="edit-row credentials-fields" id="authPasswordEdit">
+              <label>Password:</label>
+              <input type="password" id="password" placeholder="Password">
+            </div>
+            <div class="edit-row">
+              <div class="checkbox-row">
+                <label for="autoLogin">Auto-login</label>
+                <input type="checkbox" id="autoLogin">
+              </div>
+            </div>
+            <div class="section-actions">
+              <button class="btn btn-danger btn-action" id="deleteAuthBtn">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Settings Section -->
+        <div class="card">
+          <div class="section-header">
+            <h3 class="section-title">Advanced</h3>
+          </div>
+          <div class="info-row" id="minDelayDisplayRow">
+            <span class="info-label">Min Delay:</span>
+            <span class="info-value" id="minDelayDisplay">-</span>
+            <button class="btn btn-icon inline-edit-btn" id="editMinDelay" title="Edit">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </button>
+          </div>
+          <div id="minDelayEdit" class="hidden">
+            <div class="edit-row">
+              <label>Hours:</label>
+              <input type="number" id="minDelayHours" min="0" step="0.1" placeholder="12">
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="checkbox-row">
+              <label for="autoStart">Auto-start</label>
+              <input type="checkbox" id="autoStart">
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="logs-container" id="logsContainer"></div>
+    </div>
+
+    <!-- Tab Content: Webhook -->
+    <div class="tab-content" id="contentWebhook">
+      <div class="tab-panel">
+        <div class="card">
+          <div class="section-header">
+            <h3 class="section-title">Webhook URL</h3>
+            <button class="btn btn-icon" id="editWebhook" title="Edit">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+            </button>
+          </div>
+          <div id="webhookDisplay">
+            <div class="info-row">
+              <span class="info-label">URL:</span>
+              <span class="info-value" id="webhookURLDisplay">-</span>
+            </div>
+          </div>
+          <div id="webhookEdit" class="hidden">
+            <div class="edit-row">
+              <label>URL:</label>
+              <input type="text" id="webhookURL" placeholder="https://n8n.quentinveys.be/webhook/grindr-stats">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Content: Logs -->
+    <div class="tab-content" id="contentLogs">
+      <div class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Logs</h3>
+            <button id="clearLogsButton" class="btn btn-danger">Clear</button>
+          </div>
+          <div class="logs-container" id="logsContainer"></div>
+        </div>
+      </div>
     </div>
   </div>
+
+  <!-- Modal Overlay -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-title" id="modalTitle"></div>
+      <div class="modal-message" id="modalMessage"></div>
+      <div class="modal-buttons">
+        <button class="modal-btn modal-btn-cancel" id="modalCancel">Cancel</button>
+        <button class="modal-btn modal-btn-confirm" id="modalConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup/edit-mode.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
