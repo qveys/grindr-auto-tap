@@ -49,3 +49,13 @@ function clearLogs() {
     console.error('Failed to clear logs from storage:', err);
   });
 }
+
+/**
+ * Load logs from storage on startup
+ */
+chrome.storage.local.get(['logs'], (result) => {
+  if (result.logs) {
+    logs = result.logs;
+    console.log(`Loaded ${logs.length} logs from storage`);
+  }
+});
