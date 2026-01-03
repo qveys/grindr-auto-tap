@@ -67,6 +67,18 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // Écouter les messages du content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'sendToN8N') {
+    // Envoyer les stats vers n8n (contourne la CSP)
+    sendToN8NWebhook(request.stats, request.retries || 2)
+      .then(success => {
+        sendResponse({ success: success });
+      })
+      .catch(error => {
+        sendResponse({ success: false, error: error.message });
+      });
+    return true; // Indique qu'on répondra de manière asynchrone
+  }
+
   if (request.action === 'getCredentials') {
     // Récupérer les identifiants depuis le storage
     chrome.storage.local.get(['loginMethod', 'grindrEmail', 'grindrPassword', 'autoLogin'], (result) => {
@@ -177,3 +189,49 @@ chrome.storage.local.get(['logs'], (result) => {
     console.log(`Loaded ${logs.length} logs from storage`);
   }
 });
+
+// Fonction pour envoyer vers n8n (contourne la CSP)
+async function sendToN8NWebhook(stats, retries = 2) {
+  // Récupérer l'URL du webhook depuis le storage
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['n8nWebhookURL'], async (result) => {
+      const webhookURL = result.n8nWebhookURL || 'https://n8n.quentinveys.be/webhook/grindr-stats';
+
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          // Timeout de 10 secondes
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+          const response = await fetch(webhookURL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(stats),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          logger('info', 'Background', '📤 Récapitulatif envoyé à n8n avec succès');
+          resolve(true);
+          return;
+        } catch (error) {
+          if (attempt < retries) {
+            logger('warn', 'Background', `⚠️ Tentative ${attempt + 1}/${retries + 1} échouée, nouvel essai dans 2s...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          } else {
+            logger('error', 'Background', '❌ Erreur lors de l\'envoi du webhook après ' + (retries + 1) + ' tentatives: ' + error.message);
+            resolve(false);
+            return;
+          }
+        }
+      }
+    });
+  });
+}
