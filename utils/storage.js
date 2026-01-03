@@ -35,3 +35,20 @@ export function setStorage(items) {
     });
   });
 }
+
+/**
+ * Remove keys from chrome.storage.local
+ * @param {string|string[]} keys - Key(s) to remove
+ * @returns {Promise<void>}
+ */
+export function removeStorage(keys) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.remove(keys, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
