@@ -446,3 +446,78 @@ async function waitForApplePopupClose(maxWait = TIMEOUTS.APPLE_POPUP_CLOSE) {
   logger('warn', 'Auth', '⚠️ Timeout lors de l\'attente de fermeture du popup Apple');
   return false;
 }
+
+async function performAppleLogin() {
+  try {
+    logger('info', 'Auth', '🍎 Connexion par Apple...');
+
+    const appleButton = document.querySelector(SELECTORS.APPLE_BUTTON) ||
+      Array.from(document.querySelectorAll('button')).find(btn =>
+        btn.getAttribute('title')?.toLowerCase().includes('apple') ||
+        btn.textContent.toLowerCase().includes('apple') ||
+        btn.textContent.toLowerCase().includes('log in with apple')
+      );
+
+    if (!appleButton) {
+      throw new Error('Bouton "Log In With Apple" introuvable');
+    }
+
+    logger('info', 'Auth', '🖱️ Clic sur le bouton Apple...');
+
+    let popupWindow = null;
+    const originalOpen = window.open;
+
+    if (originalOpen) {
+      window.open = function (...args) {
+        popupWindow = originalOpen.apply(this, args);
+        logger('info', 'Auth', '🔍 Nouvelle fenêtre détectée via window.open');
+        return popupWindow;
+      };
+    }
+
+    appleButton.click();
+    await delay(DELAYS.TWO_SECONDS);
+
+    logger('info', 'Auth', '⏳ Attente de la nouvelle fenêtre Apple...');
+    const appleTabId = await waitForApplePopupWindow(TIMEOUTS.APPLE_POPUP, popupWindow);
+    if (!appleTabId) {
+      throw new Error('Fenêtre popup Apple non détectée');
+    }
+
+    logger('info', 'Auth', '📱 Fenêtre popup Apple détectée (onglet ID: ' + appleTabId + ')');
+    await delay(DELAYS.TWO_SECONDS);
+
+    if (originalOpen) {
+      window.open = originalOpen;
+    }
+
+    logger('info', 'Auth', '⏳ Injection du script dans l\'onglet Apple...');
+
+    logger('info', 'Auth', '⏳ Attente du bouton sign-in...');
+    await delay(DELAYS.TWO_SECONDS);
+    await clickAppleButtonInTab(appleTabId, APPLE.SIGN_IN_BUTTON_ID, 'id');
+    await delay(DELAYS.TWO_AND_HALF_SECONDS);
+
+    logger('info', 'Auth', '⏳ Attente du bouton Sign In...');
+    await delay(1500);
+    await clickAppleButtonInTab(appleTabId, 'Sign In', 'text');
+    await delay(DELAYS.TWO_AND_HALF_SECONDS);
+
+    logger('info', 'Auth', '⏳ Attente du dernier bouton Continue...');
+    await delay(1500);
+    await clickAppleButtonInTab(appleTabId, 'Continue', 'text');
+    await delay(DELAYS.THREE_SECONDS);
+
+    await waitForApplePopupClose();
+    await delay(DELAYS.TWO_SECONDS);
+
+    await waitForLogin(TIMEOUTS.APPLE_LOGIN);
+
+    logger('info', 'Auth', '✅ Connexion Apple réussie');
+    return { success: true };
+
+  } catch (error) {
+    logger('error', 'Auth', '❌ Erreur lors de la connexion Apple: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
