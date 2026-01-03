@@ -67,8 +67,24 @@ const logsContainer = document.getElementById('logsContainer');
 // Charger les données sauvegardées au démarrage (sans charger le webhook display si le tab n'est pas actif)
 loadSavedData(false); // Passer false pour ne pas charger le webhook display au démarrage
 
-// Vérifier l'état du script au chargement
-checkScriptStatus();
+// Vérifier l'état du script au chargement (avec un petit délai pour laisser le content script s'initialiser)
+setTimeout(() => {
+  checkScriptStatus(0, false);
+}, 100);
+
+// Vérifier périodiquement l'état du script (toutes les 2 secondes) pour rester synchronisé
+// Cela permet de détecter les changements même si le popup était fermé lors du démarrage automatique
+// Passer true pour isPeriodicCheck pour éviter les logs répétitifs
+const statusCheckInterval = setInterval(() => {
+  checkScriptStatus(0, true);
+}, 2000);
+
+// Nettoyer l'intervalle quand le popup se ferme
+window.addEventListener('beforeunload', () => {
+  if (statusCheckInterval) {
+    clearInterval(statusCheckInterval);
+  }
+});
 
 // Logger le chargement du popup
 logger('info', 'Popup', '📱 Popup de l\'extension ouvert');
@@ -474,56 +490,155 @@ function updateScriptButtons(isRunning) {
   }
 }
 
+// Variable pour stocker le dernier état connu
+let lastKnownScriptStatus = null;
+
 // Vérifier l'état du script au chargement
-function checkScriptStatus() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0] && tabs[0].url && tabs[0].url.includes('web.grindr.com')) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'getScriptStatus' }, (response) => {
-        if (!chrome.runtime.lastError && response) {
-          updateScriptButtons(response.isRunning || false);
+function checkScriptStatus(retryCount = 0, isPeriodicCheck = false) {
+  const maxRetries = 3;
+  const retryDelay = 500;
+
+  // Essayer d'abord l'onglet actif
+  chrome.tabs.query({ active: true, currentWindow: true }, (activeTabs) => {
+    let targetTab = null;
+
+    if (activeTabs[0] && activeTabs[0].url && activeTabs[0].url.includes('web.grindr.com')) {
+      targetTab = activeTabs[0];
+    } else {
+      // Si l'onglet actif n'est pas web.grindr.com, chercher tous les onglets web.grindr.com
+      chrome.tabs.query({ url: '*://web.grindr.com/*' }, (grindrTabs) => {
+        if (grindrTabs.length > 0) {
+          // Prendre le premier onglet web.grindr.com trouvé
+          targetTab = grindrTabs[0];
+          queryScriptStatus(targetTab.id, retryCount, isPeriodicCheck);
         }
       });
+      return;
+    }
+
+    if (targetTab) {
+      queryScriptStatus(targetTab.id, retryCount, isPeriodicCheck);
+    }
+  });
+}
+
+function queryScriptStatus(tabId, retryCount, isPeriodicCheck) {
+  chrome.tabs.sendMessage(tabId, { action: 'getScriptStatus' }, (response) => {
+    if (chrome.runtime.lastError) {
+      // Si erreur et qu'on peut réessayer, réessayer après un délai
+      if (retryCount < 3) {
+        if (!isPeriodicCheck) {
+          logger('debug', 'Popup', `⚠️ Erreur lors de la vérification de l'état (tentative ${retryCount + 1}/3): ${chrome.runtime.lastError.message}`);
+        }
+        setTimeout(() => {
+          checkScriptStatus(retryCount + 1, isPeriodicCheck);
+        }, 500);
+      } else if (!isPeriodicCheck) {
+        logger('warn', 'Popup', `❌ Impossible de vérifier l'état du script après 3 tentatives`);
+      }
+    } else if (response) {
+      const isRunning = response.isRunning || false;
+      // Logger uniquement si l'état a changé ou si c'est la première vérification
+      if (lastKnownScriptStatus !== isRunning) {
+        logger('info', 'Popup', `📊 État du script: ${isRunning ? 'en cours' : 'arrêté'}`);
+        lastKnownScriptStatus = isRunning;
+      }
+      updateScriptButtons(isRunning);
     }
   });
 }
 
 // Fonction pour démarrer le script
 function startScript() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0] && tabs[0].url && tabs[0].url.includes('web.grindr.com')) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'startScript' }, (response) => {
-        if (chrome.runtime.lastError) {
-          showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
-          logger('error', 'Popup', '❌ Erreur lors du démarrage du script: ' + chrome.runtime.lastError.message);
+  logger('info', 'Popup', '📤 Demande de démarrage manuel du script...');
+
+  // Chercher d'abord l'onglet actif
+  chrome.tabs.query({ active: true, currentWindow: true }, (activeTabs) => {
+    let targetTab = null;
+
+    if (activeTabs[0] && activeTabs[0].url && activeTabs[0].url.includes('web.grindr.com')) {
+      targetTab = activeTabs[0];
+      sendStartScriptMessage(targetTab.id);
+    } else {
+      // Si l'onglet actif n'est pas web.grindr.com, chercher tous les onglets web.grindr.com
+      chrome.tabs.query({ url: '*://web.grindr.com/*' }, (grindrTabs) => {
+        if (grindrTabs.length > 0) {
+          // Prendre le premier onglet web.grindr.com trouvé
+          targetTab = grindrTabs[0];
+          logger('info', 'Popup', `🔍 Onglet web.grindr.com trouvé: ${targetTab.id} (${targetTab.url})`);
+          sendStartScriptMessage(targetTab.id);
         } else {
-          showStatus('▶️ Script démarré', 'success');
-          logger('info', 'Popup', '▶️ Script démarré manuellement');
-          updateScriptButtons(true);
+          showStatus('⚠️ Ouvrez web.grindr.com', 'error');
+          logger('warn', 'Popup', '⚠️ Impossible de démarrer le script: aucun onglet web.grindr.com trouvé');
         }
       });
+    }
+  });
+}
+
+function sendStartScriptMessage(tabId) {
+  chrome.tabs.sendMessage(tabId, { action: 'startScript' }, (response) => {
+    if (chrome.runtime.lastError) {
+      showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
+      logger('error', 'Popup', '❌ Erreur lors du démarrage du script: ' + chrome.runtime.lastError.message);
+      updateScriptButtons(false);
+    } else if (response && response.success) {
+      showStatus('▶️ Script démarré', 'success');
+      logger('info', 'Popup', '✅ Script démarré manuellement avec succès');
+      updateScriptButtons(true);
     } else {
-      showStatus('⚠️ Ouvrez web.grindr.com', 'error');
+      showStatus('❌ Échec du démarrage: ' + (response?.error || 'Erreur inconnue'), 'error');
+      logger('error', 'Popup', '❌ Échec du démarrage du script: ' + (response?.error || 'Erreur inconnue'));
+      updateScriptButtons(false);
     }
   });
 }
 
 // Fonction pour arrêter le script
 function stopScript() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0] && tabs[0].url && tabs[0].url.includes('web.grindr.com')) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'stopScript' }, (response) => {
+  logger('info', 'Popup', '📤 Demande d\'arrêt manuel du script...');
+  // Chercher TOUS les onglets web.grindr.com, pas seulement l'onglet actif
+  // (car le popup peut être l'onglet actif)
+  chrome.tabs.query({ url: '*://web.grindr.com/*' }, (tabs) => {
+    if (tabs.length === 0) {
+      showStatus('⚠️ Aucun onglet web.grindr.com trouvé', 'error');
+      logger('warn', 'Popup', '⚠️ Impossible d\'arrêter le script: aucun onglet web.grindr.com trouvé');
+      return;
+    }
+
+    // Envoyer le message d'arrêt à tous les onglets web.grindr.com trouvés
+    let successCount = 0;
+    let errorCount = 0;
+    let pending = tabs.length;
+
+    tabs.forEach(tab => {
+      chrome.tabs.sendMessage(tab.id, { action: 'stopScript' }, (response) => {
+        pending--;
+
         if (chrome.runtime.lastError) {
-          showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
-          logger('error', 'Popup', '❌ Erreur lors de l\'arrêt du script: ' + chrome.runtime.lastError.message);
+          errorCount++;
+          logger('error', 'Popup', `❌ Erreur lors de l'arrêt du script dans l'onglet ${tab.id}: ${chrome.runtime.lastError.message}`);
+        } else if (response && response.success) {
+          successCount++;
         } else {
-          showStatus('⏹️ Script arrêté', 'success');
-          logger('info', 'Popup', '⏹️ Script arrêté manuellement');
-          updateScriptButtons(false);
+          errorCount++;
+          logger('error', 'Popup', `❌ Échec de l'arrêt dans l'onglet ${tab.id}: ${response?.error || 'Erreur inconnue'}`);
+        }
+
+        // Une fois que tous les onglets ont répondu
+        if (pending === 0) {
+          if (successCount > 0) {
+            showStatus('⏹️ Script arrêté', 'success');
+            logger('info', 'Popup', `✅ Script arrêté manuellement avec succès dans ${successCount} onglet(s)`);
+            updateScriptButtons(false);
+          } else {
+            showStatus('❌ Échec de l\'arrêt dans tous les onglets', 'error');
+            logger('error', 'Popup', '❌ Échec de l\'arrêt du script dans tous les onglets');
+            updateScriptButtons(true);
+          }
         }
       });
-    } else {
-      showStatus('⚠️ Ouvrez web.grindr.com', 'error');
-    }
+    });
   });
 }
 
@@ -573,7 +688,7 @@ function loadLogs() {
     // Afficher les logs en utilisant DOM methods pour éviter les warnings innerHTML
     logsContainer.textContent = ''; // Clear container
     const fragment = document.createDocumentFragment();
-    
+
     logs.forEach(log => {
       const timestamp = formatTimestamp(log.timestamp);
       // Sanitize level for CSS class name (only allow alphanumeric and hyphens)
@@ -656,17 +771,28 @@ function escapeHtml(text) {
 // Effacer les logs
 function clearLogs() {
   showConfirm('Êtes-vous sûr de vouloir effacer tous les logs ?', () => {
-    logger('info', 'Popup', '🗑️ Effacement de tous les logs demandé');
+    // Vider immédiatement le conteneur pour un feedback visuel instantané
+    logsContainer.innerHTML = '<div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">Suppression en cours...</div>';
+
     chrome.runtime.sendMessage({ action: 'clearLogs' }, (response) => {
       if (chrome.runtime.lastError) {
         showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
         logger('error', 'Popup', '❌ Erreur lors de l\'effacement des logs: ' + chrome.runtime.lastError.message);
+        // Recharger les logs en cas d'erreur
+        loadLogs();
       } else if (response && response.success) {
         showStatus('✅ Logs effacés', 'success');
-        loadLogs();
+        // Afficher immédiatement le message "Aucun log disponible"
+        logsContainer.innerHTML = '<div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">Aucun log disponible</div>';
+        // Recharger pour s'assurer que c'est bien synchronisé avec le storage
+        setTimeout(() => {
+          loadLogs();
+        }, 50);
       } else {
         showStatus('❌ Erreur lors de l\'effacement', 'error');
         logger('error', 'Popup', '❌ Erreur lors de l\'effacement des logs');
+        // Recharger les logs en cas d'erreur
+        loadLogs();
       }
     });
   });
