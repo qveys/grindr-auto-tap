@@ -43,7 +43,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Setup script control buttons
   setupScriptControls();
+
+  // Setup message listeners
+  setupMessageListeners();
 });
+
+/**
+ * Setup message listeners
+ */
+function setupMessageListeners() {
+  // Listen for status updates from content script
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'updateStatus') {
+      showStatus(request.message, request.type || 'info');
+    } else if (request.action === 'scriptStatusChanged') {
+      updateScriptButtons(request.isRunning || false);
+    }
+  });
+}
 
 /**
  * Setup script control buttons
@@ -579,9 +596,84 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Placeholder functions (will be implemented in later commits)
-function showStatus(message, type) {}
-async function showConfirm(title, message) { return false; }
+/**
+ * Show status message
+ * @param {string} message - Status message
+ * @param {string} type - Status type (success, error, info)
+ */
+function showStatus(message, type = 'info') {
+  const statusEl = document.getElementById('status');
+  if (!statusEl) return;
+
+  statusEl.textContent = message;
+  statusEl.className = `status ${type}`;
+  statusEl.style.display = 'block';
+
+  // Auto-hide after timeout
+  const timeouts = {
+    success: 3000,
+    error: 5000,
+    info: 4000
+  };
+  const timeout = timeouts[type] || 4000;
+
+  setTimeout(() => {
+    statusEl.style.display = 'none';
+  }, timeout);
+}
+
+/**
+ * Show confirmation modal
+ * @param {string} title - Modal title
+ * @param {string} message - Modal message
+ * @returns {Promise<boolean>} True if confirmed, false otherwise
+ */
+async function showConfirm(title, message) {
+  return new Promise((resolve) => {
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const modalCancel = document.getElementById('modalCancel');
+    const modalConfirm = document.getElementById('modalConfirm');
+
+    if (!modalOverlay || !modalTitle || !modalMessage || !modalCancel || !modalConfirm) {
+      resolve(false);
+      return;
+    }
+
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    modalOverlay.classList.add('show');
+
+    const cleanup = () => {
+      modalOverlay.classList.remove('show');
+      modalCancel.removeEventListener('click', onCancel);
+      modalConfirm.removeEventListener('click', onConfirm);
+      modalOverlay.removeEventListener('click', onOverlayClick);
+    };
+
+    const onCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    const onConfirm = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const onOverlayClick = (e) => {
+      if (e.target === modalOverlay) {
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    modalCancel.addEventListener('click', onCancel);
+    modalConfirm.addEventListener('click', onConfirm);
+    modalOverlay.addEventListener('click', onOverlayClick);
+  });
+}
 
 /**
  * Check script status and update buttons
