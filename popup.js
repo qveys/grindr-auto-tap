@@ -32,12 +32,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup edit mode button listeners
   setupEditModeButtons();
 
+  // Setup authentication listeners
+  setupAuthListeners();
+
   // Load initial data
   await loadSavedData();
 
   // Check script status
   await checkScriptStatus();
 });
+
+/**
+ * Setup authentication listeners
+ */
+function setupAuthListeners() {
+  const loginMethod = document.getElementById('loginMethod');
+  const deleteAuthBtn = document.getElementById('deleteAuthBtn');
+
+  if (loginMethod) {
+    loginMethod.addEventListener('change', handleLoginMethodChange);
+  }
+  if (deleteAuthBtn) {
+    deleteAuthBtn.addEventListener('click', deleteCredentials);
+  }
+
+  // Set save callback for auth edit mode manager
+  if (editModeManagers && editModeManagers.auth) {
+    editModeManagers.auth.saveCallback = saveCredentials;
+    editModeManagers.auth.loadEditCallback = loadAuthToEdit;
+  }
+}
 
 /**
  * Setup edit mode button listeners
@@ -150,6 +174,14 @@ async function loadSavedData() {
   await loadAutoStart();
 }
 
+// Placeholder functions (will be implemented in later commits)
+async function loadMinDelayDisplay() {}
+async function loadAutoStart() {}
+async function loadWebhookDisplay() {}
+async function loadLogs() {}
+function showStatus(message, type) {}
+async function showConfirm(title, message) { return false; }
+
 /**
  * Check script status and update buttons
  */
@@ -187,6 +219,199 @@ function updateScriptButtons(isRunning) {
   } else {
     if (startButton) startButton.classList.remove('hidden');
     if (stopButton) stopButton.classList.add('hidden');
+  }
+}
+
+/**
+ * Handle login method change
+ */
+function handleLoginMethodChange() {
+  const loginMethod = document.getElementById('loginMethod');
+  const authEmailEdit = document.getElementById('authEmailEdit');
+  const authPasswordEdit = document.getElementById('authPasswordEdit');
+  const authEmailDisplay = document.getElementById('authEmailDisplay');
+
+  if (!loginMethod) return;
+
+  const method = loginMethod.value;
+  const showEmailFields = method === 'email';
+
+  if (authEmailEdit) {
+    authEmailEdit.style.display = showEmailFields ? 'flex' : 'none';
+  }
+  if (authPasswordEdit) {
+    authPasswordEdit.style.display = showEmailFields ? 'flex' : 'none';
+  }
+  if (authEmailDisplay) {
+    authEmailDisplay.style.display = showEmailFields ? 'block' : 'none';
+  }
+}
+
+/**
+ * Save credentials
+ */
+async function saveCredentials() {
+  const loginMethod = document.getElementById('loginMethod');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const autoLoginCheckbox = document.getElementById('autoLogin');
+
+  if (!loginMethod) return;
+
+  const method = loginMethod.value;
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passwordInput ? passwordInput.value : '';
+  const autoLogin = autoLoginCheckbox ? autoLoginCheckbox.checked : false;
+
+  // Validate email and password for email method
+  if (method === 'email') {
+    if (!email) {
+      showStatus('Email is required', 'error');
+      return;
+    }
+    if (!password) {
+      showStatus('Password is required', 'error');
+      return;
+    }
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: 'saveCredentials',
+      loginMethod: method,
+      email: method === 'email' ? email : null,
+      password: method === 'email' ? password : null,
+      autoLogin: autoLogin
+    });
+
+    if (response && response.success) {
+      showStatus('Credentials saved', 'success');
+      if (editModeManagers && editModeManagers.auth) {
+        editModeManagers.auth.exitEditMode();
+      }
+      await loadAuthDisplay();
+    } else {
+      showStatus('Failed to save credentials', 'error');
+    }
+  } catch (error) {
+    logger('error', 'saveCredentials', 'Failed to save credentials', { error: error.message });
+    showStatus('Failed to save credentials', 'error');
+  }
+}
+
+/**
+ * Delete credentials
+ */
+async function deleteCredentials() {
+  const confirmed = await showConfirm(
+    'Delete Credentials',
+    'Are you sure you want to delete your saved credentials?'
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: 'deleteCredentials'
+    });
+
+    if (response && response.success) {
+      showStatus('Credentials deleted', 'success');
+      // Clear form fields
+      const emailInput = document.getElementById('email');
+      const passwordInput = document.getElementById('password');
+      const loginMethod = document.getElementById('loginMethod');
+      const autoLoginCheckbox = document.getElementById('autoLogin');
+
+      if (emailInput) emailInput.value = '';
+      if (passwordInput) passwordInput.value = '';
+      if (loginMethod) loginMethod.value = 'email';
+      if (autoLoginCheckbox) autoLoginCheckbox.checked = false;
+
+      await loadAuthDisplay();
+    } else {
+      showStatus('Failed to delete credentials', 'error');
+    }
+  } catch (error) {
+    logger('error', 'deleteCredentials', 'Failed to delete credentials', { error: error.message });
+    showStatus('Failed to delete credentials', 'error');
+  }
+}
+
+/**
+ * Load authentication display
+ */
+async function loadAuthDisplay() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getCredentials' });
+    if (response) {
+      const method = response.loginMethod || 'email';
+      const methodNames = {
+        email: 'Email',
+        facebook: 'Facebook',
+        google: 'Google',
+        apple: 'Apple'
+      };
+
+      const authMethodDisplay = document.getElementById('authMethodDisplay');
+      const authEmailValue = document.getElementById('authEmailValue');
+      const authEmailDisplay = document.getElementById('authEmailDisplay');
+      const autoLoginDisplay = document.getElementById('autoLoginDisplay');
+
+      if (authMethodDisplay) {
+        authMethodDisplay.textContent = methodNames[method] || method;
+      }
+
+      if (method === 'email' && response.email) {
+        if (authEmailValue) {
+          authEmailValue.textContent = response.email;
+        }
+        if (authEmailDisplay) {
+          authEmailDisplay.style.display = 'block';
+        }
+      } else {
+        if (authEmailDisplay) {
+          authEmailDisplay.style.display = 'none';
+        }
+      }
+
+      if (autoLoginDisplay) {
+        autoLoginDisplay.checked = response.autoLogin !== false;
+      }
+    }
+  } catch (error) {
+    logger('error', 'loadAuthDisplay', 'Failed to load auth display', { error: error.message });
+  }
+}
+
+/**
+ * Load authentication to edit form
+ */
+async function loadAuthToEdit() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getCredentials' });
+    if (response) {
+      const loginMethod = document.getElementById('loginMethod');
+      const emailInput = document.getElementById('email');
+      const passwordInput = document.getElementById('password');
+      const autoLoginCheckbox = document.getElementById('autoLogin');
+
+      if (loginMethod) {
+        loginMethod.value = response.loginMethod || 'email';
+        handleLoginMethodChange();
+      }
+      if (emailInput) {
+        emailInput.value = response.email || '';
+      }
+      if (passwordInput) {
+        passwordInput.value = response.password || '';
+      }
+      if (autoLoginCheckbox) {
+        autoLoginCheckbox.checked = response.autoLogin !== false;
+      }
+    }
+  } catch (error) {
+    logger('error', 'loadAuthToEdit', 'Failed to load auth to edit', { error: error.message });
   }
 }
 
