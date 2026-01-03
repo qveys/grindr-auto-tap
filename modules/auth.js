@@ -302,3 +302,36 @@ async function clickAppleButtonInTab(popupWindow) {
     throw error;
   }
 }
+
+/**
+ * Wait for Apple popup window to close
+ * @param {Window} popupWindow - Reference to popup window
+ * @returns {Promise<void>}
+ */
+async function waitForApplePopupClose(popupWindow) {
+  try {
+    const startTime = Date.now();
+    const timeout = TIMEOUTS.APPLE_POPUP_CLOSE;
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        if (popupWindow.closed) {
+          logger('info', 'waitForApplePopupClose', 'Apple popup closed');
+          return;
+        }
+      } catch (error) {
+        // Popup reference lost, assume closed
+        logger('info', 'waitForApplePopupClose', 'Popup reference lost, assuming closed');
+        return;
+      }
+
+      await delay(DELAYS.MEDIUM);
+    }
+
+    logger('error', 'waitForApplePopupClose', 'Apple popup close timeout');
+    throw new Error('Apple popup did not close');
+  } catch (error) {
+    logger('error', 'waitForApplePopupClose', 'Failed to wait for popup close', { error: error.message });
+    throw error;
+  }
+}
