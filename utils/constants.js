@@ -59,4 +59,13 @@ window.Constants = {
       'signinwithapple',
     ],
   },
+
+  // DOM Selectors
+  SELECTORS: {
+    // Login
+    EMAIL_INPUT: 'input[type="email"], input[type="text"][name*="email" i], input[type="text"][placeholder*="email" i], input[type="text"][id*="email" i]',
+    PASSWORD_INPUT: 'input[type="password"], input[name*="password" i], input[id*="password" i]',
+    LOGIN_BUTTON: 'button[type="submit"], form button, button.btn-primary, button.primary',
+    CAPTCHA: '[data-captcha], iframe[src*="recaptcha"], .g-recaptcha',
+  },
 };
