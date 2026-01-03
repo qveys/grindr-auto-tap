@@ -185,3 +185,63 @@ function displayLogs(logs) {
   // Auto-scroll to bottom
   logsContainer.scrollTop = logsContainer.scrollHeight;
 }
+
+/**
+ * Clear logs
+ */
+function handleClearLogs() {
+  chrome.runtime.sendMessage({ action: 'clearLogs' }, () => {
+    logsContainer.innerHTML = '';
+    showNotification('Logs cleared', 'success');
+  });
+}
+
+/**
+ * Show notification
+ * @param {string} message - Notification message
+ * @param {string} type - 'success' or 'error'
+ */
+function showNotification(message, type) {
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    padding: 12px 16px;
+    border-radius: 4px;
+    color: white;
+    font-size: 13px;
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out;
+  `;
+
+  if (type === 'success') {
+    notification.style.background = '#51cf66';
+  } else {
+    notification.style.background = '#ff6b6b';
+  }
+
+  notification.textContent = message;
+  document.body.appendChild(notification);
+
+  // Remove after 3 seconds
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease-out';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
+}
+
+// Add CSS for notifications
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideIn {
+    from { transform: translateX(400px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(400px); opacity: 0; }
+  }
+`;
+document.head.appendChild(style);
