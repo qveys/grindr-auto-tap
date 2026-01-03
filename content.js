@@ -734,3 +734,61 @@ async function performPreScriptActions() {
     return verifyProfileOpened();
   }
 }
+// ============================================================================
+// STATISTICS MODULE
+// ============================================================================
+
+async function sendToN8NWebhook(stats, retries = LIMITS.DEFAULT_RETRIES) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({
+      action: 'sendToN8N',
+      stats: stats,
+      retries: retries
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        logger('error', 'Content', '❌ Erreur communication avec background: ' + chrome.runtime.lastError.message);
+        resolve(false);
+      } else {
+        if (response && response.success) {
+          logger('info', 'Content', '📤 Récapitulatif envoyé à n8n avec succès');
+          resolve(true);
+        } else {
+          logger('error', 'Content', '❌ Erreur lors de l\'envoi du webhook: ' + (response?.error || 'Erreur inconnue'));
+          resolve(false);
+        }
+      }
+    });
+  });
+}
+
+function displayStats(stats) {
+  const successRate = stats.totalCount > 0 ? ((stats.tappedCount / stats.totalCount) * 100).toFixed(1) : 0;
+
+  logger('info', 'Content', `📊 RÉCAPITULATIF - Début: ${formatDate(stats.startTime)}, Fin: ${formatDate(stats.endTime)}, Durée: ${formatDuration(stats.duration)}`);
+  logger('info', 'Content', `👥 Personnes déjà tapées: ${stats.alreadyTappedCount}, Tapées: ${stats.tappedCount}, Total: ${stats.totalCount}, Taux: ${successRate}%`);
+  if (stats.error) {
+    logger('warn', 'Content', `⚠️ Erreur: ${stats.errorMessage}`);
+  }
+}
+
+async function sendFinalStats(stats, isError = false) {
+  const statsToSend = { ...stats };
+
+  if (isError && !statsToSend.error) {
+    statsToSend.error = true;
+    if (!statsToSend.errorMessage) {
+      statsToSend.errorMessage = 'Script interrompu prématurément';
+    }
+  }
+
+  displayStats(statsToSend);
+  await sendToN8NWebhook(statsToSend);
+}
+
+function createErrorStats(baseStats, error) {
+  return {
+    ...baseStats,
+    error: true,
+    errorMessage: error?.message || String(error) || 'Erreur inconnue'
+  };
+}
