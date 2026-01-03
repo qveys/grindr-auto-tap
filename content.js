@@ -72,3 +72,20 @@ async function performAutoLogin() {
     return false;
   }
 }
+
+/**
+ * Initialize content script and set up message listeners
+ */
+function initializeContentScript() {
+  log('info', 'Content script initialized on page');
+
+  // Listen for messages from popup
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    handlePopupMessage(request, sendResponse);
+  });
+
+  // Perform auto-login if configured
+  performAutoLogin().catch(err => {
+    log('error', 'Failed to perform auto-login', { error: err.message });
+  });
+}
