@@ -191,3 +191,79 @@ body {
   font-weight: 600;
   color: #667eea;
 }
+
+.logs-section {
+  padding: 20px;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.logs-header h3 {
+  font-size: 14px;
+  color: #333;
+}
+
+.logs-container {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 12px;
+  background: #f9f9f9;
+  font-size: 12px;
+  font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.log-entry {
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 3px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.log-entry.info {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.log-entry.warn {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.log-entry.error {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.log-entry.debug {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
+
+.logs-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.logs-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.logs-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.logs-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
