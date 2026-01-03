@@ -198,54 +198,75 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'debugLog') {
+    // Stocker les logs de debug dans chrome.storage.local
+    const logEntry = {
+      timestamp: request.timestamp || Date.now(),
+      location: request.location,
+      message: request.message,
+      data: request.data,
+      sessionId: request.sessionId,
+      runId: request.runId,
+      hypothesisId: request.hypothesisId
+    };
+
+    // Récupérer les logs existants
+    chrome.storage.local.get(['debugLogs'], (result) => {
+      const logs = result.debugLogs || [];
+      logs.push(logEntry);
+      // Garder seulement les 1000 derniers logs
+      if (logs.length > 1000) {
+        logs.shift();
+      }
+      chrome.storage.local.set({ debugLogs: logs }, () => {
+        sendResponse({ success: true });
+      });
+    });
+    return true;
+  }
+
   if (request.action === 'addLog') {
-    addLog(request.logEntry);
-    sendResponse({ success: true });
-  } else if (request.action === 'getLogs') {
-    sendResponse({ logs: logs });
-  } else if (request.action === 'clearLogs') {
-    clearLogs();
-    sendResponse({ success: true });
+    // Stocker les logs dans chrome.storage.local
+    const logEntry = request.logEntry || {
+      timestamp: Date.now(),
+      level: 'info',
+      location: 'unknown',
+      message: '',
+      data: null
+    };
+
+    // Récupérer les logs existants
+    chrome.storage.local.get(['extensionLogs'], (result) => {
+      const logs = result.extensionLogs || [];
+      logs.push(logEntry);
+      // Garder seulement les 1000 derniers logs
+      if (logs.length > 1000) {
+        logs.shift();
+      }
+      chrome.storage.local.set({ extensionLogs: logs }, () => {
+        sendResponse({ success: true });
+      });
+    });
+    return true;
+  }
+
+  if (request.action === 'getLogs') {
+    // Récupérer les logs depuis le storage
+    chrome.storage.local.get(['extensionLogs'], (result) => {
+      sendResponse({ logs: result.extensionLogs || [] });
+    });
+    return true;
+  }
+
+  if (request.action === 'clearLogs') {
+    // Supprimer tous les logs
+    chrome.storage.local.set({ extensionLogs: [] }, () => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 });
 
-/**
- * Add a log entry to the logs array
- * @param {Object} logEntry - Log entry object
- */
-function addLog(logEntry) {
-  logs.push(logEntry);
-
-  // Keep logs size manageable
-  if (logs.length > MAX_LOGS) {
-    logs = logs.slice(-MAX_LOGS);
-  }
-
-  // Also save to chrome storage for persistence
-  chrome.storage.local.set({ logs: logs }).catch(err => {
-    console.error('Failed to save logs to storage:', err);
-  });
-}
-
-/**
- * Clear all logs
- */
-function clearLogs() {
-  logs = [];
-  chrome.storage.local.set({ logs: [] }).catch(err => {
-    console.error('Failed to clear logs from storage:', err);
-  });
-}
-
-/**
- * Load logs from storage on startup
- */
-chrome.storage.local.get(['logs'], (result) => {
-  if (result.logs) {
-    logs = result.logs;
-    console.log(`Loaded ${logs.length} logs from storage`);
-  }
-});
 
 // Fonction pour injecter un script et cliquer sur un bouton dans l'onglet Apple
 function injectAndClickButton(tabId, buttonValue, searchType, maxRetries, sendResponse) {
