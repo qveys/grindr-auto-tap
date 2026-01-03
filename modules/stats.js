@@ -144,3 +144,12 @@ async function sendWebhook(stats, webhookUrl) {
     return false;
   }
 }
+
+// Export StatsModule for global access
+window.StatsModule = {
+  initializeStats,
+  recordSuccessfulTap,
+  recordFailedTap,
+  finalizeStats,
+  sendWebhook,
+};
