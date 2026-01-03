@@ -1,18 +1,10 @@
 /**
  * Statistics and Webhook module for Grindr Auto Tap extension
  * Handles collecting and sending statistics to N8N webhook
- *
- * Note: This file is loaded as a global script, not as an ES module
- * Functions are attached to window.StatsModule
  */
 
-// Dependencies will be loaded via script tags in manifest.json
-
-// Extract constants from window for easier access
-const { DELAYS, TIMEOUTS, URLS } = window.Constants || {};
-
-// Utility function for delays
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+import { formatDate, formatDuration } from '../utils/formatters.js';
+import { LIMITS } from '../utils/constants.js';
 
 // Logger function for stats module
 function logger(level, location, message, data = null) {
@@ -47,7 +39,7 @@ function logger(level, location, message, data = null) {
  * Initialize statistics object with default values
  * @returns {Object} Statistics object
  */
-function initializeStats() {
+export function initializeStats() {
   const stats = {
     startTime: Date.now(),
     endTime: null,
@@ -66,7 +58,7 @@ function initializeStats() {
  * @param {Object} stats - Statistics object
  * @returns {Object} Updated statistics object
  */
-function recordSuccessfulTap(stats) {
+export function recordSuccessfulTap(stats) {
   stats.totalTaps += 1;
   stats.successfulTaps += 1;
   logger('debug', 'recordSuccessfulTap', 'Successful tap recorded', {
@@ -81,7 +73,7 @@ function recordSuccessfulTap(stats) {
  * @param {Object} stats - Statistics object
  * @returns {Object} Updated statistics object
  */
-function recordFailedTap(stats) {
+export function recordFailedTap(stats) {
   stats.totalTaps += 1;
   stats.failedTaps += 1;
   logger('debug', 'recordFailedTap', 'Failed tap recorded', {
@@ -96,7 +88,7 @@ function recordFailedTap(stats) {
  * @param {Object} stats - Statistics object
  * @returns {Object} Finalized statistics object
  */
-function finalizeStats(stats) {
+export function finalizeStats(stats) {
   stats.endTime = Date.now();
   stats.duration = stats.endTime - stats.startTime;
   stats.successRate = stats.totalTaps > 0 ? (stats.successfulTaps / stats.totalTaps * 100).toFixed(2) : 0;
@@ -111,45 +103,81 @@ function finalizeStats(stats) {
 }
 
 /**
- * Send statistics to N8N webhook
+ * Send statistics to N8N webhook via background script
  * @param {Object} stats - Finalized statistics object
- * @param {string} webhookUrl - Webhook URL to send to
+ * @param {number} retry - Number of retries (default: 2)
  * @returns {Promise<boolean>} True if successful, false otherwise
  */
-async function sendWebhook(stats, webhookUrl) {
+export async function sendToN8NWebhook(stats, retry = 2) {
   try {
-    logger('info', 'sendWebhook', 'Sending statistics to webhook', { url: webhookUrl });
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(stats),
-      timeout: TIMEOUTS.WEBHOOK_REQUEST,
+    logger('info', 'sendToN8NWebhook', 'Sending statistics via background', { retry });
+    
+    const response = await chrome.runtime.sendMessage({
+      action: 'sendToN8N',
+      data: stats,
+      retry: retry
     });
-
-    if (response.ok) {
-      logger('info', 'sendWebhook', 'Webhook sent successfully');
+    
+    if (response && response.success) {
+      logger('info', 'sendToN8NWebhook', 'Webhook sent successfully');
       return true;
     } else {
-      logger('error', 'sendWebhook', 'Webhook request failed', {
-        status: response.status,
-        statusText: response.statusText
-      });
+      logger('error', 'sendToN8NWebhook', 'Webhook failed', response);
       return false;
     }
   } catch (error) {
-    logger('error', 'sendWebhook', 'Failed to send webhook', { error: error.message });
+    logger('error', 'sendToN8NWebhook', 'Failed to send webhook', { error: error.message });
     return false;
   }
 }
 
-// Export StatsModule for global access
-window.StatsModule = {
-  initializeStats,
-  recordSuccessfulTap,
-  recordFailedTap,
-  finalizeStats,
-  sendWebhook,
-};
+/**
+ * Display statistics summary in console
+ * @param {Object} stats - Statistics object
+ */
+export function displayStats(stats) {
+  const successRate = stats.totalTaps > 0 ? (stats.successfulTaps / stats.totalTaps * 100).toFixed(1) : 0;
+  const duration = formatDuration(stats.duration);
+  
+  console.log(`📊 Grindr Auto Tap Statistics`);
+  console.log(`⏱️  Duration: ${duration}`);
+  console.log(`👥 People tapped: ${stats.successfulTaps}/${stats.totalTaps}`);
+  console.log(`✅ Success rate: ${successRate}%`);
+  console.log(`📅 Date: ${formatDate(stats.startTime)}`);
+}
+
+/**
+ * Send final statistics with display and webhook
+ * @param {Object} stats - Statistics object
+ * @param {boolean} isError - Whether this is an error scenario
+ */
+export async function sendFinalStats(stats, isError = false) {
+  try {
+    displayStats(stats);
+    
+    if (!isError) {
+      await sendToN8NWebhook(stats);
+    }
+  } catch (error) {
+    logger('error', 'sendFinalStats', 'Failed to send final stats', { error: error.message });
+  }
+}
+
+/**
+ * Create error statistics object
+ * @param {string} errorMessage - Error message
+ * @returns {Object} Error statistics object
+ */
+export function createErrorStats(errorMessage) {
+  return {
+    startTime: Date.now(),
+    endTime: Date.now(),
+    totalTaps: 0,
+    successfulTaps: 0,
+    failedTaps: 0,
+    duration: 0,
+    timestamp: new Date().toISOString(),
+    error: errorMessage,
+    successRate: 0
+  };
+}

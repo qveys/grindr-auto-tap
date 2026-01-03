@@ -37,3 +37,6 @@ function formatDuration(ms) {
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+// ES6 exports for module imports
+export { formatDate, formatDuration, delay };
