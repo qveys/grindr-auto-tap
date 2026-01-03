@@ -335,3 +335,36 @@ async function waitForApplePopupClose(popupWindow) {
     throw error;
   }
 }
+
+/**
+ * Perform Apple login flow
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function performAppleLogin() {
+  try {
+    logger('info', 'performAppleLogin', 'Starting Apple login flow');
+
+    const appleButton = document.querySelector(SELECTORS.APPLE_BUTTON);
+    if (!appleButton) {
+      logger('error', 'performAppleLogin', 'Apple button not found');
+      return false;
+    }
+
+    // Wait for popup window
+    const popupPromise = waitForApplePopupWindow();
+    await delay(DELAYS.NORMAL);
+    appleButton.click();
+    logger('info', 'performAppleLogin', 'Apple button clicked, waiting for popup');
+
+    const popupWindow = await popupPromise;
+    await clickAppleButtonInTab(popupWindow);
+    await waitForApplePopupClose(popupWindow);
+    await waitForLogin();
+
+    logger('info', 'performAppleLogin', 'Apple login completed successfully');
+    return true;
+  } catch (error) {
+    logger('error', 'performAppleLogin', 'Apple login failed', { error: error.message });
+    return false;
+  }
+}
