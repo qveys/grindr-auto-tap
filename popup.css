@@ -17,3 +17,21 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.version {
+  font-size: 12px;
+  opacity: 0.8;
+}
