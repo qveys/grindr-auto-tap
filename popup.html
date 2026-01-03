@@ -1,180 +1,1045 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Grindr Auto Tap</title>
+  <meta charset="utf-8">
   <link rel="stylesheet" href="styles/popup.css">
+  <style>
+    /* Design System Variables */
+    :root {
+      /* Colors */
+      --color-primary: #f0b43c;
+      --color-primary-hover: #f0a03c;
+      --color-secondary: #8b5cf6;
+      --color-success: #10b981;
+      --color-error: #ef4444;
+      --color-error-hover: #dc2626;
+      --color-warning: #f59e0b;
+      --color-accent: #f0b43c;
+
+      /* Neutrals */
+      --color-bg: #f9fafb;
+      --color-surface: #ffffff;
+      --color-border: #e5e7eb;
+      --color-text-primary: #111827;
+      --color-text-secondary: #6b7280;
+      --color-text-muted: #9ca3af;
+
+      /* Spacing (4px grid) */
+      --spacing-xs: 2px;
+      --spacing-sm: 4px;
+      --spacing-md: 6px;
+      --spacing-lg: 8px;
+      --spacing-xl: 12px;
+      --spacing-2xl: 16px;
+
+      /* Typography */
+      --font-size-xs: 10px;
+      --font-size-sm: 12px;
+      --font-size-base: 14px;
+      --font-size-lg: 16px;
+      --font-weight-normal: 400;
+      --font-weight-medium: 500;
+      --font-weight-semibold: 600;
+      --line-height: 1.5;
+
+      /* Border radius */
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+      /* Transitions */
+      --transition: 0.2s ease;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 600px;
+      max-height: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: var(--font-size-sm);
+      background: var(--color-bg);
+      overflow-y: auto;
+      overflow-x: hidden;
+      color: var(--color-text-primary);
+      line-height: var(--line-height);
+    }
+
+    body {
+      padding: var(--spacing-md);
+      position: relative;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-xs);
+      padding-bottom: var(--spacing-xs);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .header-icon {
+      width: 20px;
+      height: 20px;
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    /* Status Toast */
+    .status {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: var(--spacing-md) var(--spacing-lg);
+      font-size: var(--font-size-xs);
+      z-index: 1000;
+      box-shadow: var(--shadow-md);
+      animation: slideDown 0.3s ease-out;
+      display: none;
+      font-weight: var(--font-weight-medium);
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .status.success {
+      background: #d1fae5;
+      color: #065f46;
+      border-bottom: 1px solid #10b981;
+    }
+
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border-bottom: 1px solid var(--color-error);
+    }
+
+    .status.info {
+      background: #dbeafe;
+      color: #1e40af;
+      border-bottom: 1px solid #3b82f6;
+    }
+
+    /* Card Component */
+    .card {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--color-border);
+      border-left: 3px solid var(--color-accent);
+      transition: box-shadow var(--transition), border-color var(--transition);
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      border-left-color: var(--color-primary-hover);
+    }
+
+    .card:last-child {
+      margin-bottom: 0;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-sm);
+      padding-bottom: var(--spacing-xs);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin: 0;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .card-icon {
+      width: 16px;
+      height: 16px;
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    /* Info Row */
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-xs) 0;
+      font-size: var(--font-size-sm);
+      gap: var(--spacing-sm);
+      min-height: 20px;
+    }
+
+    .info-label {
+      color: var(--color-text-secondary);
+      font-weight: var(--font-weight-medium);
+      flex-shrink: 0;
+    }
+
+    .info-value {
+      color: var(--color-text-primary);
+      flex: 1;
+      text-align: right;
+      word-break: break-word;
+      font-weight: var(--font-weight-normal);
+      min-height: 1em;
+    }
+
+    #webhookDisplay {
+      min-height: 40px;
+      display: block;
+      padding: var(--spacing-sm) 0;
+    }
+
+    #webhookDisplay.hidden {
+      display: none !important;
+    }
+
+    .masked {
+      color: var(--color-text-muted);
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.05em;
+    }
+
+    /* Edit Row */
+    .edit-row {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .edit-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .edit-row label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-secondary);
+      min-width: 70px;
+      font-weight: var(--font-weight-medium);
+    }
+
+    .edit-row input,
+    .edit-row select {
+      flex: 1;
+      padding: var(--spacing-sm);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      font-family: inherit;
+      background: var(--color-surface);
+      color: var(--color-text-primary);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .edit-row input:focus,
+    .edit-row select:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(240, 180, 60, 0.15);
+    }
+
+    .edit-row input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    /* Buttons */
+    .btn {
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      transition: all var(--transition);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-xs);
+      font-family: inherit;
+    }
+
+    .btn:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(240, 180, 60, 0.25);
+    }
+
+    .btn-icon {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--color-text-secondary);
+      opacity: 0.6;
+      transition: opacity var(--transition), background-color var(--transition), color var(--transition);
+    }
+
+    .card:hover .btn-icon {
+      opacity: 1;
+    }
+
+    .btn-icon:hover {
+      background: var(--color-bg);
+      color: var(--color-accent);
+    }
+
+    .btn-icon svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .btn-primary {
+      background: var(--color-primary);
+      color: white;
+      padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .btn-primary:hover {
+      background: var(--color-primary-hover);
+    }
+
+    .btn-secondary {
+      background: #f3f4f6;
+      color: var(--color-text-primary);
+      padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+
+    .btn-danger {
+      background: #fee2e2;
+      color: var(--color-error);
+      padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .btn-danger:hover {
+      background: #fecaca;
+      color: var(--color-error-hover);
+    }
+
+    .btn-action {
+      width: 100%;
+      padding: var(--spacing-sm);
+      margin-top: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+    }
+
+    .btn-action:first-child {
+      margin-top: 0;
+    }
+
+    /* Checkbox */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-xs) 0;
+      cursor: pointer;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: var(--color-accent);
+    }
+
+    .checkbox-row label {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-primary);
+      margin: 0;
+      cursor: pointer;
+      font-weight: var(--font-weight-normal);
+      user-select: none;
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--color-border);
+      transition: var(--transition);
+      border-radius: 24px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: var(--transition);
+      border-radius: 50%;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .toggle-switch input:checked+.toggle-slider {
+      background-color: var(--color-primary);
+    }
+
+    .toggle-switch input:checked+.toggle-slider:before {
+      transform: translateX(20px);
+    }
+
+    .toggle-switch input:focus+.toggle-slider {
+      box-shadow: 0 0 0 3px rgba(240, 180, 60, 0.2);
+    }
+
+    .toggle-switch input:disabled+.toggle-slider {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Utilities */
+    .hidden {
+      display: none !important;
+    }
+
+    .credentials-fields {
+      margin-top: var(--spacing-xs);
+    }
+
+    .section-actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      display: none;
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-xl);
+      max-width: 280px;
+      width: calc(100% - 32px);
+      box-shadow: var(--shadow-lg);
+      animation: modalSlideIn 0.2s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        transform: scale(0.95);
+        opacity: 0;
+      }
+
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .modal-title {
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--spacing-md);
+      color: var(--color-text-primary);
+    }
+
+    .modal-message {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--spacing-lg);
+      line-height: var(--line-height);
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: var(--spacing-sm);
+      justify-content: flex-end;
+    }
+
+    .modal-btn {
+      padding: var(--spacing-sm) var(--spacing-md);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      transition: background-color var(--transition);
+      font-family: inherit;
+    }
+
+    .modal-btn:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(240, 180, 60, 0.25);
+    }
+
+    .modal-btn-cancel {
+      background: #f3f4f6;
+      color: var(--color-text-primary);
+    }
+
+    .modal-btn-cancel:hover {
+      background: #e5e7eb;
+    }
+
+    .modal-btn-confirm {
+      background: var(--color-error);
+      color: white;
+    }
+
+    .modal-btn-confirm:hover {
+      background: var(--color-error-hover);
+    }
+
+    /* Inline edit button for minDelay */
+    .inline-edit-btn {
+      opacity: 0.6;
+      margin-left: var(--spacing-xs);
+    }
+
+    .info-row:hover .inline-edit-btn {
+      opacity: 1;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: var(--spacing-xs);
+      margin-bottom: var(--spacing-xs);
+      border-bottom: 2px solid var(--color-border);
+    }
+
+    .tab {
+      flex: 1;
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-secondary);
+      transition: all var(--transition);
+      font-family: inherit;
+      position: relative;
+      bottom: -2px;
+    }
+
+    .tab:hover {
+      color: var(--color-text-primary);
+      background: var(--color-bg);
+    }
+
+    .tab.active {
+      color: var(--color-accent);
+      border-bottom-color: var(--color-accent);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .tab-content {
+      display: none !important;
+    }
+
+    .tab-content.active {
+      display: block !important;
+    }
+
+    .tab-panel {
+      padding: var(--spacing-xs) 0;
+      min-height: 30px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-sm);
+      padding-bottom: var(--spacing-xs);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin: 0;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .section-icon {
+      width: 16px;
+      height: 16px;
+      color: var(--color-accent);
+      flex-shrink: 0;
+    }
+
+    /* Logs */
+    .log-entry {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-bottom: 1px solid var(--color-border);
+      border-left: 3px solid transparent;
+      display: flex;
+      gap: var(--spacing-sm);
+      align-items: flex-start;
+      transition: background-color var(--transition);
+    }
+
+    .log-entry:hover {
+      background-color: var(--color-bg);
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    /* Colorisation par niveau */
+    .log-entry.log-info {
+      border-left-color: #3b82f6;
+    }
+
+    .log-entry.log-warn {
+      border-left-color: var(--color-warning);
+      background-color: rgba(245, 158, 11, 0.05);
+    }
+
+    .log-entry.log-error {
+      border-left-color: var(--color-error);
+      background-color: rgba(239, 68, 68, 0.05);
+    }
+
+    .log-entry.log-debug {
+      border-left-color: var(--color-text-muted);
+    }
+
+    .log-timestamp {
+      color: var(--color-text-muted);
+      font-size: 10px;
+      flex-shrink: 0;
+      max-width: 70px;
+    }
+
+    .log-level {
+      flex-shrink: 0;
+      min-width: 50px;
+      font-weight: var(--font-weight-semibold);
+      font-size: 10px;
+    }
+
+    .log-level.info {
+      color: #3b82f6;
+    }
+
+    .log-level.warn {
+      color: var(--color-warning);
+    }
+
+    .log-level.error {
+      color: var(--color-error);
+    }
+
+    .log-level.debug {
+      color: var(--color-text-muted);
+    }
+
+    .log-location {
+      color: var(--color-text-secondary);
+      font-weight: var(--font-weight-medium);
+      flex-shrink: 0;
+      min-width: 80px;
+      font-size: 10px;
+    }
+
+    .log-message {
+      flex: 1;
+      word-break: break-word;
+      white-space: normal;
+      min-width: 100px;
+      font-size: 11px;
+    }
+
+    /* Colorisation du message selon le niveau */
+    .log-entry.log-info .log-message {
+      color: #1e40af;
+    }
+
+    .log-entry.log-warn .log-message {
+      color: #92400e;
+    }
+
+    .log-entry.log-error .log-message {
+      color: #991b1b;
+    }
+
+    .log-entry.log-debug .log-message {
+      color: var(--color-text-primary);
+    }
+
+    .log-data {
+      color: var(--color-text-muted);
+      font-size: 10px;
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    #logsContainer {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-border) transparent;
+    }
+
+    #logsContainer::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #logsContainer::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #logsContainer::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      border-radius: 3px;
+    }
+
+    #logsContainer::-webkit-scrollbar-thumb:hover {
+      background: var(--color-text-muted);
+    }
+  </style>
 </head>
+
 <body>
   <div id="status" class="status"></div>
-  <div class="container">
-    <div class="header">
-      <h1 class="header-title">Grindr Auto Tap</h1>
-    </div>
 
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab active" id="tabScript">Script</button>
-      <button class="tab" id="tabSettings">Settings</button>
-      <button class="tab" id="tabWebhook">Webhook</button>
-      <button class="tab" id="tabLogs">Logs</button>
-    </div>
+  <!-- Header -->
+  <div class="header">
+    <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+      </path>
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+    </svg>
+    <h1 class="header-title">Grindr Auto Tap</h1>
+  </div>
 
-    <!-- Tab Content: Script -->
-    <div class="tab-content active" id="contentScript">
-      <div class="tab-panel">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Control</h3>
-          </div>
-          <div class="section-actions">
-            <button id="startButton" class="btn btn-primary btn-action">Start</button>
-            <button id="stopButton" class="btn btn-secondary btn-action hidden">Stop</button>
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="actions">⚙️ Actions</button>
+    <button class="tab" data-tab="auth">🔐 Auth</button>
+    <button class="tab" data-tab="webhook">📡 n8n</button>
+    <button class="tab" data-tab="logs">📋 Logs</button>
+  </div>
+
+  <!-- Tab Content: Actions -->
+  <div class="tab-content active" id="tabActions">
+    <div class="tab-panel">
+      <div class="section-header">
+        <h3 class="section-title">
+          <svg class="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+            </path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z">
+            </path>
+          </svg>
+          Actions
+        </h3>
+        <button class="btn btn-icon" id="editMinDelay" title="Modifier">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+            </path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="section-actions">
+        <div class="checkbox-row">
+          <label for="autoStart">Démarrage automatique</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autoStart">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Délai min (h):</span>
+          <span class="info-value" id="minDelayDisplay">12</span>
+        </div>
+
+        <div id="minDelayEdit" class="hidden">
+          <div class="edit-row">
+            <label>Heures:</label>
+            <input type="number" id="minDelayHours" min="0" step="0.5" placeholder="12">
           </div>
         </div>
+
+        <button class="btn btn-primary btn-action" id="startScript">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+            </path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+            </path>
+          </svg>
+          Démarrer
+        </button>
+        <button class="btn btn-secondary btn-action hidden" id="stopScript">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+            </path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h6v4H9z"></path>
+          </svg>
+          Arrêter
+        </button>
       </div>
     </div>
+  </div>
 
-    <!-- Tab Content: Settings -->
-    <div class="tab-content" id="contentSettings">
-      <div class="tab-panel">
-        <!-- Authentication Section -->
-        <div class="card">
-          <div class="section-header">
-            <h3 class="section-title">Authentication</h3>
-            <button class="btn btn-icon" id="editAuth" title="Edit">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-              </svg>
-            </button>
-          </div>
-          <div id="authDisplay">
-            <div class="info-row">
-              <span class="info-label">Method:</span>
-              <span class="info-value" id="authMethodDisplay">-</span>
-            </div>
-            <div class="info-row credentials-fields" id="authEmailDisplay" style="display: none;">
-              <span class="info-label">Email:</span>
-              <span class="info-value" id="authEmailValue">-</span>
-            </div>
-            <div class="info-row">
-              <div class="checkbox-row">
-                <label for="autoLoginDisplay">Auto-login</label>
-                <input type="checkbox" id="autoLoginDisplay" disabled>
-              </div>
-            </div>
-          </div>
-          <div id="authEdit" class="hidden">
-            <div class="edit-row">
-              <label>Method:</label>
-              <select id="loginMethod">
-                <option value="email">Email</option>
-                <option value="facebook">Facebook</option>
-                <option value="google">Google</option>
-                <option value="apple">Apple</option>
-              </select>
-            </div>
-            <div class="edit-row credentials-fields" id="authEmailEdit">
-              <label>Email:</label>
-              <input type="email" id="email" placeholder="your@email.com">
-            </div>
-            <div class="edit-row credentials-fields" id="authPasswordEdit">
-              <label>Password:</label>
-              <input type="password" id="password" placeholder="Password">
-            </div>
-            <div class="edit-row">
-              <div class="checkbox-row">
-                <label for="autoLogin">Auto-login</label>
-                <input type="checkbox" id="autoLogin">
-              </div>
-            </div>
-            <div class="section-actions">
-              <button class="btn btn-danger btn-action" id="deleteAuthBtn">Delete</button>
-            </div>
-          </div>
+  <!-- Tab Content: Authentification -->
+  <div class="tab-content" id="tabAuth">
+    <div class="tab-panel">
+      <div class="section-header">
+        <h3 class="section-title">
+          <svg class="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+            </path>
+          </svg>
+          Authentification
+        </h3>
+        <button class="btn btn-icon" id="editAuth" title="Modifier">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+            </path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Mode affichage -->
+      <div id="authDisplay">
+        <div class="info-row">
+          <span class="info-label">Méthode:</span>
+          <span class="info-value" id="loginMethodDisplay">-</span>
         </div>
-
-        <!-- Advanced Settings Section -->
-        <div class="card">
-          <div class="section-header">
-            <h3 class="section-title">Advanced</h3>
-          </div>
-          <div class="info-row" id="minDelayDisplayRow">
-            <span class="info-label">Min Delay:</span>
-            <span class="info-value" id="minDelayDisplay">-</span>
-            <button class="btn btn-icon inline-edit-btn" id="editMinDelay" title="Edit">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-              </svg>
-            </button>
-          </div>
-          <div id="minDelayEdit" class="hidden">
-            <div class="edit-row">
-              <label>Hours:</label>
-              <input type="number" id="minDelayHours" min="0" step="0.1" placeholder="12">
-            </div>
-          </div>
-          <div class="info-row">
-            <div class="checkbox-row">
-              <label for="autoStart">Auto-start</label>
-              <input type="checkbox" id="autoStart">
-            </div>
-          </div>
+        <div class="info-row" id="emailDisplayRow">
+          <span class="info-label">Email:</span>
+          <span class="info-value" id="emailDisplay">-</span>
+        </div>
+        <div class="info-row" id="passwordDisplayRow">
+          <span class="info-label">Mot de passe:</span>
+          <span class="info-value masked" id="passwordDisplay">••••••••</span>
+        </div>
+        <div class="checkbox-row">
+          <label for="autoLoginDisplay">Connexion automatique</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autoLoginDisplay" disabled>
+            <span class="toggle-slider"></span>
+          </label>
         </div>
       </div>
-    </div>
 
-    <!-- Tab Content: Webhook -->
-    <div class="tab-content" id="contentWebhook">
-      <div class="tab-panel">
-        <div class="card">
-          <div class="section-header">
-            <h3 class="section-title">Webhook URL</h3>
-            <button class="btn btn-icon" id="editWebhook" title="Edit">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-              </svg>
-            </button>
+      <!-- Mode édition -->
+      <div id="authEdit" class="hidden">
+        <div class="edit-row">
+          <label>Méthode:</label>
+          <select id="loginMethod">
+            <option value="email">Email</option>
+            <option value="facebook">Facebook</option>
+            <option value="google">Google</option>
+            <option value="apple">Apple</option>
+          </select>
+        </div>
+        <div id="credentialsFields" class="credentials-fields">
+          <div class="edit-row">
+            <label>Email:</label>
+            <input type="email" id="email" placeholder="votre@email.com">
           </div>
-          <div id="webhookDisplay">
-            <div class="info-row">
-              <span class="info-label">URL:</span>
-              <span class="info-value" id="webhookURLDisplay">-</span>
-            </div>
-          </div>
-          <div id="webhookEdit" class="hidden">
-            <div class="edit-row">
-              <label>URL:</label>
-              <input type="text" id="webhookURL" placeholder="https://n8n.quentinveys.be/webhook/grindr-stats">
-            </div>
+          <div class="edit-row">
+            <label>Mot de passe:</label>
+            <input type="password" id="password" placeholder="••••••••">
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Tab Content: Logs -->
-    <div class="tab-content" id="contentLogs">
-      <div class="tab-panel">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Logs</h3>
-            <button id="clearLogsButton" class="btn btn-danger">Clear</button>
-          </div>
-          <div class="logs-container" id="logsContainer"></div>
+        <div class="checkbox-row">
+          <label for="autoLogin">Connexion automatique</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autoLogin">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div style="margin-top: var(--spacing-xs);">
+          <button class="btn btn-danger" id="deleteCredentials" title="Supprimer">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+              </path>
+            </svg>
+            Supprimer
+          </button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal Overlay -->
-  <div class="modal-overlay" id="modalOverlay">
+  <!-- Tab Content: n8n -->
+  <div class="tab-content" id="tabWebhook">
+    <div class="tab-panel">
+      <div class="section-header">
+        <h3 class="section-title">
+          <svg class="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0">
+            </path>
+          </svg>
+          Configuration n8n
+        </h3>
+        <button class="btn btn-icon" id="editWebhook" title="Modifier">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+            </path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Mode affichage -->
+      <div id="webhookDisplay">
+        <div class="info-row">
+          <span class="info-label">Webhook URL:</span>
+          <span class="info-value" id="webhookURLDisplay">-</span>
+        </div>
+      </div>
+
+      <!-- Mode édition -->
+      <div id="webhookEdit" class="hidden">
+        <div class="edit-row">
+          <label>URL:</label>
+          <input type="url" id="webhookURL" placeholder="https://...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Content: Logs -->
+  <div class="tab-content" id="tabLogs">
+    <div class="tab-panel">
+      <div class="section-header">
+        <h3 class="section-title">
+          <svg class="section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+            </path>
+          </svg>
+          Logs de l'extension
+        </h3>
+        <button class="btn btn-icon" id="clearLogs" title="Effacer les logs">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+            </path>
+          </svg>
+        </button>
+      </div>
+
+      <div id="logsContainer"
+        style="max-height: 150px; overflow-y: auto; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 11px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--spacing-sm);">
+        <div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">
+          Chargement des logs...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de confirmation -->
+  <div id="confirmModal" class="modal-overlay">
     <div class="modal">
-      <div class="modal-title" id="modalTitle"></div>
-      <div class="modal-message" id="modalMessage"></div>
+      <div class="modal-title">Confirmation</div>
+      <div class="modal-message" id="confirmMessage">Êtes-vous sûr ?</div>
       <div class="modal-buttons">
-        <button class="modal-btn modal-btn-cancel" id="modalCancel">Cancel</button>
-        <button class="modal-btn modal-btn-confirm" id="modalConfirm">Confirm</button>
+        <button class="modal-btn modal-btn-cancel" id="confirmCancel">Annuler</button>
+        <button class="modal-btn modal-btn-confirm" id="confirmOk">OK</button>
       </div>
     </div>
   </div>
@@ -182,4 +1047,5 @@
   <script src="popup/edit-mode.js"></script>
   <script src="popup.js"></script>
 </body>
+
 </html>
