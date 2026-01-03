@@ -179,3 +179,59 @@ async function performEmailLogin(email, password) {
     return false;
   }
 }
+
+/**
+ * Perform Facebook login flow
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function performFacebookLogin() {
+  try {
+    logger('info', 'performFacebookLogin', 'Starting Facebook login flow');
+
+    const facebookButton = document.querySelector(SELECTORS.FACEBOOK_BUTTON);
+    if (!facebookButton) {
+      logger('error', 'performFacebookLogin', 'Facebook button not found');
+      return false;
+    }
+
+    await delay(DELAYS.NORMAL);
+    facebookButton.click();
+    logger('info', 'performFacebookLogin', 'Facebook button clicked, waiting for popup');
+
+    await waitForLogin();
+
+    logger('info', 'performFacebookLogin', 'Facebook login completed successfully');
+    return true;
+  } catch (error) {
+    logger('error', 'performFacebookLogin', 'Facebook login failed', { error: error.message });
+    return false;
+  }
+}
+
+/**
+ * Perform Google login flow
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function performGoogleLogin() {
+  try {
+    logger('info', 'performGoogleLogin', 'Starting Google login flow');
+
+    const googleButton = document.querySelector(SELECTORS.GOOGLE_BUTTON);
+    if (!googleButton) {
+      logger('error', 'performGoogleLogin', 'Google button not found');
+      return false;
+    }
+
+    await delay(DELAYS.NORMAL);
+    googleButton.click();
+    logger('info', 'performGoogleLogin', 'Google button clicked, waiting for popup');
+
+    await waitForLogin();
+
+    logger('info', 'performGoogleLogin', 'Google login completed successfully');
+    return true;
+  } catch (error) {
+    logger('error', 'performGoogleLogin', 'Google login failed', { error: error.message });
+    return false;
+  }
+}
