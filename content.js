@@ -395,3 +395,27 @@ async function waitForApplePopupWindow(maxWait = TIMEOUTS.APPLE_POPUP, popupWind
     }, maxWait);
   });
 }
+
+async function clickAppleButtonInTab(tabId, buttonValue, searchType = 'id', maxRetries = LIMITS.MAX_APPLE_BUTTON_RETRIES) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({
+      action: 'clickButtonInAppleTab',
+      tabId: tabId,
+      buttonValue: buttonValue,
+      searchType: searchType,
+      maxRetries: maxRetries
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      if (response && response.success) {
+        logger('info', 'Auth', `✅ Bouton "${buttonValue}" cliqué dans l'onglet Apple`);
+        resolve(true);
+      } else {
+        reject(new Error(response?.error || 'Échec du clic sur le bouton'));
+      }
+    });
+  });
+}
