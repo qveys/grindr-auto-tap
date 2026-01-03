@@ -86,4 +86,18 @@ window.Constants = {
     // Error messages
     ERROR_MESSAGE: '.error, .alert-error, [role="alert"]',
   },
+
+  // Status message timeouts (in milliseconds)
+  STATUS_TIMEOUTS: {
+    SUCCESS: 3000,
+    ERROR: 5000,
+    INFO: 4000,
+  },
+
+  // Apple login specific
+  APPLE: {
+    SIGN_IN_BUTTON_ID: 'sign-in',
+    BUTTON_CLASSES: 'button.signin-v2__buttons-wrapper__button-wrapper__button, button.button-rounded-rectangle',
+    POPUP_CHECK_INTERVAL: 1000,
+  },
 };
