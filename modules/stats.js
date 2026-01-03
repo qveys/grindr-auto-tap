@@ -60,3 +60,33 @@ function initializeStats() {
   logger('debug', 'initializeStats', 'Statistics initialized', stats);
   return stats;
 }
+
+/**
+ * Update statistics with successful tap
+ * @param {Object} stats - Statistics object
+ * @returns {Object} Updated statistics object
+ */
+function recordSuccessfulTap(stats) {
+  stats.totalTaps += 1;
+  stats.successfulTaps += 1;
+  logger('debug', 'recordSuccessfulTap', 'Successful tap recorded', {
+    total: stats.totalTaps,
+    successful: stats.successfulTaps
+  });
+  return stats;
+}
+
+/**
+ * Update statistics with failed tap
+ * @param {Object} stats - Statistics object
+ * @returns {Object} Updated statistics object
+ */
+function recordFailedTap(stats) {
+  stats.totalTaps += 1;
+  stats.failedTaps += 1;
+  logger('debug', 'recordFailedTap', 'Failed tap recorded', {
+    total: stats.totalTaps,
+    failed: stats.failedTaps
+  });
+  return stats;
+}
