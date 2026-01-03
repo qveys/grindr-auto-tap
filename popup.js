@@ -439,8 +439,147 @@ async function loadAutoStart() {
   }
 }
 
+/**
+ * Format timestamp
+ * @param {number} timestamp - Unix timestamp in milliseconds
+ * @returns {string} Formatted timestamp
+ */
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const ms = String(date.getMilliseconds()).padStart(3, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}.${ms}`;
+}
+
+/**
+ * Escape HTML
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * Load logs
+ */
+async function loadLogs() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getLogs' });
+    const logs = response && response.logs ? response.logs : [];
+
+    const logsContainer = document.getElementById('logsContainer');
+    if (!logsContainer) return;
+
+    // Clear container
+    logsContainer.innerHTML = '';
+
+    // Sort logs by timestamp (oldest first)
+    const sortedLogs = [...logs].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    sortedLogs.forEach(log => {
+      const logEntry = document.createElement('div');
+      logEntry.className = `log-entry log-${log.level || 'info'}`;
+
+      const timestamp = formatTimestamp(log.timestamp || Date.now());
+      const location = escapeHtml(log.location || 'unknown');
+      const message = escapeHtml(log.message || '');
+
+      // Use textContent for security (avoid innerHTML)
+      const timestampEl = document.createElement('span');
+      timestampEl.className = 'log-timestamp';
+      timestampEl.textContent = `[${timestamp}] `;
+
+      const locationEl = document.createElement('span');
+      locationEl.className = 'log-location';
+      locationEl.textContent = `[${location}] `;
+
+      const messageEl = document.createElement('span');
+      messageEl.className = 'log-message';
+      messageEl.textContent = message;
+
+      logEntry.appendChild(timestampEl);
+      logEntry.appendChild(locationEl);
+      logEntry.appendChild(messageEl);
+
+      // Show log data as JSON if present
+      if (log.data) {
+        const dataEl = document.createElement('pre');
+        dataEl.className = 'log-data';
+        dataEl.textContent = JSON.stringify(log.data, null, 2);
+        logEntry.appendChild(dataEl);
+      }
+
+      logsContainer.appendChild(logEntry);
+    });
+
+    // Auto-scroll to bottom
+    scrollLogsToBottom();
+  } catch (error) {
+    logger('error', 'loadLogs', 'Failed to load logs', { error: error.message });
+  }
+}
+
+/**
+ * Scroll logs container to bottom
+ */
+function scrollLogsToBottom() {
+  const logsContainer = document.getElementById('logsContainer');
+  if (logsContainer) {
+    requestAnimationFrame(() => {
+      logsContainer.scrollTop = logsContainer.scrollHeight;
+    });
+  }
+}
+
+/**
+ * Clear logs
+ */
+async function clearLogs() {
+  const confirmed = await showConfirm(
+    'Clear Logs',
+    'Are you sure you want to clear all logs?'
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'clearLogs' });
+    if (response && response.success) {
+      await loadLogs();
+      showStatus('Logs cleared', 'success');
+    } else {
+      showStatus('Failed to clear logs', 'error');
+    }
+  } catch (error) {
+    logger('error', 'clearLogs', 'Failed to clear logs', { error: error.message });
+    showStatus('Failed to clear logs', 'error');
+  }
+}
+
+// Setup clear logs button
+document.addEventListener('DOMContentLoaded', () => {
+  const clearLogsButton = document.getElementById('clearLogsButton');
+  if (clearLogsButton) {
+    clearLogsButton.addEventListener('click', clearLogs);
+  }
+
+  // Real-time logs updates via chrome.storage.onChanged
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes.extensionLogs && activeTab === 'logs') {
+      loadLogs();
+    }
+  });
+});
+
 // Placeholder functions (will be implemented in later commits)
-async function loadLogs() {}
 function showStatus(message, type) {}
 async function showConfirm(title, message) { return false; }
 
