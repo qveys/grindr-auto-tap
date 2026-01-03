@@ -118,3 +118,42 @@ async function clickLoginButton() {
   loginButton.click();
   logger('info', 'clickLoginButton', 'Login button clicked');
 }
+
+/**
+ * Wait for login to complete
+ * @returns {Promise<void>}
+ */
+async function waitForLogin() {
+  const startTime = Date.now();
+  const timeout = TIMEOUTS.LOGIN;
+
+  while (Date.now() - startTime < timeout) {
+    // Check if login form is gone (indicating successful login)
+    const loginForm = document.querySelector(SELECTORS.EMAIL_INPUT);
+    if (!loginForm) {
+      logger('info', 'waitForLogin', 'Login completed, form is gone');
+      await delay(DELAYS.SECOND);
+      return;
+    }
+
+    // Check if profile indicators exist (indicating successful login)
+    const profileElements = document.querySelector(SELECTORS.PROFILE_INDICATORS);
+    if (profileElements) {
+      logger('info', 'waitForLogin', 'Login completed, profile elements found');
+      return;
+    }
+
+    // Check for error messages
+    const errorElement = document.querySelector(SELECTORS.ERROR_MESSAGE);
+    if (errorElement && errorElement.textContent) {
+      const errorMessage = errorElement.textContent.trim();
+      logger('error', 'waitForLogin', 'Login failed with error', { error: errorMessage });
+      throw new Error(`Login failed: ${errorMessage}`);
+    }
+
+    await delay(DELAYS.MEDIUM);
+  }
+
+  logger('error', 'waitForLogin', 'Login timeout exceeded');
+  throw new Error('Login timeout');
+}
