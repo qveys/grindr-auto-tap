@@ -268,3 +268,37 @@ async function waitForApplePopupWindow() {
   logger('error', 'waitForApplePopupWindow', 'Apple popup timeout');
   throw new Error('Apple popup window did not open');
 }
+
+/**
+ * Click the Apple sign-in button in the popup window
+ * @param {Window} popupWindow - Reference to popup window
+ * @returns {Promise<void>}
+ */
+async function clickAppleButtonInTab(popupWindow) {
+  try {
+    const startTime = Date.now();
+    const timeout = TIMEOUTS.APPLE_POPUP;
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const signInButton = popupWindow.document.getElementById(APPLE.SIGN_IN_BUTTON_ID);
+        if (signInButton) {
+          await delay(DELAYS.NORMAL);
+          signInButton.click();
+          logger('info', 'clickAppleButtonInTab', 'Apple sign-in button clicked in popup');
+          return;
+        }
+      } catch (error) {
+        // Popup may not be fully loaded yet
+      }
+
+      await delay(DELAYS.MEDIUM);
+    }
+
+    logger('error', 'clickAppleButtonInTab', 'Apple button not found in popup');
+    throw new Error('Apple button not found in popup');
+  } catch (error) {
+    logger('error', 'clickAppleButtonInTab', 'Failed to click Apple button', { error: error.message });
+    throw error;
+  }
+}
