@@ -94,3 +94,53 @@ function updateUI() {
     statusText.textContent = 'Ready';
   }
 }
+
+/**
+ * Start auto-tap
+ */
+async function handleStartClick() {
+  try {
+    const tab = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab[0]) {
+      showNotification('No active tab found', 'error');
+      return;
+    }
+
+    isRunning = true;
+    updateUI();
+
+    chrome.tabs.sendMessage(tab[0].id, { action: 'startAutoTap' }).catch(err => {
+      console.error('Failed to start auto-tap:', err);
+      isRunning = false;
+      updateUI();
+      showNotification('Failed to start auto-tap', 'error');
+    });
+  } catch (error) {
+    console.error('Failed to start:', error);
+    showNotification('Failed to start auto-tap', 'error');
+  }
+}
+
+/**
+ * Stop auto-tap
+ */
+async function handleStopClick() {
+  try {
+    const tab = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab[0]) {
+      showNotification('No active tab found', 'error');
+      return;
+    }
+
+    isRunning = false;
+    updateUI();
+
+    chrome.tabs.sendMessage(tab[0].id, { action: 'stopAutoTap' }).catch(err => {
+      console.error('Failed to stop auto-tap:', err);
+      showNotification('Failed to stop auto-tap', 'error');
+    });
+  } catch (error) {
+    console.error('Failed to stop:', error);
+    showNotification('Failed to stop auto-tap', 'error');
+  }
+}
