@@ -101,3 +101,20 @@ async function fillLoginForm(email, password) {
   logger('info', 'fillLoginForm', 'Login form filled successfully');
   return { emailField, passwordField };
 }
+
+/**
+ * Click the login button to submit credentials
+ * @returns {Promise<void>}
+ */
+async function clickLoginButton() {
+  const loginButton = document.querySelector(SELECTORS.LOGIN_BUTTON);
+
+  if (!loginButton) {
+    logger('error', 'clickLoginButton', 'Login button not found');
+    throw new Error('Login button not found');
+  }
+
+  await delay(DELAYS.NORMAL);
+  loginButton.click();
+  logger('info', 'clickLoginButton', 'Login button clicked');
+}
