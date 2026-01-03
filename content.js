@@ -193,3 +193,10 @@ function stopAutoTap() {
   log('info', 'Auto-tap stopping');
   autoTapRunning = false;
 }
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeContentScript);
+} else {
+  initializeContentScript();
+}
