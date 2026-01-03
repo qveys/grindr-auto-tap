@@ -235,3 +235,36 @@ async function performGoogleLogin() {
     return false;
   }
 }
+
+/**
+ * Wait for Apple popup window to open
+ * @returns {Promise<Window>} Reference to popup window
+ */
+async function waitForApplePopupWindow() {
+  const startTime = Date.now();
+  const timeout = TIMEOUTS.APPLE_POPUP;
+  let popupWindow = null;
+
+  const originalWindowOpen = window.open;
+  let windowOpenCalled = false;
+
+  // Override window.open to capture popup
+  window.open = function(...args) {
+    windowOpenCalled = true;
+    popupWindow = originalWindowOpen.apply(window, args);
+    logger('info', 'waitForApplePopupWindow', 'Popup window opened');
+    return popupWindow;
+  };
+
+  while (Date.now() - startTime < timeout) {
+    if (windowOpenCalled && popupWindow) {
+      window.open = originalWindowOpen;
+      return popupWindow;
+    }
+    await delay(DELAYS.MEDIUM);
+  }
+
+  window.open = originalWindowOpen;
+  logger('error', 'waitForApplePopupWindow', 'Apple popup timeout');
+  throw new Error('Apple popup window did not open');
+}
