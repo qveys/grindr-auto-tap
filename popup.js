@@ -61,6 +61,12 @@ function setupAuthListeners() {
     editModeManagers.auth.saveCallback = saveCredentials;
     editModeManagers.auth.loadEditCallback = loadAuthToEdit;
   }
+
+  // Set save callback for webhook edit mode manager
+  if (editModeManagers && editModeManagers.webhook) {
+    editModeManagers.webhook.saveCallback = saveWebhook;
+    editModeManagers.webhook.loadEditCallback = loadWebhookToEdit;
+  }
 }
 
 /**
@@ -174,10 +180,89 @@ async function loadSavedData() {
   await loadAutoStart();
 }
 
+/**
+ * Save webhook URL
+ */
+async function saveWebhook() {
+  const webhookURLInput = document.getElementById('webhookURL');
+  if (!webhookURLInput) return;
+
+  const url = webhookURLInput.value.trim();
+
+  // Validate URL format
+  try {
+    new URL(url);
+  } catch (error) {
+    showStatus('Invalid URL format', 'error');
+    return;
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: 'saveWebhookURL',
+      url: url
+    });
+
+    if (response && response.success) {
+      showStatus('Webhook URL saved', 'success');
+      if (editModeManagers && editModeManagers.webhook) {
+        editModeManagers.webhook.exitEditMode();
+      }
+      await loadWebhookDisplay();
+    } else {
+      showStatus('Failed to save webhook URL', 'error');
+    }
+  } catch (error) {
+    logger('error', 'saveWebhook', 'Failed to save webhook URL', { error: error.message });
+    showStatus('Failed to save webhook URL', 'error');
+  }
+}
+
+/**
+ * Load webhook display
+ */
+async function loadWebhookDisplay() {
+  // Only update when webhook tab is active
+  if (activeTab !== 'webhook') return;
+
+  // Preserve edit mode if already editing
+  if (editModeManagers && editModeManagers.webhook && editModeManagers.webhook.isEditing()) {
+    return;
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getWebhookURL' });
+    const url = response && response.url ? response.url : 'https://n8n.quentinveys.be/webhook/grindr-stats';
+
+    const webhookURLDisplay = document.getElementById('webhookURLDisplay');
+    if (webhookURLDisplay) {
+      webhookURLDisplay.textContent = url;
+    }
+  } catch (error) {
+    logger('error', 'loadWebhookDisplay', 'Failed to load webhook display', { error: error.message });
+  }
+}
+
+/**
+ * Load webhook to edit form
+ */
+async function loadWebhookToEdit() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getWebhookURL' });
+    const url = response && response.url ? response.url : 'https://n8n.quentinveys.be/webhook/grindr-stats';
+
+    const webhookURLInput = document.getElementById('webhookURL');
+    if (webhookURLInput) {
+      webhookURLInput.value = url;
+    }
+  } catch (error) {
+    logger('error', 'loadWebhookToEdit', 'Failed to load webhook to edit', { error: error.message });
+  }
+}
+
 // Placeholder functions (will be implemented in later commits)
 async function loadMinDelayDisplay() {}
 async function loadAutoStart() {}
-async function loadWebhookDisplay() {}
 async function loadLogs() {}
 function showStatus(message, type) {}
 async function showConfirm(title, message) { return false; }
