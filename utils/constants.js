@@ -16,4 +16,16 @@ window.Constants = {
     RANDOM_MIN: 50,
     RANDOM_MAX: 50,
   },
+
+  // Timeouts (in milliseconds)
+  TIMEOUTS: {
+    LOGIN: 10000,
+    APPLE_LOGIN: 15000,
+    APPLE_POPUP: 15000,
+    APPLE_POPUP_CLOSE: 15000,
+    WEBHOOK_REQUEST: 10000,
+    BUTTON_WAIT: 10000,
+    APPLE_BUTTON_RETRY: 2000,
+    APPLE_TAB_CHECK: 1000,
+  },
 };
