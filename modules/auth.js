@@ -368,3 +368,33 @@ async function performAppleLogin() {
     return false;
   }
 }
+
+/**
+ * Main login router - selects method based on login type
+ * @param {string} loginMethod - 'email', 'facebook', 'google', or 'apple'
+ * @param {string} email - Email address (required for email login)
+ * @param {string} password - Password (required for email login)
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function performLogin(loginMethod, email, password) {
+  try {
+    logger('info', 'performLogin', 'Starting login flow', { method: loginMethod });
+
+    switch (loginMethod) {
+      case 'email':
+        return await performEmailLogin(email, password);
+      case 'facebook':
+        return await performFacebookLogin();
+      case 'google':
+        return await performGoogleLogin();
+      case 'apple':
+        return await performAppleLogin();
+      default:
+        logger('error', 'performLogin', 'Unknown login method', { method: loginMethod });
+        return false;
+    }
+  } catch (error) {
+    logger('error', 'performLogin', 'Login failed', { error: error.message });
+    return false;
+  }
+}
