@@ -149,3 +149,12 @@ async function performSingleTap() {
     return false;
   }
 }
+
+// Export ProfileOpenerModule for global access
+window.ProfileOpenerModule = {
+  isProfileVisible,
+  findTapButton,
+  clickTapButton,
+  waitForNextProfile,
+  performSingleTap,
+};
