@@ -116,3 +116,36 @@ async function waitForNextProfile() {
     return false;
   }
 }
+
+/**
+ * Perform single tap action (tap and wait for next profile)
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function performSingleTap() {
+  try {
+    logger('info', 'performSingleTap', 'Performing single tap action');
+
+    if (!isProfileVisible()) {
+      logger('warn', 'performSingleTap', 'No profile visible');
+      return false;
+    }
+
+    const clicked = await clickTapButton();
+    if (!clicked) {
+      logger('warn', 'performSingleTap', 'Failed to click tap button');
+      return false;
+    }
+
+    const loaded = await waitForNextProfile();
+    if (!loaded) {
+      logger('warn', 'performSingleTap', 'Next profile did not load');
+      return false;
+    }
+
+    logger('info', 'performSingleTap', 'Single tap completed successfully');
+    return true;
+  } catch (error) {
+    logger('error', 'performSingleTap', 'Single tap failed', { error: error.message });
+    return false;
+  }
+}
