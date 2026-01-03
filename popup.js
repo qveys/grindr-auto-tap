@@ -57,3 +57,24 @@ async function loadSettings() {
     console.error('Failed to load settings:', error);
   }
 }
+
+/**
+ * Save settings to storage
+ */
+async function saveSettings() {
+  try {
+    const settings = {
+      loginMethod: loginMethodSelect.value,
+      grindrEmail: emailInput.value,
+      grindrPassword: passwordInput.value,
+      autoLogin: autoLoginCheckbox.checked,
+      n8nWebhookURL: webhookURLInput.value
+    };
+
+    await chrome.storage.local.set(settings);
+    showNotification('Settings saved successfully', 'success');
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+    showNotification('Failed to save settings', 'error');
+  }
+}
