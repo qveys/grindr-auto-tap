@@ -89,3 +89,22 @@ function initializeContentScript() {
     log('error', 'Failed to perform auto-login', { error: err.message });
   });
 }
+
+/**
+ * Handle messages from popup UI
+ * @param {Object} request - Message request
+ * @param {Function} sendResponse - Response callback
+ */
+function handlePopupMessage(request, sendResponse) {
+  if (request.action === 'startAutoTap') {
+    log('info', 'Start auto-tap requested');
+    startAutoTap();
+    sendResponse({ success: true });
+  } else if (request.action === 'stopAutoTap') {
+    log('info', 'Stop auto-tap requested');
+    stopAutoTap();
+    sendResponse({ success: true });
+  } else if (request.action === 'getStatus') {
+    sendResponse({ status: 'idle' });
+  }
+}
