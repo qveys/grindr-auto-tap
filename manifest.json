@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Grindr Auto Tap",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Extension pour automatiser les actions sur Grindr et envoyer les statistiques vers n8n",
   "permissions": [
     "tabs",
@@ -26,6 +26,14 @@
         "*://web.grindr.com/*"
       ],
       "js": [
+        "utils/constants.js",
+        "utils/logger.js",
+        "utils/formatters.js",
+        "utils/dom-helpers.js",
+        "modules/auth.js",
+        "modules/profile-opener.js",
+        "modules/stats.js",
+        "modules/auto-tap.js",
         "content.js"
       ],
       "run_at": "document_idle"
