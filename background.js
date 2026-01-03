@@ -69,10 +69,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'sendToN8N') {
     // Envoyer les stats vers n8n (contourne la CSP)
-    // Support both 'data'/'retry' (new) and 'stats'/'retries' (legacy)
-    const statsData = request.data || request.stats;
-    const retryCount = request.retry !== undefined ? request.retry : (request.retries || 2);
-    sendToN8NWebhook(statsData, retryCount)
+    sendToN8NWebhook(request.stats, request.retries || 2)
       .then(success => {
         sendResponse({ success: success });
       })
