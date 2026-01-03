@@ -14,5 +14,10 @@
     "*://*.apple.com/*",
     "*://*.appleid.apple.com/*",
     "*://*.idmsa.apple.com/*"
-  ]
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  }
 }
