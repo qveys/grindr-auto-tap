@@ -185,3 +185,11 @@ async function startAutoTap() {
     log('info', 'Auto-tap completed', { stats: autoTapStats });
   }
 }
+
+/**
+ * Stop auto-tap operation
+ */
+function stopAutoTap() {
+  log('info', 'Auto-tap stopping');
+  autoTapRunning = false;
+}
