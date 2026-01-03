@@ -165,3 +165,23 @@ function pollLogs() {
   logsPoller = setInterval(pollFn, 500);
   pollFn(); // Call immediately
 }
+
+/**
+ * Display logs in the UI
+ * @param {Array} logs - Array of log entries
+ */
+function displayLogs(logs) {
+  logsContainer.innerHTML = '';
+
+  const visibleLogs = logs.slice(-50); // Show last 50 logs
+
+  visibleLogs.forEach(log => {
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry ${log.level}`;
+    logEntry.textContent = `[${log.level.toUpperCase()}] ${log.location}: ${log.message}`;
+    logsContainer.appendChild(logEntry);
+  });
+
+  // Auto-scroll to bottom
+  logsContainer.scrollTop = logsContainer.scrollHeight;
+}
