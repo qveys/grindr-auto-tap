@@ -42,3 +42,12 @@ function logger(level, location, message, data = null) {
     });
   }
 }
+
+/**
+ * Check if profile is currently displayed
+ * @returns {boolean} True if profile is visible, false otherwise
+ */
+function isProfileVisible() {
+  const profileView = document.querySelector(SELECTORS.PROFILE_VIEW);
+  return profileView !== null;
+}
