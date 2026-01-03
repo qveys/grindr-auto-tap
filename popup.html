@@ -19,6 +19,36 @@
       <button id="startButton" class="btn btn-primary">Start</button>
       <button id="stopButton" class="btn btn-secondary" disabled>Stop</button>
     </div>
+    <div class="settings-section">
+      <div class="setting">
+        <label for="loginMethod">Login Method:</label>
+        <select id="loginMethod">
+          <option value="email">Email</option>
+          <option value="facebook">Facebook</option>
+          <option value="google">Google</option>
+          <option value="apple">Apple</option>
+        </select>
+      </div>
+      <div class="setting">
+        <label for="email">Email (if using email login):</label>
+        <input type="email" id="email" placeholder="your@email.com">
+      </div>
+      <div class="setting">
+        <label for="password">Password (if using email login):</label>
+        <input type="password" id="password" placeholder="Password">
+      </div>
+      <div class="setting">
+        <label for="autoLogin">
+          <input type="checkbox" id="autoLogin" checked>
+          Auto-login on startup
+        </label>
+      </div>
+      <div class="setting">
+        <label for="webhookURL">Webhook URL (N8N):</label>
+        <input type="text" id="webhookURL" placeholder="https://n8n.example.com/webhook/grindr-stats">
+      </div>
+      <button id="saveButton" class="btn btn-secondary">Save Settings</button>
+    </div>
   </div>
 </body>
 </html>
