@@ -105,4 +105,22 @@ class EditModeManager {
       this.loadDisplayCallback();
     }
   }
+
+  /**
+   * Toggle edit mode
+   */
+  toggle() {
+    if (this.isEditing()) {
+      this.exitEditMode();
+    } else {
+      this.enterEditMode();
+    }
+  }
+
+  /**
+   * Cancel edit mode (reload display without saving)
+   */
+  cancel() {
+    this.exitEditMode();
+  }
 }
