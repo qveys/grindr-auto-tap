@@ -149,3 +149,129 @@ const URLS = {
   GRINDR_DOMAIN: 'web.grindr.com',
   APPLE_DOMAINS: ['apple.com', 'appleid.apple.com', 'idmsa.apple.com', 'signinwithapple'],
 };
+
+// ============================================================================
+// AUTHENTICATION MODULE
+// ============================================================================
+
+function checkLoginStatus() {
+  const loginPage = document.querySelector(SELECTORS.EMAIL_INPUT);
+  if (loginPage) {
+    return false;
+  }
+
+  const profileElements = document.querySelector(SELECTORS.PROFILE_INDICATORS);
+  if (profileElements) {
+    return true;
+  }
+
+  if (window.location.pathname.includes('/login') || window.location.pathname.includes('/signin')) {
+    return false;
+  }
+
+  return true;
+}
+
+async function fillLoginForm(email, password) {
+  const emailField = document.querySelector(SELECTORS.EMAIL_INPUT);
+  const passwordField = document.querySelector(SELECTORS.PASSWORD_INPUT);
+
+  if (!emailField || !passwordField) {
+    throw new Error('Champs de connexion introuvables');
+  }
+
+  emailField.focus();
+  emailField.value = '';
+  await delay(DELAYS.MEDIUM);
+
+  for (const char of email) {
+    emailField.value += char;
+    emailField.dispatchEvent(new Event('input', { bubbles: true }));
+    await delay(DELAYS.RANDOM_MIN + Math.random() * DELAYS.RANDOM_MAX);
+  }
+
+  emailField.dispatchEvent(new Event('change', { bubbles: true }));
+  await delay(DELAYS.NORMAL);
+
+  passwordField.focus();
+  passwordField.value = '';
+  await delay(DELAYS.MEDIUM);
+
+  for (const char of password) {
+    passwordField.value += char;
+    passwordField.dispatchEvent(new Event('input', { bubbles: true }));
+    await delay(DELAYS.RANDOM_MIN + Math.random() * DELAYS.RANDOM_MAX);
+  }
+
+  passwordField.dispatchEvent(new Event('change', { bubbles: true }));
+  await delay(DELAYS.NORMAL);
+
+  return { emailField, passwordField };
+}
+
+async function clickLoginButton() {
+  const loginButton = document.querySelector(SELECTORS.LOGIN_BUTTON);
+  if (!loginButton) {
+    throw new Error('Bouton de connexion introuvable');
+  }
+
+  const captcha = document.querySelector(SELECTORS.CAPTCHA);
+  if (captcha) {
+    throw new Error('Captcha détecté - action manuelle requise');
+  }
+
+  loginButton.click();
+  await delay(DELAYS.SECOND);
+
+  return true;
+}
+
+async function waitForLogin(maxWait = TIMEOUTS.LOGIN) {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWait) {
+    await delay(DELAYS.VERY_LONG);
+
+    if (checkLoginStatus()) {
+      return true;
+    }
+
+    const errorMessage = document.querySelector(SELECTORS.ERROR_MESSAGE);
+    if (errorMessage && (errorMessage.textContent.toLowerCase().includes('incorrect') ||
+      errorMessage.textContent.toLowerCase().includes('wrong'))) {
+      throw new Error('Identifiants incorrects');
+    }
+
+    const captcha = document.querySelector(SELECTORS.CAPTCHA);
+    if (captcha) {
+      throw new Error('Captcha détecté - action manuelle requise');
+    }
+  }
+
+  throw new Error('Timeout lors de l\'attente de la connexion');
+}
+
+async function performEmailLogin(email, password) {
+  try {
+    logger('info', 'Auth', '📧 Connexion par email...');
+
+    if (!email || !password) {
+      throw new Error('Email et mot de passe requis pour la connexion par email');
+    }
+
+    await fillLoginForm(email, password);
+    logger('info', 'Auth', '📝 Formulaire rempli');
+
+    await clickLoginButton();
+    logger('info', 'Auth', '🖱️ Bouton de connexion cliqué');
+
+    await waitForLogin();
+
+    logger('info', 'Auth', '✅ Connexion réussie');
+    return { success: true };
+
+  } catch (error) {
+    logger('error', 'Auth', '❌ Erreur lors de la connexion email: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
