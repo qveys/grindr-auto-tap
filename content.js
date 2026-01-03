@@ -108,3 +108,6 @@ function handlePopupMessage(request, sendResponse) {
     sendResponse({ status: 'idle' });
   }
 }
+
+let autoTapRunning = false;
+let autoTapStats = null;
