@@ -101,3 +101,14 @@ window.Constants = {
     POPUP_CHECK_INTERVAL: 1000,
   },
 };
+
+// Export individual constants for easier access
+const { DELAYS, TIMEOUTS, LIMITS, DEFAULTS, URLS, SELECTORS, STATUS_TIMEOUTS, APPLE } = window.Constants;
+window.DELAYS = DELAYS;
+window.TIMEOUTS = TIMEOUTS;
+window.LIMITS = LIMITS;
+window.DEFAULTS = DEFAULTS;
+window.URLS = URLS;
+window.SELECTORS = SELECTORS;
+window.STATUS_TIMEOUTS = STATUS_TIMEOUTS;
+window.APPLE = APPLE;
