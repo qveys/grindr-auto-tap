@@ -28,4 +28,15 @@ window.Constants = {
     APPLE_BUTTON_RETRY: 2000,
     APPLE_TAB_CHECK: 1000,
   },
+
+  // Limits
+  LIMITS: {
+    MAX_ITERATIONS: 10000,
+    MAX_DURATION_HOURS: 2,
+    MAX_DURATION_MS: 2 * 60 * 60 * 1000, // 2 hours in milliseconds
+    MAX_DEBUG_LOGS: 1000,
+    MAX_RETRIES: 8,
+    DEFAULT_RETRIES: 2,
+    MAX_APPLE_BUTTON_RETRIES: 8,
+  },
 };
