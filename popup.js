@@ -144,3 +144,24 @@ async function handleStopClick() {
     showNotification('Failed to stop auto-tap', 'error');
   }
 }
+
+/**
+ * Poll for logs periodically
+ */
+function pollLogs() {
+  const pollFn = async () => {
+    try {
+      chrome.runtime.sendMessage({ action: 'getLogs' }, (response) => {
+        if (response && response.logs) {
+          displayLogs(response.logs);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to fetch logs:', error);
+    }
+  };
+
+  // Poll every 500ms
+  logsPoller = setInterval(pollFn, 500);
+  pollFn(); // Call immediately
+}
