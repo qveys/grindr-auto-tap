@@ -17,6 +17,7 @@
   ],
   "background": {
     "scripts": [
+      "shared-constants.js",
       "background.js"
     ]
   },

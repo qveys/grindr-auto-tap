@@ -1,7 +1,7 @@
-// Constants for the Grindr Auto Tap extension
-// Exported as global object for use in content scripts
+// Shared constants for Grindr Auto Tap extension
+// Works in both service workers and content scripts
 
-window.Constants = {
+const SharedConstants = {
   // Delays (in milliseconds)
   DELAYS: {
     SHORT: 50,
@@ -109,14 +109,40 @@ window.Constants = {
   },
 };
 
-// Export individual constants for easier access
-const { DELAYS, TIMEOUTS, LIMITS, LOGGING, DEFAULTS, URLS, SELECTORS, STATUS_TIMEOUTS, APPLE } = window.Constants;
-window.DELAYS = DELAYS;
-window.TIMEOUTS = TIMEOUTS;
-window.LIMITS = LIMITS;
-window.LOGGING = LOGGING;
-window.DEFAULTS = DEFAULTS;
-window.URLS = URLS;
-window.SELECTORS = SELECTORS;
-window.STATUS_TIMEOUTS = STATUS_TIMEOUTS;
-window.APPLE = APPLE;
+// Export for service workers (background.js)
+if (typeof self !== 'undefined' && typeof window === 'undefined') {
+  // Service worker context
+  self.Constants = SharedConstants;
+  const { DELAYS, TIMEOUTS, LIMITS, LOGGING, DEFAULTS, URLS, SELECTORS, STATUS_TIMEOUTS, APPLE } = SharedConstants;
+  self.DELAYS = DELAYS;
+  self.TIMEOUTS = TIMEOUTS;
+  self.LIMITS = LIMITS;
+  self.LOGGING = LOGGING;
+  self.DEFAULTS = DEFAULTS;
+  self.URLS = URLS;
+  self.SELECTORS = SELECTORS;
+  self.STATUS_TIMEOUTS = STATUS_TIMEOUTS;
+  self.APPLE = APPLE;
+}
+
+// Export for content scripts (via window)
+if (typeof window !== 'undefined') {
+  window.Constants = SharedConstants;
+  const { DELAYS, TIMEOUTS, LIMITS, LOGGING, DEFAULTS, URLS, SELECTORS, STATUS_TIMEOUTS, APPLE } = SharedConstants;
+  window.DELAYS = DELAYS;
+  window.TIMEOUTS = TIMEOUTS;
+  window.LIMITS = LIMITS;
+  window.LOGGING = LOGGING;
+  window.DEFAULTS = DEFAULTS;
+  window.URLS = URLS;
+  window.SELECTORS = SELECTORS;
+  window.STATUS_TIMEOUTS = STATUS_TIMEOUTS;
+  window.APPLE = APPLE;
+}
+
+// Export for popup.js (HTML context)
+if (typeof document !== 'undefined' && typeof chrome !== 'undefined') {
+  if (typeof window !== 'undefined') {
+    window.Constants = SharedConstants;
+  }
+}

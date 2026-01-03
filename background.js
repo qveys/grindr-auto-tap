@@ -21,8 +21,8 @@ function logger(level, location, message, data = null) {
   chrome.storage.local.get(['extensionLogs'], (result) => {
     const logs = result.extensionLogs || [];
     logs.push(logEntry);
-    // Garder seulement les 1000 derniers logs
-    if (logs.length > 1000) {
+    // Garder seulement les derniers logs (limite définie dans shared-constants.js)
+    if (logs.length > LOGGING.MAX_LOGS) {
       logs.shift();
     }
     chrome.storage.local.set({ extensionLogs: logs });
@@ -214,8 +214,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.storage.local.get(['debugLogs'], (result) => {
       const logs = result.debugLogs || [];
       logs.push(logEntry);
-      // Garder seulement les 1000 derniers logs
-      if (logs.length > 1000) {
+      // Garder seulement les derniers logs (limite définie dans shared-constants.js)
+      if (logs.length > LOGGING.MAX_LOGS) {
         logs.shift();
       }
       chrome.storage.local.set({ debugLogs: logs }, () => {
@@ -239,8 +239,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.storage.local.get(['extensionLogs'], (result) => {
       const logs = result.extensionLogs || [];
       logs.push(logEntry);
-      // Garder seulement les 1000 derniers logs
-      if (logs.length > 1000) {
+      // Garder seulement les derniers logs (limite définie dans shared-constants.js)
+      if (logs.length > LOGGING.MAX_LOGS) {
         logs.shift();
       }
       chrome.storage.local.set({ extensionLogs: logs }, () => {
