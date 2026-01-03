@@ -65,3 +65,25 @@ function findTapButton() {
   logger('debug', 'findTapButton', 'Tap button not found');
   return null;
 }
+
+/**
+ * Click the tap button on current profile
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function clickTapButton() {
+  try {
+    const tapButton = findTapButton();
+    if (!tapButton) {
+      logger('warn', 'clickTapButton', 'Tap button not found on current profile');
+      return false;
+    }
+
+    await delay(DELAYS.NORMAL);
+    tapButton.click();
+    logger('info', 'clickTapButton', 'Tap button clicked');
+    return true;
+  } catch (error) {
+    logger('error', 'clickTapButton', 'Failed to click tap button', { error: error.message });
+    return false;
+  }
+}
