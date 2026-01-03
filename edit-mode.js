@@ -209,3 +209,7 @@ function createEditModeManagers() {
     })
   };
 }
+
+// Export for use in popup.js
+window.EditModeManager = EditModeManager;
+window.createEditModeManagers = createEditModeManagers;
