@@ -419,3 +419,30 @@ async function clickAppleButtonInTab(tabId, buttonValue, searchType = 'id', maxR
     });
   });
 }
+
+async function waitForApplePopupClose(maxWait = TIMEOUTS.APPLE_POPUP_CLOSE) {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWait) {
+    await delay(DELAYS.VERY_LONG);
+
+    const appleIframes = Array.from(document.querySelectorAll('iframe')).filter(iframe => {
+      try {
+        return iframe.src && (
+          iframe.src.includes('apple.com') ||
+          iframe.src.includes('appleid.apple.com')
+        );
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (appleIframes.length === 0) {
+      logger('info', 'Auth', '✅ Popup Apple fermé');
+      return true;
+    }
+  }
+
+  logger('warn', 'Auth', '⚠️ Timeout lors de l\'attente de fermeture du popup Apple');
+  return false;
+}
