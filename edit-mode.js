@@ -15,4 +15,44 @@ class EditModeManager {
     this.saveBtnId = `save${this.section.charAt(0).toUpperCase() + this.section.slice(1)}BtnHeader`;
     this.displayRow = config.displayRow || null;
   }
+
+  /**
+   * Check if currently in edit mode
+   * @returns {boolean}
+   */
+  isEditing() {
+    return this.editElement && !this.editElement.classList.contains('hidden');
+  }
+
+  /**
+   * Create save button header
+   * @returns {HTMLElement}
+   */
+  createSaveButton() {
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-icon';
+    saveBtn.id = this.saveBtnId;
+    saveBtn.title = 'Sauvegarder';
+    saveBtn.innerHTML = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+    saveBtn.addEventListener('click', this.saveCallback);
+
+    const sectionHeader = this.editBtn.closest('.section-header');
+    if (sectionHeader) {
+      sectionHeader.appendChild(saveBtn);
+    }
+
+    return saveBtn;
+  }
+
+  /**
+   * Get or create save button
+   * @returns {HTMLElement}
+   */
+  getSaveButton() {
+    let saveBtn = document.getElementById(this.saveBtnId);
+    if (!saveBtn) {
+      saveBtn = this.createSaveButton();
+    }
+    return saveBtn;
+  }
 }
