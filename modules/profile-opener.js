@@ -1,132 +1,129 @@
 /**
  * Profile opener module for Grindr Auto Tap extension
- * Handles opening the first profile before starting the script
+ * Handles opening the first profile before starting the auto-tap loop
  */
 
-import { delay } from '../utils/formatters.js';
-import { SELECTORS, DELAYS } from '../utils/constants.js';
+(function() {
+  'use strict';
 
-// Logger function for profile-opener module
-function logger(level, location, message, data = null) {
-  const logEntry = {
-    timestamp: Date.now(),
-    level: level,
-    location: location || 'ProfileOpener',
-    message: message,
-    data: data
-  };
+  // Dependencies: window.Constants, window.Logger, window.DOMHelpers
+  const { SELECTORS, DELAYS } = window.Constants;
+  const { logger } = window.Logger;
+  const { delay } = window.DOMHelpers;
 
-  // Log to console as well
-  const consoleMethod = level === 'error' ? console.error :
-                       level === 'warn' ? console.warn :
-                       level === 'debug' ? console.debug :
-                       console.log;
-  consoleMethod(`[${location}] ${message}`, data || '');
-
-  // Send to background script to store
-  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-    chrome.runtime.sendMessage({
-      action: 'addLog',
-      logEntry: logEntry
-    }).catch(err => {
-      // Silently fail if background script is not available
-    });
-  }
-}
-
-/**
- * Dismiss beta banner if present
- * @returns {Promise<void>}
- */
-export async function dismissBetaBanner() {
-  const betaDismissBtn = document.getElementById('beta-dismiss-btn');
-  if (betaDismissBtn) {
-    logger('info', 'ProfileOpener', '🔘 Clic sur le bouton beta-dismiss-btn...');
-    betaDismissBtn.click();
-    await delay(DELAYS.SECOND);
-  } else {
-    logger('info', 'ProfileOpener', 'ℹ️ Bouton beta-dismiss-btn non trouvé (peut-être déjà fermé)');
-  }
-}
-
-/**
- * Find the first profile grid cell
- * @returns {HTMLElement|null} First grid cell element or null
- */
-export function findFirstProfileGridCell() {
-  return document.querySelector(SELECTORS.PROFILE_GRIDCELL);
-}
-
-/**
- * Verify if profile is opened
- * @returns {boolean} True if profile is opened
- */
-export function verifyProfileOpened() {
-  const currentURL = window.location.href;
-  const urlContainsProfile = currentURL.includes('?profile=true') || currentURL.includes('&profile=true');
-  const nextProfileBtn = document.querySelector(SELECTORS.NEXT_PROFILE);
-  const tapButton = document.querySelector(SELECTORS.TAP_BUTTON);
-  const profileView = document.querySelector(SELECTORS.PROFILE_VIEW);
-
-  return urlContainsProfile || !!(nextProfileBtn || tapButton || profileView);
-}
-
-/**
- * Attempt to open profile by clicking on grid cell
- * @param {HTMLElement} gridCell - Grid cell element to click
- * @returns {Promise<boolean>} True if profile opened successfully
- */
-export async function attemptProfileClick(gridCell) {
-  try {
-    logger('info', 'ProfileOpener', '👤 Ouverture du premier profil...');
-
-    // Simple click on the grid cell
-    gridCell.click();
-    await delay(DELAYS.VERY_LONG);
-
-    // Wait a bit and check if profile opened
-    await delay(DELAYS.SECOND);
-
-    return verifyProfileOpened();
-  } catch (error) {
-    logger('warn', 'ProfileOpener', '⚠️ Erreur lors du clic sur le profil: ' + error.message);
-    return false;
-  }
-}
-
-/**
- * Perform pre-script actions: dismiss banner and open first profile
- * @returns {Promise<boolean>} True if profile opened successfully
- */
-export async function performPreScriptActions() {
-  try {
-    logger('info', 'ProfileOpener', '🔧 Exécution des actions préalables...');
-
-    // 1. Dismiss beta banner
-    await dismissBetaBanner();
-    await delay(DELAYS.SECOND);
-
-    // 2. Find and click first profile
-    const firstGridCell = findFirstProfileGridCell();
-    if (!firstGridCell) {
-      logger('warn', 'ProfileOpener', '⚠️ Aucun div avec role="gridcell" trouvé');
-      return false;
-    }
-
-    // 3. Attempt to open profile
-    const profileOpened = await attemptProfileClick(firstGridCell);
-
-    if (profileOpened) {
-      logger('info', 'ProfileOpener', '✅ Actions préalables terminées - Profil ouvert');
-      return true;
+  /**
+   * Dismiss the beta banner if present
+   * @returns {Promise<void>}
+   */
+  async function dismissBetaBanner() {
+    const betaDismissBtn = document.getElementById('beta-dismiss-btn');
+    if (betaDismissBtn) {
+      logger('info', 'Content', '🔘 Clic sur le bouton beta-dismiss-btn...');
+      betaDismissBtn.click();
+      await delay(DELAYS.SECOND);
     } else {
-      logger('warn', 'ProfileOpener', '⚠️ Actions préalables terminées - Profil non ouvert');
+      logger('info', 'Content', 'ℹ️ Bouton beta-dismiss-btn non trouvé (peut-être déjà fermé)');
+    }
+  }
+
+  /**
+   * Verify that a profile is currently opened
+   * @returns {boolean} True if profile is open, false otherwise
+   */
+  function verifyProfileOpened() {
+    const currentURL = window.location.href;
+    const urlContainsProfile = currentURL.includes('?profile=true') || currentURL.includes('&profile=true');
+    const nextProfileBtn = document.querySelector(SELECTORS.NEXT_PROFILE);
+    const tapButton = document.querySelector(SELECTORS.TAP_BUTTON);
+    const profileView = document.querySelector(SELECTORS.PROFILE_VIEW);
+
+    // Un profil est considéré comme ouvert SEULEMENT si les boutons/vue sont présents
+    // L'URL seule ne suffit PAS (car elle peut être changée sans que le DOM se mette à jour)
+    const hasProfileElements = !!(nextProfileBtn || tapButton || profileView);
+
+    logger('debug', 'Content', 'verifyProfileOpened check', {
+      url: currentURL,
+      urlContainsProfile,
+      hasNextProfileBtn: !!nextProfileBtn,
+      hasTapButton: !!tapButton,
+      hasProfileView: !!profileView,
+      result: hasProfileElements,
+      hypothesisId: 'E'
+    });
+
+    return hasProfileElements;
+  }
+
+  /**
+   * Open the first profile by performing necessary actions
+   * @returns {Promise<boolean>} True if profile opened successfully, false otherwise
+   */
+  async function openProfile() {
+    try {
+      logger('info', 'Content', '🔧 Exécution des actions préalables...');
+
+      // Vérifier si le script a été arrêté avant de continuer
+      if (!window.__grindrRunning || window.__grindrStopped) {
+        logger('info', 'Content', '⏹️ Script arrêté, interruption des actions préalables');
+        return false;
+      }
+
+      await dismissBetaBanner();
+      await delay(DELAYS.SECOND);
+
+      // Action 1: Clic sur cascadeCellContainer img
+      logger('info', 'Content', '🎯 Action 1: Clic sur cascadeCellContainer img...');
+      const cascadeImg = document.querySelector('[data-testid="cascadeCellContainer"] img');
+      if (cascadeImg) {
+        cascadeImg.click();
+        await delay(DELAYS.SECOND);
+      } else {
+        logger('warn', 'Content', '⚠️ cascadeCellContainer img non trouvé');
+      }
+
+      // Action 2: Clic sur userAvatar img
+      logger('info', 'Content', '🎯 Action 2: Clic sur userAvatar img...');
+      const userAvatarImg = document.querySelector('[data-testid="userAvatar"] img');
+      if (userAvatarImg) {
+        userAvatarImg.click();
+        await delay(DELAYS.SECOND);
+      } else {
+        logger('warn', 'Content', '⚠️ userAvatar img non trouvé');
+      }
+
+      // Action 3: Fermeture du chat
+      logger('info', 'Content', '🎯 Action 3: Fermeture du chat...');
+      const closeChatBtn = document.querySelector('[aria-label="close chat"]');
+      if (closeChatBtn) {
+        closeChatBtn.click();
+        await delay(DELAYS.SECOND);
+      } else {
+        logger('warn', 'Content', '⚠️ Bouton close chat non trouvé');
+      }
+
+      // Vérifier que le profil est ouvert
+      if (verifyProfileOpened()) {
+        logger('info', 'Content', '✅ Profil ouvert avec succès !');
+        chrome.runtime.sendMessage({
+          action: 'updateStatus',
+          message: '✅ Profil ouvert !',
+          type: 'success'
+        });
+        return true;
+      } else {
+        logger('warn', 'Content', '⚠️ Le profil ne semble pas être ouvert');
+        return false;
+      }
+    } catch (error) {
+      logger('warn', 'Content', '⚠️ Erreur lors des actions préalables: ' + error.message);
       return false;
     }
-  } catch (error) {
-    logger('warn', 'ProfileOpener', '⚠️ Erreur lors des actions préalables: ' + error.message);
-    // In case of error, check if profile is opened anyway
-    return verifyProfileOpened();
   }
-}
 
+  // Export to global scope
+  window.ProfileOpener = {
+    dismissBetaBanner,
+    verifyProfileOpened,
+    openProfile
+  };
+})();
