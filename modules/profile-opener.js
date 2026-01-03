@@ -87,3 +87,32 @@ async function clickTapButton() {
     return false;
   }
 }
+
+/**
+ * Wait for next profile to load after tapping
+ * @returns {Promise<boolean>} True if next profile loaded, false on timeout
+ */
+async function waitForNextProfile() {
+  try {
+    const startTime = Date.now();
+    const timeout = TIMEOUTS.BUTTON_WAIT;
+    let previousProfile = document.querySelector(SELECTORS.PROFILE_VIEW);
+
+    while (Date.now() - startTime < timeout) {
+      await delay(DELAYS.MEDIUM);
+      const currentProfile = document.querySelector(SELECTORS.PROFILE_VIEW);
+
+      // Check if profile changed
+      if (currentProfile !== previousProfile) {
+        logger('info', 'waitForNextProfile', 'Next profile loaded');
+        return true;
+      }
+    }
+
+    logger('warn', 'waitForNextProfile', 'Next profile did not load in time');
+    return false;
+  } catch (error) {
+    logger('error', 'waitForNextProfile', 'Failed to wait for next profile', { error: error.message });
+    return false;
+  }
+}
