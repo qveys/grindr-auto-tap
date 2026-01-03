@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git reset:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(GIT_SEQUENCE_EDITOR=\"sed -i ''1s/pick/reword/''\" git rebase -i HEAD~2)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(GIT_SEQUENCE_EDITOR=\"sed -i ''s/^pick/reword/''\" git rebase -i HEAD~9)",
+      "Bash(git rebase:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(cat:*)"
+    ]
+  }
+}
