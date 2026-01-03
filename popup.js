@@ -40,7 +40,83 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Check script status
   await checkScriptStatus();
+
+  // Setup script control buttons
+  setupScriptControls();
 });
+
+/**
+ * Setup script control buttons
+ */
+function setupScriptControls() {
+  const startButton = document.getElementById('startButton');
+  const stopButton = document.getElementById('stopButton');
+
+  if (startButton) {
+    startButton.addEventListener('click', startScript);
+  }
+  if (stopButton) {
+    stopButton.addEventListener('click', stopScript);
+  }
+}
+
+/**
+ * Start script
+ */
+async function startScript() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs[0]) {
+      showStatus('No active tab found', 'error');
+      return;
+    }
+
+    // Verify tab URL contains 'web.grindr.com'
+    if (!tabs[0].url || !tabs[0].url.includes('web.grindr.com')) {
+      showStatus('Please open web.grindr.com', 'error');
+      return;
+    }
+
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'startScript' }, (response) => {
+      if (chrome.runtime.lastError) {
+        showStatus('Failed to start script', 'error');
+        logger('error', 'startScript', 'Failed to start script', { error: chrome.runtime.lastError.message });
+      } else {
+        showStatus('Script started', 'success');
+        updateScriptButtons(true);
+      }
+    });
+  } catch (error) {
+    logger('error', 'startScript', 'Failed to start script', { error: error.message });
+    showStatus('Failed to start script', 'error');
+  }
+}
+
+/**
+ * Stop script
+ */
+async function stopScript() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs[0]) {
+      showStatus('No active tab found', 'error');
+      return;
+    }
+
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'stopScript' }, (response) => {
+      if (chrome.runtime.lastError) {
+        showStatus('Failed to stop script', 'error');
+        logger('error', 'stopScript', 'Failed to stop script', { error: chrome.runtime.lastError.message });
+      } else {
+        showStatus('Script stopped', 'success');
+        updateScriptButtons(false);
+      }
+    });
+  } catch (error) {
+    logger('error', 'stopScript', 'Failed to stop script', { error: error.message });
+    showStatus('Failed to stop script', 'error');
+  }
+}
 
 /**
  * Setup authentication listeners
