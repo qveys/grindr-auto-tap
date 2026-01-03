@@ -29,12 +29,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup tab navigation
   setupTabs();
 
+  // Setup edit mode button listeners
+  setupEditModeButtons();
+
   // Load initial data
   await loadSavedData();
 
   // Check script status
   await checkScriptStatus();
 });
+
+/**
+ * Setup edit mode button listeners
+ */
+function setupEditModeButtons() {
+  const editAuthBtn = document.getElementById('editAuth');
+  const editWebhookBtn = document.getElementById('editWebhook');
+  const editMinDelayBtn = document.getElementById('editMinDelay');
+
+  if (editAuthBtn) {
+    editAuthBtn.addEventListener('click', () => toggleEditMode('auth'));
+  }
+  if (editWebhookBtn) {
+    editWebhookBtn.addEventListener('click', () => toggleEditMode('webhook'));
+  }
+  if (editMinDelayBtn) {
+    editMinDelayBtn.addEventListener('click', () => toggleEditMode('minDelay'));
+  }
+}
 
 /**
  * Setup tab navigation
@@ -86,6 +108,16 @@ function switchTab(tabKey) {
 }
 
 /**
+ * Toggle edit mode for a specific section
+ * @param {string} section - Section name (auth, webhook, minDelay)
+ */
+function toggleEditMode(section) {
+  if (editModeManagers && editModeManagers[section]) {
+    editModeManagers[section].toggle();
+  }
+}
+
+/**
  * Cancel edit mode for all sections
  */
 function cancelEditMode() {
@@ -97,6 +129,15 @@ function cancelEditMode() {
     });
   }
 }
+
+// Auto-cancel edit mode on popup close
+window.addEventListener('beforeunload', cancelEditMode);
+window.addEventListener('pagehide', cancelEditMode);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    cancelEditMode();
+  }
+});
 
 /**
  * Load saved data on popup open
