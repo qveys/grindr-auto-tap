@@ -13,3 +13,18 @@ function formatDate(timestamp) {
   const seconds = String(date.getSeconds()).padStart(2, '0');
   return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
 }
+
+/**
+ * Format a duration in milliseconds to a readable string
+ * @param {number} ms - Duration in milliseconds
+ * @returns {string} Formatted duration string (e.g., "5min 30s" or "45s")
+ */
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes}min ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
