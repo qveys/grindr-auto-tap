@@ -72,12 +72,13 @@ setTimeout(() => {
   checkScriptStatus(0, false);
 }, 100);
 
-// Vérifier périodiquement l'état du script (toutes les 2 secondes) pour rester synchronisé
+// Vérifier périodiquement l'état du script pour rester synchronisé
 // Cela permet de détecter les changements même si le popup était fermé lors du démarrage automatique
 // Passer true pour isPeriodicCheck pour éviter les logs répétitifs
+// Interval défini dans shared-constants.js (LOGGING.STATUS_CHECK_INTERVAL)
 const statusCheckInterval = setInterval(() => {
   checkScriptStatus(0, true);
-}, 2000);
+}, LOGGING.STATUS_CHECK_INTERVAL);
 
 // Nettoyer l'intervalle quand le popup se ferme
 window.addEventListener('beforeunload', () => {
