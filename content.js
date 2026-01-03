@@ -887,3 +887,136 @@ async function initAndRun() {
     window.__grindrRunning = false;
   }
 }
+async function autoTapAndNext() {
+  const startTime = Date.now();
+  let alreadyTappedCount = 0;
+  let tappedCount = 0;
+  let stats = null;
+
+  window.__grindrStats = {
+    startTime: startTime,
+    alreadyTappedCount: 0,
+    tappedCount: 0
+  };
+
+  logger('info', 'Content', `🚀 Démarrage du script à ${formatDate(startTime)}`);
+
+  try {
+    let iterationCount = 0;
+
+    const waitStartTime = Date.now();
+    while (!document.querySelector(SELECTORS.NEXT_PROFILE) && (Date.now() - waitStartTime) < TIMEOUTS.BUTTON_WAIT) {
+      if (!window.__grindrRunning || window.__grindrStopped) {
+        logger('info', 'Content', '⏹️ Script arrêté pendant l\'attente du bouton');
+        return;
+      }
+      await delay(DELAYS.MEDIUM);
+    }
+
+    while (document.querySelector(SELECTORS.NEXT_PROFILE) && window.__grindrRunning && !window.__grindrStopped) {
+      const currentDuration = Date.now() - startTime;
+      if (currentDuration > LIMITS.MAX_DURATION_MS) {
+        logger('warn', 'Content', `⚠️ Durée maximale atteinte (${formatDuration(LIMITS.MAX_DURATION_MS)}), arrêt du script`);
+        break;
+      }
+
+      iterationCount++;
+      if (iterationCount > LIMITS.MAX_ITERATIONS) {
+        logger('warn', 'Content', `⚠️ Nombre maximum d'itérations atteint (${LIMITS.MAX_ITERATIONS}), arrêt du script`);
+        break;
+      }
+
+      try {
+        if (!window.__grindrRunning || window.__grindrStopped) {
+          logger('info', 'Content', '⏹️ Script arrêté, interruption de la boucle');
+          break;
+        }
+
+        const tapBtn = document.querySelector(SELECTORS.TAP_BUTTON);
+        const nextBtn = document.querySelector(SELECTORS.NEXT_PROFILE);
+
+        if (!nextBtn) {
+          logger('warn', 'Content', '⚠️ Bouton "Next Profile" introuvable, arrêt de la boucle');
+          break;
+        }
+
+        const modalRoot = document.querySelector(".MuiModal-root .MuiStack-root");
+        const textNodes = modalRoot ? getTextNodes(modalRoot) : [];
+
+        if (!tapBtn) {
+          logger('debug', 'Content', '➡️ déjà tapper, au suivant', textNodes);
+          alreadyTappedCount++;
+          window.__grindrStats.alreadyTappedCount = alreadyTappedCount;
+
+          try {
+            nextBtn.click();
+          } catch (clickError) {
+            logger('error', 'Content', '❌ Erreur lors du clic sur nextBtn: ' + clickError.message);
+            throw clickError;
+          }
+        } else {
+          logger('debug', 'Content', '🔥 à tapper', textNodes);
+          tappedCount++;
+          window.__grindrStats.tappedCount = tappedCount;
+
+          try {
+            tapBtn.click();
+            await delay(DELAYS.SECOND);
+            nextBtn.click();
+            await delay(DELAYS.SECOND);
+          } catch (clickError) {
+            logger('error', 'Content', '❌ Erreur lors du clic: ' + clickError.message);
+            throw clickError;
+          }
+        }
+
+        await delay(DELAYS.TWO_SECONDS);
+      } catch (loopError) {
+        logger('error', 'Content', '❌ Erreur dans la boucle: ' + loopError.message);
+        await delay(DELAYS.SECOND);
+        continue;
+      }
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    const totalCount = alreadyTappedCount + tappedCount;
+
+    stats = {
+      startTime: startTime,
+      endTime: endTime,
+      duration: duration,
+      alreadyTappedCount: alreadyTappedCount,
+      tappedCount: tappedCount,
+      totalCount: totalCount
+    };
+
+    await sendFinalStats(stats, false);
+    logger('info', 'Content', '✅ Fin de la boucle');
+
+  } catch (error) {
+    logger('error', 'Content', '❌ Erreur fatale dans autoTapAndNext: ' + error.message, error);
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    const totalCount = alreadyTappedCount + tappedCount;
+
+    stats = createErrorStats({
+      startTime: startTime,
+      endTime: endTime,
+      duration: duration,
+      alreadyTappedCount: alreadyTappedCount,
+      tappedCount: tappedCount,
+      totalCount: totalCount
+    }, error);
+
+    await sendFinalStats(stats, true);
+    throw error;
+  } finally {
+    window.__grindrRunning = false;
+    if (window.__grindrStats) {
+      delete window.__grindrStats;
+    }
+    window.__grindrLastRun = Date.now();
+  }
+}
