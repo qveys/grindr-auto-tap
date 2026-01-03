@@ -2,5 +2,11 @@
   "manifest_version": 3,
   "name": "Grindr Auto Tap",
   "version": "1.0.0",
-  "description": "Extension pour automatiser les actions sur Grindr et envoyer les statistiques vers n8n"
+  "description": "Extension pour automatiser les actions sur Grindr et envoyer les statistiques vers n8n",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "activeTab"
+  ]
 }
