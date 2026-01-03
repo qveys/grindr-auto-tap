@@ -1,916 +1,12 @@
-/**
- * Popup Script for Grindr Auto Tap extension
- * Handles UI interactions and settings management
- */
+// Popup script pour gérer l'interface utilisateur avec mode affichage/édition
 
-// Initialize edit mode managers (external from edit-mode.js)
+// Initialize edit mode managers
 let editModeManagers = null;
-
-// Tab management
-const tabs = {
-  script: { tab: document.getElementById('tabScript'), content: document.getElementById('contentScript') },
-  settings: { tab: document.getElementById('tabSettings'), content: document.getElementById('contentSettings') },
-  webhook: { tab: document.getElementById('tabWebhook'), content: document.getElementById('contentWebhook') },
-  logs: { tab: document.getElementById('tabLogs'), content: document.getElementById('contentLogs') }
-};
-
-// Current active tab
-let activeTab = 'script';
-
-/**
- * Initialize popup when DOM is ready
- */
-document.addEventListener('DOMContentLoaded', async () => {
-  // Initialize edit mode managers
-  if (typeof createEditModeManagers === 'function') {
-    editModeManagers = createEditModeManagers();
-  }
-
-  // Setup tab navigation
-  setupTabs();
-
-  // Setup edit mode button listeners
-  setupEditModeButtons();
-
-  // Setup authentication listeners
-  setupAuthListeners();
-
-  // Load initial data
-  await loadSavedData();
-
-  // Check script status
-  await checkScriptStatus();
-
-  // Setup script control buttons
-  setupScriptControls();
-
-  // Setup message listeners
-  setupMessageListeners();
-});
-
-/**
- * Setup message listeners
- */
-function setupMessageListeners() {
-  // Listen for status updates from content script
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'updateStatus') {
-      showStatus(request.message, request.type || 'info');
-    } else if (request.action === 'scriptStatusChanged') {
-      updateScriptButtons(request.isRunning || false);
-    }
-  });
+if (typeof createEditModeManagers === 'function') {
+  editModeManagers = createEditModeManagers();
 }
 
-/**
- * Setup script control buttons
- */
-function setupScriptControls() {
-  const startButton = document.getElementById('startButton');
-  const stopButton = document.getElementById('stopButton');
-
-  if (startButton) {
-    startButton.addEventListener('click', startScript);
-  }
-  if (stopButton) {
-    stopButton.addEventListener('click', stopScript);
-  }
-}
-
-/**
- * Start script
- */
-async function startScript() {
-  try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tabs[0]) {
-      showStatus('No active tab found', 'error');
-      return;
-    }
-
-    // Verify tab URL contains 'web.grindr.com'
-    if (!tabs[0].url || !tabs[0].url.includes('web.grindr.com')) {
-      showStatus('Please open web.grindr.com', 'error');
-      return;
-    }
-
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'startScript' }, (response) => {
-      if (chrome.runtime.lastError) {
-        showStatus('Failed to start script', 'error');
-        logger('error', 'startScript', 'Failed to start script', { error: chrome.runtime.lastError.message });
-      } else {
-        showStatus('Script started', 'success');
-        updateScriptButtons(true);
-      }
-    });
-  } catch (error) {
-    logger('error', 'startScript', 'Failed to start script', { error: error.message });
-    showStatus('Failed to start script', 'error');
-  }
-}
-
-/**
- * Stop script
- */
-async function stopScript() {
-  try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tabs[0]) {
-      showStatus('No active tab found', 'error');
-      return;
-    }
-
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'stopScript' }, (response) => {
-      if (chrome.runtime.lastError) {
-        showStatus('Failed to stop script', 'error');
-        logger('error', 'stopScript', 'Failed to stop script', { error: chrome.runtime.lastError.message });
-      } else {
-        showStatus('Script stopped', 'success');
-        updateScriptButtons(false);
-      }
-    });
-  } catch (error) {
-    logger('error', 'stopScript', 'Failed to stop script', { error: error.message });
-    showStatus('Failed to stop script', 'error');
-  }
-}
-
-/**
- * Setup authentication listeners
- */
-function setupAuthListeners() {
-  const loginMethod = document.getElementById('loginMethod');
-  const deleteAuthBtn = document.getElementById('deleteAuthBtn');
-
-  if (loginMethod) {
-    loginMethod.addEventListener('change', handleLoginMethodChange);
-  }
-  if (deleteAuthBtn) {
-    deleteAuthBtn.addEventListener('click', deleteCredentials);
-  }
-
-  // Set save callback for auth edit mode manager
-  if (editModeManagers && editModeManagers.auth) {
-    editModeManagers.auth.saveCallback = saveCredentials;
-    editModeManagers.auth.loadEditCallback = loadAuthToEdit;
-  }
-
-  // Set save callback for webhook edit mode manager
-  if (editModeManagers && editModeManagers.webhook) {
-    editModeManagers.webhook.saveCallback = saveWebhook;
-    editModeManagers.webhook.loadEditCallback = loadWebhookToEdit;
-  }
-
-  // Set save callback for minDelay edit mode manager
-  if (editModeManagers && editModeManagers.minDelay) {
-    editModeManagers.minDelay.saveCallback = saveMinDelay;
-    editModeManagers.minDelay.loadEditCallback = loadMinDelayToEdit;
-  }
-}
-
-/**
- * Setup edit mode button listeners
- */
-function setupEditModeButtons() {
-  const editAuthBtn = document.getElementById('editAuth');
-  const editWebhookBtn = document.getElementById('editWebhook');
-  const editMinDelayBtn = document.getElementById('editMinDelay');
-
-  if (editAuthBtn) {
-    editAuthBtn.addEventListener('click', () => toggleEditMode('auth'));
-  }
-  if (editWebhookBtn) {
-    editWebhookBtn.addEventListener('click', () => toggleEditMode('webhook'));
-  }
-  if (editMinDelayBtn) {
-    editMinDelayBtn.addEventListener('click', () => toggleEditMode('minDelay'));
-  }
-}
-
-/**
- * Setup tab navigation
- */
-function setupTabs() {
-  // Add click listeners to all tabs
-  Object.keys(tabs).forEach(tabKey => {
-    const tabElement = tabs[tabKey].tab;
-    if (tabElement) {
-      tabElement.addEventListener('click', () => switchTab(tabKey));
-    }
-  });
-}
-
-/**
- * Switch to a different tab
- * @param {string} tabKey - Key of the tab to switch to
- */
-function switchTab(tabKey) {
-  // Cancel any active edit mode
-  cancelEditMode();
-
-  // Remove active class from all tabs and content
-  Object.keys(tabs).forEach(key => {
-    if (tabs[key].tab) {
-      tabs[key].tab.classList.remove('active');
-    }
-    if (tabs[key].content) {
-      tabs[key].content.classList.remove('active');
-    }
-  });
-
-  // Add active class to selected tab and content
-  if (tabs[tabKey] && tabs[tabKey].tab) {
-    tabs[tabKey].tab.classList.add('active');
-  }
-  if (tabs[tabKey] && tabs[tabKey].content) {
-    tabs[tabKey].content.classList.add('active');
-  }
-
-  activeTab = tabKey;
-
-  // Load data on-demand when activating specific tabs
-  if (tabKey === 'webhook') {
-    loadWebhookDisplay();
-  } else if (tabKey === 'logs') {
-    loadLogs();
-  }
-}
-
-/**
- * Toggle edit mode for a specific section
- * @param {string} section - Section name (auth, webhook, minDelay)
- */
-function toggleEditMode(section) {
-  if (editModeManagers && editModeManagers[section]) {
-    editModeManagers[section].toggle();
-  }
-}
-
-/**
- * Cancel edit mode for all sections
- */
-function cancelEditMode() {
-  if (editModeManagers) {
-    Object.values(editModeManagers).forEach(manager => {
-      if (manager && typeof manager.cancel === 'function') {
-        manager.cancel();
-      }
-    });
-  }
-}
-
-// Auto-cancel edit mode on popup close
-window.addEventListener('beforeunload', cancelEditMode);
-window.addEventListener('pagehide', cancelEditMode);
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    cancelEditMode();
-  }
-});
-
-/**
- * Load saved data on popup open
- */
-async function loadSavedData() {
-  // Load auth, auto-start, min delay
-  // Skip webhook loading initially (loaded on-demand)
-  await loadAuthDisplay();
-  await loadMinDelayDisplay();
-  await loadAutoStart();
-}
-
-/**
- * Save webhook URL
- */
-async function saveWebhook() {
-  const webhookURLInput = document.getElementById('webhookURL');
-  if (!webhookURLInput) return;
-
-  const url = webhookURLInput.value.trim();
-
-  // Validate URL format
-  try {
-    new URL(url);
-  } catch (error) {
-    showStatus('Invalid URL format', 'error');
-    return;
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'saveWebhookURL',
-      url: url
-    });
-
-    if (response && response.success) {
-      showStatus('Webhook URL saved', 'success');
-      if (editModeManagers && editModeManagers.webhook) {
-        editModeManagers.webhook.exitEditMode();
-      }
-      await loadWebhookDisplay();
-    } else {
-      showStatus('Failed to save webhook URL', 'error');
-    }
-  } catch (error) {
-    logger('error', 'saveWebhook', 'Failed to save webhook URL', { error: error.message });
-    showStatus('Failed to save webhook URL', 'error');
-  }
-}
-
-/**
- * Load webhook display
- */
-async function loadWebhookDisplay() {
-  // Only update when webhook tab is active
-  if (activeTab !== 'webhook') return;
-
-  // Preserve edit mode if already editing
-  if (editModeManagers && editModeManagers.webhook && editModeManagers.webhook.isEditing()) {
-    return;
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getWebhookURL' });
-    const url = response && response.url ? response.url : 'https://n8n.quentinveys.be/webhook/grindr-stats';
-
-    const webhookURLDisplay = document.getElementById('webhookURLDisplay');
-    if (webhookURLDisplay) {
-      webhookURLDisplay.textContent = url;
-    }
-  } catch (error) {
-    logger('error', 'loadWebhookDisplay', 'Failed to load webhook display', { error: error.message });
-  }
-}
-
-/**
- * Load webhook to edit form
- */
-async function loadWebhookToEdit() {
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getWebhookURL' });
-    const url = response && response.url ? response.url : 'https://n8n.quentinveys.be/webhook/grindr-stats';
-
-    const webhookURLInput = document.getElementById('webhookURL');
-    if (webhookURLInput) {
-      webhookURLInput.value = url;
-    }
-  } catch (error) {
-    logger('error', 'loadWebhookToEdit', 'Failed to load webhook to edit', { error: error.message });
-  }
-}
-
-/**
- * Save min delay
- */
-async function saveMinDelay() {
-  const minDelayHoursInput = document.getElementById('minDelayHours');
-  if (!minDelayHoursInput) return;
-
-  const hours = parseFloat(minDelayHoursInput.value);
-
-  // Validate hours >= 0
-  if (isNaN(hours) || hours < 0) {
-    showStatus('Hours must be >= 0', 'error');
-    return;
-  }
-
-  try {
-    await chrome.storage.local.set({ minDelayHours: hours });
-    showStatus('Min delay saved', 'success');
-    if (editModeManagers && editModeManagers.minDelay) {
-      editModeManagers.minDelay.exitEditMode();
-    }
-    await loadMinDelayDisplay();
-  } catch (error) {
-    logger('error', 'saveMinDelay', 'Failed to save min delay', { error: error.message });
-    showStatus('Failed to save min delay', 'error');
-  }
-}
-
-/**
- * Save auto-start
- */
-async function saveAutoStart() {
-  const autoStartCheckbox = document.getElementById('autoStart');
-  if (!autoStartCheckbox) return;
-
-  const autoStart = autoStartCheckbox.checked;
-
-  try {
-    await chrome.storage.local.set({ autoStart: autoStart });
-    // No status message for auto-start (direct save)
-  } catch (error) {
-    logger('error', 'saveAutoStart', 'Failed to save auto-start', { error: error.message });
-  }
-}
-
-/**
- * Load min delay display
- */
-async function loadMinDelayDisplay() {
-  try {
-    const result = await chrome.storage.local.get(['minDelayHours']);
-    const hours = result.minDelayHours !== undefined ? result.minDelayHours : 12;
-
-    const minDelayDisplay = document.getElementById('minDelayDisplay');
-    if (minDelayDisplay) {
-      minDelayDisplay.textContent = `${hours}h`;
-    }
-  } catch (error) {
-    logger('error', 'loadMinDelayDisplay', 'Failed to load min delay display', { error: error.message });
-  }
-}
-
-/**
- * Load min delay to edit form
- */
-async function loadMinDelayToEdit() {
-  try {
-    const result = await chrome.storage.local.get(['minDelayHours']);
-    const hours = result.minDelayHours !== undefined ? result.minDelayHours : 12;
-
-    const minDelayHoursInput = document.getElementById('minDelayHours');
-    if (minDelayHoursInput) {
-      minDelayHoursInput.value = hours;
-    }
-  } catch (error) {
-    logger('error', 'loadMinDelayToEdit', 'Failed to load min delay to edit', { error: error.message });
-  }
-}
-
-/**
- * Load auto-start
- */
-async function loadAutoStart() {
-  try {
-    const result = await chrome.storage.local.get(['autoStart']);
-    const autoStart = result.autoStart !== undefined ? result.autoStart : true;
-
-    const autoStartCheckbox = document.getElementById('autoStart');
-    if (autoStartCheckbox) {
-      autoStartCheckbox.checked = autoStart;
-      autoStartCheckbox.addEventListener('change', saveAutoStart);
-    }
-  } catch (error) {
-    logger('error', 'loadAutoStart', 'Failed to load auto-start', { error: error.message });
-  }
-}
-
-/**
- * Format timestamp
- * @param {number} timestamp - Unix timestamp in milliseconds
- * @returns {string} Formatted timestamp
- */
-function formatTimestamp(timestamp) {
-  const date = new Date(timestamp);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  const ms = String(date.getMilliseconds()).padStart(3, '0');
-  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}.${ms}`;
-}
-
-/**
- * Escape HTML
- * @param {string} text - Text to escape
- * @returns {string} Escaped text
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-/**
- * Load logs
- */
-async function loadLogs() {
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getLogs' });
-    const logs = response && response.logs ? response.logs : [];
-
-    const logsContainer = document.getElementById('logsContainer');
-    if (!logsContainer) return;
-
-    // Clear container
-    logsContainer.innerHTML = '';
-
-    // Sort logs by timestamp (oldest first)
-    const sortedLogs = [...logs].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-
-    sortedLogs.forEach(log => {
-      const logEntry = document.createElement('div');
-      logEntry.className = `log-entry log-${log.level || 'info'}`;
-
-      const timestamp = formatTimestamp(log.timestamp || Date.now());
-      const location = escapeHtml(log.location || 'unknown');
-      const message = escapeHtml(log.message || '');
-
-      // Use textContent for security (avoid innerHTML)
-      const timestampEl = document.createElement('span');
-      timestampEl.className = 'log-timestamp';
-      timestampEl.textContent = `[${timestamp}] `;
-
-      const locationEl = document.createElement('span');
-      locationEl.className = 'log-location';
-      locationEl.textContent = `[${location}] `;
-
-      const messageEl = document.createElement('span');
-      messageEl.className = 'log-message';
-      messageEl.textContent = message;
-
-      logEntry.appendChild(timestampEl);
-      logEntry.appendChild(locationEl);
-      logEntry.appendChild(messageEl);
-
-      // Show log data as JSON if present
-      if (log.data) {
-        const dataEl = document.createElement('pre');
-        dataEl.className = 'log-data';
-        dataEl.textContent = JSON.stringify(log.data, null, 2);
-        logEntry.appendChild(dataEl);
-      }
-
-      logsContainer.appendChild(logEntry);
-    });
-
-    // Auto-scroll to bottom
-    scrollLogsToBottom();
-  } catch (error) {
-    logger('error', 'loadLogs', 'Failed to load logs', { error: error.message });
-  }
-}
-
-/**
- * Scroll logs container to bottom
- */
-function scrollLogsToBottom() {
-  const logsContainer = document.getElementById('logsContainer');
-  if (logsContainer) {
-    requestAnimationFrame(() => {
-      logsContainer.scrollTop = logsContainer.scrollHeight;
-    });
-  }
-}
-
-/**
- * Clear logs
- */
-async function clearLogs() {
-  const confirmed = await showConfirm(
-    'Clear Logs',
-    'Are you sure you want to clear all logs?'
-  );
-
-  if (!confirmed) return;
-
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'clearLogs' });
-    if (response && response.success) {
-      await loadLogs();
-      showStatus('Logs cleared', 'success');
-    } else {
-      showStatus('Failed to clear logs', 'error');
-    }
-  } catch (error) {
-    logger('error', 'clearLogs', 'Failed to clear logs', { error: error.message });
-    showStatus('Failed to clear logs', 'error');
-  }
-}
-
-// Setup clear logs button
-document.addEventListener('DOMContentLoaded', () => {
-  const clearLogsButton = document.getElementById('clearLogsButton');
-  if (clearLogsButton) {
-    clearLogsButton.addEventListener('click', clearLogs);
-  }
-
-  // Real-time logs updates via chrome.storage.onChanged
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes.extensionLogs && activeTab === 'logs') {
-      loadLogs();
-    }
-  });
-});
-
-/**
- * Show status message
- * @param {string} message - Status message
- * @param {string} type - Status type (success, error, info)
- */
-function showStatus(message, type = 'info') {
-  const statusEl = document.getElementById('status');
-  if (!statusEl) return;
-
-  statusEl.textContent = message;
-  statusEl.className = `status ${type}`;
-  statusEl.style.display = 'block';
-
-  // Auto-hide after timeout
-  const timeouts = {
-    success: 3000,
-    error: 5000,
-    info: 4000
-  };
-  const timeout = timeouts[type] || 4000;
-
-  setTimeout(() => {
-    statusEl.style.display = 'none';
-  }, timeout);
-}
-
-/**
- * Show confirmation modal
- * @param {string} title - Modal title
- * @param {string} message - Modal message
- * @returns {Promise<boolean>} True if confirmed, false otherwise
- */
-async function showConfirm(title, message) {
-  return new Promise((resolve) => {
-    const modalOverlay = document.getElementById('modalOverlay');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalMessage = document.getElementById('modalMessage');
-    const modalCancel = document.getElementById('modalCancel');
-    const modalConfirm = document.getElementById('modalConfirm');
-
-    if (!modalOverlay || !modalTitle || !modalMessage || !modalCancel || !modalConfirm) {
-      resolve(false);
-      return;
-    }
-
-    modalTitle.textContent = title;
-    modalMessage.textContent = message;
-    modalOverlay.classList.add('show');
-
-    const cleanup = () => {
-      modalOverlay.classList.remove('show');
-      modalCancel.removeEventListener('click', onCancel);
-      modalConfirm.removeEventListener('click', onConfirm);
-      modalOverlay.removeEventListener('click', onOverlayClick);
-    };
-
-    const onCancel = () => {
-      cleanup();
-      resolve(false);
-    };
-
-    const onConfirm = () => {
-      cleanup();
-      resolve(true);
-    };
-
-    const onOverlayClick = (e) => {
-      if (e.target === modalOverlay) {
-        cleanup();
-        resolve(false);
-      }
-    };
-
-    modalCancel.addEventListener('click', onCancel);
-    modalConfirm.addEventListener('click', onConfirm);
-    modalOverlay.addEventListener('click', onOverlayClick);
-  });
-}
-
-/**
- * Check script status and update buttons
- */
-async function checkScriptStatus() {
-  try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs[0] && tabs[0].url && tabs[0].url.includes('web.grindr.com')) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'getStatus' }, (response) => {
-        if (chrome.runtime.lastError) {
-          updateScriptButtons(false);
-        } else {
-          updateScriptButtons(response && response.isRunning);
-        }
-      });
-    } else {
-      updateScriptButtons(false);
-    }
-  } catch (error) {
-    logger('error', 'checkScriptStatus', 'Failed to check script status', { error: error.message });
-    updateScriptButtons(false);
-  }
-}
-
-/**
- * Update script control buttons visibility
- * @param {boolean} isRunning - Whether script is running
- */
-function updateScriptButtons(isRunning) {
-  const startButton = document.getElementById('startButton');
-  const stopButton = document.getElementById('stopButton');
-
-  if (isRunning) {
-    if (startButton) startButton.classList.add('hidden');
-    if (stopButton) stopButton.classList.remove('hidden');
-  } else {
-    if (startButton) startButton.classList.remove('hidden');
-    if (stopButton) stopButton.classList.add('hidden');
-  }
-}
-
-/**
- * Handle login method change
- */
-function handleLoginMethodChange() {
-  const loginMethod = document.getElementById('loginMethod');
-  const authEmailEdit = document.getElementById('authEmailEdit');
-  const authPasswordEdit = document.getElementById('authPasswordEdit');
-  const authEmailDisplay = document.getElementById('authEmailDisplay');
-
-  if (!loginMethod) return;
-
-  const method = loginMethod.value;
-  const showEmailFields = method === 'email';
-
-  if (authEmailEdit) {
-    authEmailEdit.style.display = showEmailFields ? 'flex' : 'none';
-  }
-  if (authPasswordEdit) {
-    authPasswordEdit.style.display = showEmailFields ? 'flex' : 'none';
-  }
-  if (authEmailDisplay) {
-    authEmailDisplay.style.display = showEmailFields ? 'block' : 'none';
-  }
-}
-
-/**
- * Save credentials
- */
-async function saveCredentials() {
-  const loginMethod = document.getElementById('loginMethod');
-  const emailInput = document.getElementById('email');
-  const passwordInput = document.getElementById('password');
-  const autoLoginCheckbox = document.getElementById('autoLogin');
-
-  if (!loginMethod) return;
-
-  const method = loginMethod.value;
-  const email = emailInput ? emailInput.value.trim() : '';
-  const password = passwordInput ? passwordInput.value : '';
-  const autoLogin = autoLoginCheckbox ? autoLoginCheckbox.checked : false;
-
-  // Validate email and password for email method
-  if (method === 'email') {
-    if (!email) {
-      showStatus('Email is required', 'error');
-      return;
-    }
-    if (!password) {
-      showStatus('Password is required', 'error');
-      return;
-    }
-  }
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'saveCredentials',
-      loginMethod: method,
-      email: method === 'email' ? email : null,
-      password: method === 'email' ? password : null,
-      autoLogin: autoLogin
-    });
-
-    if (response && response.success) {
-      showStatus('Credentials saved', 'success');
-      if (editModeManagers && editModeManagers.auth) {
-        editModeManagers.auth.exitEditMode();
-      }
-      await loadAuthDisplay();
-    } else {
-      showStatus('Failed to save credentials', 'error');
-    }
-  } catch (error) {
-    logger('error', 'saveCredentials', 'Failed to save credentials', { error: error.message });
-    showStatus('Failed to save credentials', 'error');
-  }
-}
-
-/**
- * Delete credentials
- */
-async function deleteCredentials() {
-  const confirmed = await showConfirm(
-    'Delete Credentials',
-    'Are you sure you want to delete your saved credentials?'
-  );
-
-  if (!confirmed) return;
-
-  try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'deleteCredentials'
-    });
-
-    if (response && response.success) {
-      showStatus('Credentials deleted', 'success');
-      // Clear form fields
-      const emailInput = document.getElementById('email');
-      const passwordInput = document.getElementById('password');
-      const loginMethod = document.getElementById('loginMethod');
-      const autoLoginCheckbox = document.getElementById('autoLogin');
-
-      if (emailInput) emailInput.value = '';
-      if (passwordInput) passwordInput.value = '';
-      if (loginMethod) loginMethod.value = 'email';
-      if (autoLoginCheckbox) autoLoginCheckbox.checked = false;
-
-      await loadAuthDisplay();
-    } else {
-      showStatus('Failed to delete credentials', 'error');
-    }
-  } catch (error) {
-    logger('error', 'deleteCredentials', 'Failed to delete credentials', { error: error.message });
-    showStatus('Failed to delete credentials', 'error');
-  }
-}
-
-/**
- * Load authentication display
- */
-async function loadAuthDisplay() {
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getCredentials' });
-    if (response) {
-      const method = response.loginMethod || 'email';
-      const methodNames = {
-        email: 'Email',
-        facebook: 'Facebook',
-        google: 'Google',
-        apple: 'Apple'
-      };
-
-      const authMethodDisplay = document.getElementById('authMethodDisplay');
-      const authEmailValue = document.getElementById('authEmailValue');
-      const authEmailDisplay = document.getElementById('authEmailDisplay');
-      const autoLoginDisplay = document.getElementById('autoLoginDisplay');
-
-      if (authMethodDisplay) {
-        authMethodDisplay.textContent = methodNames[method] || method;
-      }
-
-      if (method === 'email' && response.email) {
-        if (authEmailValue) {
-          authEmailValue.textContent = response.email;
-        }
-        if (authEmailDisplay) {
-          authEmailDisplay.style.display = 'block';
-        }
-      } else {
-        if (authEmailDisplay) {
-          authEmailDisplay.style.display = 'none';
-        }
-      }
-
-      if (autoLoginDisplay) {
-        autoLoginDisplay.checked = response.autoLogin !== false;
-      }
-    }
-  } catch (error) {
-    logger('error', 'loadAuthDisplay', 'Failed to load auth display', { error: error.message });
-  }
-}
-
-/**
- * Load authentication to edit form
- */
-async function loadAuthToEdit() {
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getCredentials' });
-    if (response) {
-      const loginMethod = document.getElementById('loginMethod');
-      const emailInput = document.getElementById('email');
-      const passwordInput = document.getElementById('password');
-      const autoLoginCheckbox = document.getElementById('autoLogin');
-
-      if (loginMethod) {
-        loginMethod.value = response.loginMethod || 'email';
-        handleLoginMethodChange();
-      }
-      if (emailInput) {
-        emailInput.value = response.email || '';
-      }
-      if (passwordInput) {
-        passwordInput.value = response.password || '';
-      }
-      if (autoLoginCheckbox) {
-        autoLoginCheckbox.checked = response.autoLogin !== false;
-      }
-    }
-  } catch (error) {
-    logger('error', 'loadAuthToEdit', 'Failed to load auth to edit', { error: error.message });
-  }
-}
-
-/**
- * Logger function for popup
- */
+// Logger function pour le popup
 function logger(level, location, message, data = null) {
   const logEntry = {
     timestamp: Date.now(),
@@ -920,11 +16,678 @@ function logger(level, location, message, data = null) {
     data: data
   };
 
-  // Send to background for storage
-  chrome.runtime.sendMessage({
-    action: 'addLog',
-    logEntry: logEntry
-  }).catch(err => {
-    console.error('Failed to send log to background:', err);
+  // Send to background script to store
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    chrome.runtime.sendMessage({
+      action: 'addLog',
+      logEntry: logEntry
+    }).catch(err => {
+      // Silently fail if background script is not available
+    });
+  }
+}
+
+// Éléments DOM
+const loginMethodSelect = document.getElementById('loginMethod');
+const credentialsFields = document.getElementById('credentialsFields');
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
+const autoLoginCheckbox = document.getElementById('autoLogin');
+const autoStartCheckbox = document.getElementById('autoStart');
+const minDelayHoursInput = document.getElementById('minDelayHours');
+const webhookURLInput = document.getElementById('webhookURL');
+const startScriptBtn = document.getElementById('startScript');
+const stopScriptBtn = document.getElementById('stopScript');
+const statusDiv = document.getElementById('status');
+
+// Éléments d'affichage
+const authDisplay = document.getElementById('authDisplay');
+const authEdit = document.getElementById('authEdit');
+const webhookDisplay = document.getElementById('webhookDisplay');
+const webhookEdit = document.getElementById('webhookEdit');
+const minDelayEdit = document.getElementById('minDelayEdit');
+
+const loginMethodDisplay = document.getElementById('loginMethodDisplay');
+const emailDisplay = document.getElementById('emailDisplay');
+const emailDisplayRow = document.getElementById('emailDisplayRow');
+const passwordDisplay = document.getElementById('passwordDisplay');
+const passwordDisplayRow = document.getElementById('passwordDisplayRow');
+const autoLoginDisplay = document.getElementById('autoLoginDisplay');
+const webhookURLDisplay = document.getElementById('webhookURLDisplay');
+const minDelayDisplay = document.getElementById('minDelayDisplay');
+
+// Boutons d'édition (seront remplacés par les boutons de sauvegarde en mode édition)
+const editAuthBtn = document.getElementById('editAuth');
+const editWebhookBtn = document.getElementById('editWebhook');
+const editMinDelayBtn = document.getElementById('editMinDelay');
+const deleteCredentialsBtn = document.getElementById('deleteCredentials');
+const clearLogsBtn = document.getElementById('clearLogs');
+const logsContainer = document.getElementById('logsContainer');
+
+// Charger les données sauvegardées au démarrage (sans charger le webhook display si le tab n'est pas actif)
+loadSavedData(false); // Passer false pour ne pas charger le webhook display au démarrage
+
+// Vérifier l'état du script au chargement
+checkScriptStatus();
+
+// Logger le chargement du popup
+logger('info', 'Popup', '📱 Popup de l\'extension ouvert');
+
+// Initialiser les tabs (script chargé à la fin du body, DOM déjà disponible)
+const tabs = document.querySelectorAll('.tab');
+const tabContents = document.querySelectorAll('.tab-content');
+
+// Fonction pour annuler le mode édition sans sauvegarder
+function cancelEditMode() {
+  if (editModeManagers) {
+    Object.values(editModeManagers).forEach(manager => {
+      if (manager.isEditing()) {
+        manager.cancel();
+      }
+    });
+  }
+}
+
+// Gestion des tabs
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    // Annuler le mode édition avant de changer de tab
+    cancelEditMode();
+
+    const targetTab = tab.getAttribute('data-tab');
+
+    // Désactiver tous les tabs
+    tabs.forEach(t => t.classList.remove('active'));
+    tabContents.forEach(tc => tc.classList.remove('active'));
+
+    // Activer le tab cliqué
+    tab.classList.add('active');
+    const targetContent = document.getElementById(`tab${targetTab.charAt(0).toUpperCase() + targetTab.slice(1)}`);
+    if (targetContent) {
+      targetContent.classList.add('active');
+
+      // Si c'est le tab webhook, recharger les données
+      if (targetTab === 'webhook') {
+        requestAnimationFrame(() => {
+          loadWebhookDisplay();
+        });
+      }
+
+      // Si c'est le tab logs, charger les logs
+      if (targetTab === 'logs') {
+        requestAnimationFrame(() => {
+          loadLogs();
+        });
+      }
+    }
+  });
+});
+
+// Annuler le mode édition quand le popup se ferme
+window.addEventListener('beforeunload', () => {
+  cancelEditMode();
+});
+
+// Annuler aussi lors de la fermeture de la page (plus fiable pour les popups)
+window.addEventListener('pagehide', () => {
+  cancelEditMode();
+});
+
+// Annuler lors de la perte de visibilité (quand le popup est fermé)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    cancelEditMode();
+  }
+});
+
+// Écouteurs d'événements
+loginMethodSelect.addEventListener('change', handleLoginMethodChange);
+deleteCredentialsBtn.addEventListener('click', deleteCredentials);
+startScriptBtn.addEventListener('click', startScript);
+stopScriptBtn.addEventListener('click', stopScript);
+autoStartCheckbox.addEventListener('change', saveAutoStart);
+
+// Boutons d'édition
+editAuthBtn.addEventListener('click', () => toggleEditMode('auth'));
+editWebhookBtn.addEventListener('click', () => toggleEditMode('webhook'));
+editMinDelayBtn.addEventListener('click', () => toggleEditMode('minDelay'));
+clearLogsBtn.addEventListener('click', clearLogs);
+
+// Gérer le changement de méthode de connexion
+function handleLoginMethodChange() {
+  const method = loginMethodSelect.value;
+  if (method === 'email') {
+    credentialsFields.classList.remove('hidden');
+  } else {
+    credentialsFields.classList.add('hidden');
+  }
+}
+
+// Basculer entre mode affichage et édition
+function toggleEditMode(section) {
+  if (editModeManagers && editModeManagers[section]) {
+    editModeManagers[section].toggle();
+  }
+}
+
+// Fonction pour charger les données sauvegardées
+function loadSavedData(loadWebhook = true) {
+  // Charger la méthode de connexion
+  chrome.storage.local.get(['loginMethod', 'grindrEmail', 'grindrPassword', 'autoLogin', 'n8nWebhookURL', 'autoStart', 'minDelayHours'], (result) => {
+    // Authentification
+    const loginMethod = result.loginMethod || 'email';
+    loginMethodSelect.value = loginMethod;
+
+    if (result.grindrEmail) {
+      emailInput.value = result.grindrEmail;
+    }
+    if (result.grindrPassword) {
+      passwordInput.value = result.grindrPassword;
+    }
+    autoLoginCheckbox.checked = result.autoLogin !== false;
+
+    // Webhook
+    webhookURLInput.value = result.n8nWebhookURL || 'https://n8n.quentinveys.be/webhook/grindr-stats';
+
+    // Auto start
+    autoStartCheckbox.checked = result.autoStart !== false;
+
+    // Min delay
+    minDelayHoursInput.value = result.minDelayHours !== undefined ? result.minDelayHours : 12;
+
+    // Mettre à jour l'affichage
+    loadAuthDisplay();
+    if (loadWebhook) {
+      loadWebhookDisplay();
+    }
+    loadMinDelayDisplay();
   });
 }
+
+// Charger les données d'authentification pour l'affichage
+function loadAuthDisplay() {
+  chrome.storage.local.get(['loginMethod', 'grindrEmail', 'grindrPassword', 'autoLogin'], (result) => {
+    const method = result.loginMethod || 'email';
+    const methodNames = {
+      'email': 'Email',
+      'facebook': 'Facebook',
+      'google': 'Google',
+      'apple': 'Apple'
+    };
+    loginMethodDisplay.textContent = methodNames[method] || method;
+
+    if (method === 'email' && result.grindrEmail) {
+      emailDisplay.textContent = result.grindrEmail;
+      emailDisplayRow.classList.remove('hidden');
+      passwordDisplayRow.classList.remove('hidden');
+    } else {
+      emailDisplayRow.classList.add('hidden');
+      passwordDisplayRow.classList.add('hidden');
+    }
+
+    autoLoginDisplay.checked = result.autoLogin !== false;
+  });
+}
+
+// Charger les données d'authentification pour l'édition
+function loadAuthToEdit() {
+  chrome.storage.local.get(['loginMethod', 'grindrEmail', 'grindrPassword', 'autoLogin'], (result) => {
+    loginMethodSelect.value = result.loginMethod || 'email';
+    emailInput.value = result.grindrEmail || '';
+    passwordInput.value = result.grindrPassword || '';
+    autoLoginCheckbox.checked = result.autoLogin !== false;
+    handleLoginMethodChange();
+  });
+}
+
+// Charger les données webhook pour l'affichage
+function loadWebhookDisplay() {
+  chrome.storage.local.get(['n8nWebhookURL'], (result) => {
+    const url = result.n8nWebhookURL || 'https://n8n.quentinveys.be/webhook/grindr-stats';
+
+    // Ne charger que si le tab est actif
+    const tabWebhook = document.getElementById('tabWebhook');
+    if (!tabWebhook || !tabWebhook.classList.contains('active')) {
+      return;
+    }
+
+    if (webhookURLDisplay) {
+      webhookURLDisplay.textContent = url;
+    }
+
+    // Ne forcer le mode affichage QUE si on n'est pas déjà en mode édition
+    // Si webhookEdit est visible, on est en mode édition, donc ne rien faire
+    if (webhookEdit && !webhookEdit.classList.contains('hidden')) {
+      // On est en mode édition, ne pas toucher à l'affichage
+      return;
+    }
+
+    // S'assurer que le mode affichage est visible
+    if (webhookDisplay) {
+      if (webhookDisplay.classList.contains('hidden')) {
+        webhookDisplay.classList.remove('hidden');
+      }
+    }
+    if (webhookEdit && !webhookEdit.classList.contains('hidden')) {
+      webhookEdit.classList.add('hidden');
+    }
+  });
+}
+
+// Charger les données webhook pour l'édition
+function loadWebhookToEdit() {
+  chrome.storage.local.get(['n8nWebhookURL'], (result) => {
+    webhookURLInput.value = result.n8nWebhookURL || 'https://n8n.quentinveys.be/webhook/grindr-stats';
+  });
+}
+
+// Charger les données minDelay pour l'affichage
+function loadMinDelayDisplay() {
+  chrome.storage.local.get(['minDelayHours'], (result) => {
+    minDelayDisplay.textContent = result.minDelayHours !== undefined ? result.minDelayHours : 12;
+  });
+}
+
+// Charger les données minDelay pour l'édition
+function loadMinDelayToEdit() {
+  chrome.storage.local.get(['minDelayHours'], (result) => {
+    minDelayHoursInput.value = result.minDelayHours !== undefined ? result.minDelayHours : 12;
+  });
+}
+
+// Fonction pour sauvegarder les identifiants
+function saveCredentials() {
+  const loginMethod = loginMethodSelect.value;
+  const email = emailInput.value.trim();
+  const password = passwordInput.value.trim();
+  const autoLogin = autoLoginCheckbox.checked;
+
+  // Valider les champs seulement pour la méthode email
+  if (loginMethod === 'email' && (!email || !password)) {
+    showStatus('⚠️ Veuillez remplir tous les champs', 'error');
+    return;
+  }
+
+  chrome.runtime.sendMessage({
+    action: 'saveCredentials',
+    loginMethod: loginMethod,
+    email: email,
+    password: password,
+    autoLogin: autoLogin
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
+      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde des identifiants: ' + chrome.runtime.lastError.message);
+    } else if (response && response.success) {
+      showStatus('✅ Configuration sauvegardée', 'success');
+      logger('info', 'Popup', `✅ Configuration d'authentification sauvegardée (méthode: ${loginMethod}, auto-login: ${autoLogin})`);
+      // Sortir du mode édition
+      if (editModeManagers && editModeManagers.auth) {
+        editModeManagers.auth.exitEditMode();
+      }
+      loadAuthDisplay();
+    } else {
+      showStatus('❌ Erreur lors de la sauvegarde', 'error');
+      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde des identifiants');
+    }
+  });
+}
+
+// Fonction pour afficher une confirmation personnalisée
+function showConfirm(message, onConfirm) {
+  const modal = document.getElementById('confirmModal');
+  const messageEl = document.getElementById('confirmMessage');
+  const cancelBtn = document.getElementById('confirmCancel');
+  const okBtn = document.getElementById('confirmOk');
+
+  messageEl.textContent = message;
+  modal.classList.add('show');
+
+  const cleanup = () => {
+    modal.classList.remove('show');
+    cancelBtn.removeEventListener('click', onCancel);
+    okBtn.removeEventListener('click', onOk);
+  };
+
+  const onCancel = () => {
+    cleanup();
+  };
+
+  const onOk = () => {
+    cleanup();
+    onConfirm();
+  };
+
+  cancelBtn.addEventListener('click', onCancel);
+  okBtn.addEventListener('click', onOk);
+}
+
+// Fonction pour supprimer les identifiants
+function deleteCredentials() {
+  showConfirm('Êtes-vous sûr de vouloir supprimer la configuration ?', () => {
+    chrome.runtime.sendMessage({ action: 'deleteCredentials' }, (response) => {
+      if (chrome.runtime.lastError) {
+        showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
+        logger('error', 'Popup', '❌ Erreur lors de la suppression des identifiants: ' + chrome.runtime.lastError.message);
+      } else if (response && response.success) {
+        showStatus('✅ Configuration supprimée', 'success');
+        logger('info', 'Popup', '✅ Configuration d\'authentification supprimée');
+        loginMethodSelect.value = 'email';
+        emailInput.value = '';
+        passwordInput.value = '';
+        autoLoginCheckbox.checked = true;
+        toggleEditMode('auth');
+        loadAuthDisplay();
+      } else {
+        showStatus('❌ Erreur lors de la suppression', 'error');
+        logger('error', 'Popup', '❌ Erreur lors de la suppression des identifiants');
+      }
+    });
+  });
+}
+
+// Fonction pour sauvegarder l'URL du webhook
+function saveWebhook() {
+  const url = webhookURLInput.value.trim();
+
+  if (!url) {
+    showStatus('⚠️ Veuillez entrer une URL valide', 'error');
+    return;
+  }
+
+  try {
+    new URL(url);
+  } catch (e) {
+    showStatus('❌ URL invalide', 'error');
+    return;
+  }
+
+  chrome.runtime.sendMessage({
+    action: 'saveWebhookURL',
+    url: url
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
+      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde de l\'URL webhook: ' + chrome.runtime.lastError.message);
+    } else if (response && response.success) {
+      showStatus('✅ URL sauvegardée', 'success');
+      logger('info', 'Popup', `✅ URL webhook n8n mise à jour: ${url}`);
+      // Sortir du mode édition
+      if (editModeManagers && editModeManagers.webhook) {
+        editModeManagers.webhook.exitEditMode();
+      }
+      loadWebhookDisplay();
+    } else {
+      showStatus('❌ Erreur lors de la sauvegarde', 'error');
+      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde de l\'URL webhook');
+    }
+  });
+}
+
+// Fonction pour sauvegarder le délai minimum
+function saveMinDelay() {
+  const hours = parseFloat(minDelayHoursInput.value);
+
+  if (isNaN(hours) || hours < 0) {
+    showStatus('❌ Nombre invalide (≥ 0)', 'error');
+    return;
+  }
+
+  chrome.storage.local.set({ minDelayHours: hours }, () => {
+    if (chrome.runtime.lastError) {
+      showStatus('❌ Erreur lors de la sauvegarde', 'error');
+      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde du délai minimum: ' + chrome.runtime.lastError.message);
+    } else {
+      showStatus(`✅ Délai sauvegardé: ${hours}h`, 'success');
+      logger('info', 'Popup', `✅ Délai minimum mis à jour: ${hours}h`);
+      // Sortir du mode édition
+      if (editModeManagers && editModeManagers.minDelay) {
+        editModeManagers.minDelay.exitEditMode();
+      }
+      loadMinDelayDisplay();
+    }
+  });
+}
+
+// Fonction pour sauvegarder l'option de démarrage automatique
+function saveAutoStart() {
+  const autoStart = autoStartCheckbox.checked;
+  chrome.storage.local.set({ autoStart: autoStart }, () => {
+    if (chrome.runtime.lastError) {
+      showStatus('❌ Erreur lors de la sauvegarde', 'error');
+      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde du démarrage automatique: ' + chrome.runtime.lastError.message);
+    } else {
+      showStatus(autoStart ? '✅ Démarrage automatique activé' : '✅ Démarrage automatique désactivé', 'success');
+      logger('info', 'Popup', autoStart ? '✅ Démarrage automatique activé' : '✅ Démarrage automatique désactivé');
+    }
+  });
+}
+
+// Fonction pour mettre à jour l'affichage des boutons selon l'état
+function updateScriptButtons(isRunning) {
+  if (isRunning) {
+    startScriptBtn.classList.add('hidden');
+    stopScriptBtn.classList.remove('hidden');
+  } else {
+    startScriptBtn.classList.remove('hidden');
+    stopScriptBtn.classList.add('hidden');
+  }
+}
+
+// Vérifier l'état du script au chargement
+function checkScriptStatus() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0] && tabs[0].url && tabs[0].url.includes('web.grindr.com')) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'getScriptStatus' }, (response) => {
+        if (!chrome.runtime.lastError && response) {
+          updateScriptButtons(response.isRunning || false);
+        }
+      });
+    }
+  });
+}
+
+// Fonction pour démarrer le script
+function startScript() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0] && tabs[0].url && tabs[0].url.includes('web.grindr.com')) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'startScript' }, (response) => {
+        if (chrome.runtime.lastError) {
+          showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
+          logger('error', 'Popup', '❌ Erreur lors du démarrage du script: ' + chrome.runtime.lastError.message);
+        } else {
+          showStatus('▶️ Script démarré', 'success');
+          logger('info', 'Popup', '▶️ Script démarré manuellement');
+          updateScriptButtons(true);
+        }
+      });
+    } else {
+      showStatus('⚠️ Ouvrez web.grindr.com', 'error');
+    }
+  });
+}
+
+// Fonction pour arrêter le script
+function stopScript() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0] && tabs[0].url && tabs[0].url.includes('web.grindr.com')) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'stopScript' }, (response) => {
+        if (chrome.runtime.lastError) {
+          showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
+          logger('error', 'Popup', '❌ Erreur lors de l\'arrêt du script: ' + chrome.runtime.lastError.message);
+        } else {
+          showStatus('⏹️ Script arrêté', 'success');
+          logger('info', 'Popup', '⏹️ Script arrêté manuellement');
+          updateScriptButtons(false);
+        }
+      });
+    } else {
+      showStatus('⚠️ Ouvrez web.grindr.com', 'error');
+    }
+  });
+}
+
+// Fonction pour afficher un message de statut
+function showStatus(message, type = 'info') {
+  statusDiv.textContent = message;
+  statusDiv.className = 'status ' + type;
+  statusDiv.style.display = 'block';
+
+  const timeout = type === 'success' ? 3000 : (type === 'error' ? 5000 : 4000);
+  setTimeout(() => {
+    statusDiv.style.display = 'none';
+  }, timeout);
+}
+
+// Fonction pour formater un timestamp
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+}
+
+// Charger et afficher les logs
+function loadLogs() {
+  chrome.runtime.sendMessage({ action: 'getLogs' }, (response) => {
+    if (chrome.runtime.lastError) {
+      logsContainer.innerHTML = '<div style="color: var(--color-error); padding: var(--spacing-md); text-align: center;">Erreur lors du chargement des logs</div>';
+      return;
+    }
+
+    const logs = response.logs || [];
+
+    if (logs.length === 0) {
+      logsContainer.innerHTML = '<div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">Aucun log disponible</div>';
+      return;
+    }
+
+    // Trier les logs par timestamp (plus anciens en premier)
+    logs.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Afficher les logs en utilisant DOM methods pour éviter les warnings innerHTML
+    logsContainer.textContent = ''; // Clear container
+    const fragment = document.createDocumentFragment();
+    
+    logs.forEach(log => {
+      const timestamp = formatTimestamp(log.timestamp);
+      // Sanitize level for CSS class name (only allow alphanumeric and hyphens)
+      const levelRaw = (log.level || 'info').toString();
+      const level = levelRaw.replace(/[^a-zA-Z0-9-]/g, '');
+      const levelDisplay = levelRaw.toUpperCase();
+      const location = log.location || 'unknown';
+      const message = log.message || '';
+      let dataStr = '';
+
+      if (log.data) {
+        try {
+          if (log.data instanceof Error) {
+            dataStr = log.data.toString();
+          } else {
+            dataStr = JSON.stringify(log.data, null, 2);
+          }
+        } catch (e) {
+          dataStr = String(log.data);
+        }
+      }
+
+      const logEntry = document.createElement('div');
+      logEntry.className = `log-entry log-${level}`;
+      
+      const timestampSpan = document.createElement('span');
+      timestampSpan.className = 'log-timestamp';
+      timestampSpan.textContent = timestamp;
+      logEntry.appendChild(timestampSpan);
+      
+      const levelSpan = document.createElement('span');
+      levelSpan.className = `log-level ${level}`;
+      levelSpan.textContent = levelDisplay;
+      logEntry.appendChild(levelSpan);
+      
+      const locationSpan = document.createElement('span');
+      locationSpan.className = 'log-location';
+      locationSpan.textContent = `[${location}]`;
+      logEntry.appendChild(locationSpan);
+      
+      const messageSpan = document.createElement('span');
+      messageSpan.className = 'log-message';
+      messageSpan.textContent = message;
+      logEntry.appendChild(messageSpan);
+      
+      if (dataStr) {
+        const dataDiv = document.createElement('div');
+        dataDiv.className = 'log-data';
+        dataDiv.textContent = dataStr;
+        logEntry.appendChild(dataDiv);
+      }
+      
+      fragment.appendChild(logEntry);
+    });
+    
+    logsContainer.appendChild(fragment);
+
+    // Scroller automatiquement vers le bas pour afficher le dernier log
+    scrollLogsToBottom();
+  });
+}
+
+// Fonction pour scroller automatiquement vers le bas des logs
+function scrollLogsToBottom() {
+  if (logsContainer) {
+    // Utiliser requestAnimationFrame pour s'assurer que le DOM est mis à jour
+    requestAnimationFrame(() => {
+      logsContainer.scrollTop = logsContainer.scrollHeight;
+    });
+  }
+}
+
+// Fonction pour échapper le HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Effacer les logs
+function clearLogs() {
+  showConfirm('Êtes-vous sûr de vouloir effacer tous les logs ?', () => {
+    logger('info', 'Popup', '🗑️ Effacement de tous les logs demandé');
+    chrome.runtime.sendMessage({ action: 'clearLogs' }, (response) => {
+      if (chrome.runtime.lastError) {
+        showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
+        logger('error', 'Popup', '❌ Erreur lors de l\'effacement des logs: ' + chrome.runtime.lastError.message);
+      } else if (response && response.success) {
+        showStatus('✅ Logs effacés', 'success');
+        loadLogs();
+      } else {
+        showStatus('❌ Erreur lors de l\'effacement', 'error');
+        logger('error', 'Popup', '❌ Erreur lors de l\'effacement des logs');
+      }
+    });
+  });
+}
+
+// Écouter les messages du content script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'updateStatus') {
+    showStatus(request.message, request.type || 'info');
+  } else if (request.action === 'scriptStatusChanged') {
+    updateScriptButtons(request.isRunning);
+  }
+});
+
+// Écouter les changements dans le storage pour mettre à jour les logs en temps réel
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.extensionLogs) {
+    // Recharger les logs si on est sur l'onglet logs
+    const tabLogs = document.getElementById('tabLogs');
+    if (tabLogs && tabLogs.classList.contains('active')) {
+      loadLogs();
+    }
+  }
+});
