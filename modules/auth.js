@@ -64,3 +64,44 @@ function checkLoginStatus() {
 
   return true;
 }
+
+/**
+ * Fill email and password fields with human-like delays
+ * @param {string} email - Email address to fill
+ * @param {string} password - Password to fill
+ * @returns {Promise<Object>} Object with emailField and passwordField references
+ */
+async function fillLoginForm(email, password) {
+  const emailField = document.querySelector(SELECTORS.EMAIL_INPUT);
+  const passwordField = document.querySelector(SELECTORS.PASSWORD_INPUT);
+
+  if (!emailField || !passwordField) {
+    logger('error', 'fillLoginForm', 'Email or password field not found');
+    throw new Error('Login form fields not found');
+  }
+
+  // Fill email field with human-like typing
+  emailField.focus();
+  emailField.value = '';
+  for (const char of email) {
+    emailField.value += char;
+    emailField.dispatchEvent(new Event('input', { bubbles: true }));
+    emailField.dispatchEvent(new Event('change', { bubbles: true }));
+    await delay(DELAYS.SHORT);
+  }
+
+  await delay(DELAYS.NORMAL);
+
+  // Fill password field with human-like typing
+  passwordField.focus();
+  passwordField.value = '';
+  for (const char of password) {
+    passwordField.value += char;
+    passwordField.dispatchEvent(new Event('input', { bubbles: true }));
+    passwordField.dispatchEvent(new Event('change', { bubbles: true }));
+    await delay(DELAYS.SHORT);
+  }
+
+  logger('info', 'fillLoginForm', 'Login form filled successfully');
+  return { emailField, passwordField };
+}
