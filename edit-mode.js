@@ -124,3 +124,88 @@ class EditModeManager {
     this.exitEditMode();
   }
 }
+
+/**
+ * Create edit mode managers for all sections
+ * @returns {Object} Object with managers for each section
+ */
+function createEditModeManagers() {
+  const authDisplay = document.getElementById('authDisplay');
+  const authEdit = document.getElementById('authEdit');
+  const editAuthBtn = document.getElementById('editAuth');
+  const webhookDisplay = document.getElementById('webhookDisplay');
+  const webhookEdit = document.getElementById('webhookEdit');
+  const editWebhookBtn = document.getElementById('editWebhook');
+  const minDelayDisplay = document.getElementById('minDelayDisplay');
+  const minDelayEdit = document.getElementById('minDelayEdit');
+  const editMinDelayBtn = document.getElementById('editMinDelay');
+  const minDelayDisplayRow = minDelayDisplay ? minDelayDisplay.closest('.info-row') : null;
+
+  return {
+    auth: new EditModeManager({
+      section: 'auth',
+      editBtn: editAuthBtn,
+      displayElement: authDisplay,
+      editElement: authEdit,
+      saveCallback: () => {
+        // Will be set by popup.js
+        if (window.saveCredentials) {
+          window.saveCredentials();
+        }
+      },
+      loadDisplayCallback: () => {
+        if (window.loadAuthDisplay) {
+          window.loadAuthDisplay();
+        }
+      },
+      loadEditCallback: () => {
+        if (window.loadAuthToEdit) {
+          window.loadAuthToEdit();
+        }
+      }
+    }),
+    webhook: new EditModeManager({
+      section: 'webhook',
+      editBtn: editWebhookBtn,
+      displayElement: webhookDisplay,
+      editElement: webhookEdit,
+      saveCallback: () => {
+        if (window.saveWebhook) {
+          window.saveWebhook();
+        }
+      },
+      loadDisplayCallback: () => {
+        if (window.loadWebhookDisplay) {
+          window.loadWebhookDisplay();
+        }
+      },
+      loadEditCallback: () => {
+        if (window.loadWebhookToEdit) {
+          window.loadWebhookToEdit();
+        }
+      }
+    }),
+    minDelay: new EditModeManager({
+      section: 'minDelay',
+      editBtn: editMinDelayBtn,
+      displayElement: null,
+      editElement: minDelayEdit,
+      displayRow: minDelayDisplayRow,
+      saveCallback: () => {
+        if (window.saveMinDelay) {
+          window.saveMinDelay();
+        }
+      },
+      loadDisplayCallback: () => {
+        if (window.loadMinDelayDisplay) {
+          window.loadMinDelayDisplay();
+        }
+      },
+      loadEditCallback: () => {
+        if (window.loadMinDelayToEdit) {
+          window.loadMinDelayToEdit();
+        }
+      }
+    })
+  };
+}
