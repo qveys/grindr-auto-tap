@@ -398,3 +398,16 @@ async function performLogin(loginMethod, email, password) {
     return false;
   }
 }
+
+// Export AuthModule for global access
+window.AuthModule = {
+  checkLoginStatus,
+  fillLoginForm,
+  clickLoginButton,
+  waitForLogin,
+  performEmailLogin,
+  performFacebookLogin,
+  performGoogleLogin,
+  performAppleLogin,
+  performLogin,
+};
