@@ -55,4 +55,54 @@ class EditModeManager {
     }
     return saveBtn;
   }
+
+  /**
+   * Enter edit mode
+   */
+  enterEditMode() {
+    if (this.displayElement) {
+      this.displayElement.classList.add('hidden');
+    }
+    if (this.editElement) {
+      this.editElement.classList.remove('hidden');
+    }
+
+    if (this.displayRow) {
+      this.displayRow.classList.add('hidden');
+    }
+
+    this.editBtn.style.display = 'none';
+    const saveBtn = this.getSaveButton();
+    saveBtn.style.display = 'flex';
+
+    if (this.loadEditCallback) {
+      this.loadEditCallback();
+    }
+  }
+
+  /**
+   * Exit edit mode
+   */
+  exitEditMode() {
+    if (this.displayElement) {
+      this.displayElement.classList.remove('hidden');
+    }
+    if (this.editElement) {
+      this.editElement.classList.add('hidden');
+    }
+
+    if (this.displayRow) {
+      this.displayRow.classList.remove('hidden');
+    }
+
+    this.editBtn.style.display = 'flex';
+    const saveBtn = document.getElementById(this.saveBtnId);
+    if (saveBtn) {
+      saveBtn.style.display = 'none';
+    }
+
+    if (this.loadDisplayCallback) {
+      this.loadDisplayCallback();
+    }
+  }
 }
