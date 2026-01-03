@@ -39,4 +39,12 @@ window.Constants = {
     DEFAULT_RETRIES: 2,
     MAX_APPLE_BUTTON_RETRIES: 8,
   },
+
+  // Default values
+  DEFAULTS: {
+    MIN_DELAY_HOURS: 12,
+    AUTO_LOGIN: true,
+    AUTO_START: true,
+    LOGIN_METHOD: 'email',
+  },
 };
