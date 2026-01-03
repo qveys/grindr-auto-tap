@@ -1,202 +1,151 @@
 /**
- * Content Script for Grindr Auto Tap extension
- * Main orchestrator that coordinates all modules
+ * Content script for Grindr Auto Tap extension
+ * Handles authentication, profile opening, and auto-tap functionality
  */
 
-// Logger for content script
-function log(level, message, data = null) {
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+// Logger function
+function logger(level, location, message, data = null) {
+  const logEntry = {
+    timestamp: Date.now(),
+    level: level,
+    location: location || 'unknown',
+    message: message,
+    data: data
+  };
+
+  // Log to console as well
+  const consoleMethod = level === 'error' ? console.error :
+    level === 'warn' ? console.warn :
+      level === 'debug' ? console.debug :
+        console.log;
+  consoleMethod(`[${location}] ${message}`, data || '');
+
+  // Send to background script to store
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
     chrome.runtime.sendMessage({
       action: 'addLog',
-      logEntry: {
-        timestamp: Date.now(),
-        level: level,
-        location: 'ContentScript',
-        message: message,
-        data: data
-      }
+      logEntry: logEntry
     }).catch(err => {
-      console.error('Failed to send log:', err);
+      // Silently fail if background script is not available
     });
   }
 }
 
-/**
- * Perform auto-login if configured
- */
-async function performAutoLogin() {
-  try {
-    log('info', 'Checking auto-login setting');
-
-    const result = await chrome.storage.local.get(['autoLogin', 'loginMethod', 'grindrEmail', 'grindrPassword']);
-
-    if (!result.autoLogin) {
-      log('debug', 'Auto-login disabled');
-      return true; // Not an error, just disabled
-    }
-
-    const { loginMethod = 'email', grindrEmail, grindrPassword } = result;
-
-    // Check if already logged in
-    if (typeof window.AuthModule !== 'undefined' && window.AuthModule.checkLoginStatus()) {
-      log('info', 'Already logged in');
-      return true;
-    }
-
-    log('info', 'Performing auto-login', { method: loginMethod });
-
-    // Perform login
-    let success = false;
-    if (loginMethod === 'email' && grindrEmail && grindrPassword) {
-      success = await window.AuthModule.performLogin('email', grindrEmail, grindrPassword);
-    } else if (loginMethod === 'facebook') {
-      success = await window.AuthModule.performLogin('facebook');
-    } else if (loginMethod === 'google') {
-      success = await window.AuthModule.performLogin('google');
-    } else if (loginMethod === 'apple') {
-      success = await window.AuthModule.performLogin('apple');
-    } else {
-      log('warn', 'Invalid or missing login method');
-      return false;
-    }
-
-    if (success) {
-      log('info', 'Auto-login completed successfully');
-    } else {
-      log('error', 'Auto-login failed');
-    }
-
-    return success;
-  } catch (error) {
-    log('error', 'Auto-login error', { error: error.message });
-    return false;
-  }
+function formatDate(timestamp) {
+  const date = new Date(timestamp);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
 }
 
-/**
- * Initialize content script and set up message listeners
- */
-function initializeContentScript() {
-  log('info', 'Content script initialized on page');
-
-  // Listen for messages from popup
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    handlePopupMessage(request, sendResponse);
-  });
-
-  // Perform auto-login if configured
-  performAutoLogin().catch(err => {
-    log('error', 'Failed to perform auto-login', { error: err.message });
-  });
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes}min ${seconds}s`;
+  }
+  return `${seconds}s`;
 }
 
-/**
- * Handle messages from popup UI
- * @param {Object} request - Message request
- * @param {Function} sendResponse - Response callback
- */
-function handlePopupMessage(request, sendResponse) {
-  if (request.action === 'startAutoTap') {
-    log('info', 'Start auto-tap requested');
-    startAutoTap();
-    sendResponse({ success: true });
-  } else if (request.action === 'stopAutoTap') {
-    log('info', 'Stop auto-tap requested');
-    stopAutoTap();
-    sendResponse({ success: true });
-  } else if (request.action === 'getStatus') {
-    sendResponse({ status: 'idle' });
-  }
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-let autoTapRunning = false;
-let autoTapStats = null;
+function getTextNodes(root) {
+  const result = [];
 
-/**
- * Start auto-tap operation
- */
-async function startAutoTap() {
-  if (autoTapRunning) {
-    log('warn', 'Auto-tap already running');
-    return;
-  }
-
-  log('info', 'Auto-tap starting');
-  autoTapRunning = true;
-
-  try {
-    // Initialize statistics
-    if (typeof window.StatsModule === 'undefined') {
-      log('error', 'StatsModule not available');
-      autoTapRunning = false;
-      return;
-    }
-
-    autoTapStats = window.StatsModule.initializeStats();
-    const result = await chrome.storage.local.get(['minDelayHours', 'n8nWebhookURL']);
-    const minDelayHours = result.minDelayHours || 12;
-    const webhookUrl = result.n8nWebhookURL || 'https://n8n.quentinveys.be/webhook/grindr-stats';
-
-    log('info', 'Auto-tap loop starting', { minDelayHours });
-
-    while (autoTapRunning) {
-      // Check if profile is visible
-      if (typeof window.ProfileOpenerModule === 'undefined') {
-        log('error', 'ProfileOpenerModule not available');
-        break;
-      }
-
-      if (!window.ProfileOpenerModule.isProfileVisible()) {
-        log('warn', 'No profile visible, waiting');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        continue;
-      }
-
-      // Perform single tap
-      const success = await window.ProfileOpenerModule.performSingleTap();
-
-      // Update statistics
-      if (success) {
-        autoTapStats = window.StatsModule.recordSuccessfulTap(autoTapStats);
+  function walk(node) {
+    node.childNodes.forEach(child => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const txt = child.textContent.trim();
+        if (txt) result.push(txt);
       } else {
-        autoTapStats = window.StatsModule.recordFailedTap(autoTapStats);
+        walk(child);
       }
-
-      log('debug', 'Tap iteration', {
-        total: autoTapStats.totalTaps,
-        successful: autoTapStats.successfulTaps,
-        failed: autoTapStats.failedTaps
-      });
-
-      // Wait before next tap
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-
-    // Finalize and send statistics
-    if (autoTapStats) {
-      autoTapStats = window.StatsModule.finalizeStats(autoTapStats);
-      log('info', 'Sending webhook with statistics', { stats: autoTapStats });
-      await window.StatsModule.sendWebhook(autoTapStats, webhookUrl);
-    }
-  } catch (error) {
-    log('error', 'Auto-tap error', { error: error.message });
-  } finally {
-    autoTapRunning = false;
-    log('info', 'Auto-tap completed', { stats: autoTapStats });
+    });
   }
+
+  walk(root);
+  return result; // tableau de strings
 }
 
-/**
- * Stop auto-tap operation
- */
-function stopAutoTap() {
-  log('info', 'Auto-tap stopping');
-  autoTapRunning = false;
-}
+// Constants
+const DELAYS = {
+  SHORT: 50,
+  MEDIUM: 100,
+  NORMAL: 200,
+  LONG: 300,
+  VERY_LONG: 500,
+  SECOND: 1000,
+  TWO_SECONDS: 2000,
+  TWO_AND_HALF_SECONDS: 2500,
+  THREE_SECONDS: 3000,
+  RANDOM_MIN: 50,
+  RANDOM_MAX: 50,
+};
 
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeContentScript);
-} else {
-  initializeContentScript();
-}
+const TIMEOUTS = {
+  LOGIN: 10000,
+  APPLE_LOGIN: 15000,
+  APPLE_POPUP: 15000,
+  APPLE_POPUP_CLOSE: 15000,
+  WEBHOOK_REQUEST: 10000,
+  BUTTON_WAIT: 10000,
+  APPLE_BUTTON_RETRY: 2000,
+  APPLE_TAB_CHECK: 1000,
+};
+
+const LIMITS = {
+  MAX_ITERATIONS: 10000,
+  MAX_DURATION_HOURS: 2,
+  MAX_DURATION_MS: 2 * 60 * 60 * 1000,
+  MAX_DEBUG_LOGS: 1000,
+  MAX_RETRIES: 8,
+  DEFAULT_RETRIES: 2,
+  MAX_APPLE_BUTTON_RETRIES: 8,
+};
+
+const DEFAULTS = {
+  MIN_DELAY_HOURS: 12,
+  AUTO_LOGIN: true,
+  AUTO_START: true,
+  LOGIN_METHOD: 'email',
+};
+
+const SELECTORS = {
+  EMAIL_INPUT: 'input[type="email"], input[type="text"][name*="email" i], input[type="text"][placeholder*="email" i], input[type="text"][id*="email" i]',
+  PASSWORD_INPUT: 'input[type="password"], input[name*="password" i], input[id*="password" i]',
+  LOGIN_BUTTON: 'button[type="submit"], form button, button.btn-primary, button.primary',
+  CAPTCHA: '[data-captcha], iframe[src*="recaptcha"], .g-recaptcha',
+  NEXT_PROFILE: 'img[alt="Next Profile"]',
+  TAP_BUTTON: 'button[aria-label="Tap"]',
+  PROFILE_GRIDCELL: 'div[role="gridcell"]',
+  BETA_DISMISS: '#beta-dismiss-btn',
+  PROFILE_INDICATORS: 'img[alt="Next Profile"], button[aria-label="Tap"], [data-testid*="profile"], nav, header',
+  PROFILE_VIEW: '[data-testid*="profile-view"], [class*="profile-view"], [class*="ProfileView"]',
+  FACEBOOK_BUTTON: 'button[title="Log In With Facebook"], button[title*="Facebook" i], button[aria-label*="Facebook" i], button[data-provider="facebook"]',
+  GOOGLE_BUTTON: 'button[title="Log In With Google"], button[title*="Google" i], button[aria-label*="Google" i], button[data-provider="google"]',
+  APPLE_BUTTON: 'button[title="Log In With Apple"], button[title*="Apple" i], button[aria-label*="Apple" i], button[data-provider="apple"]',
+  ERROR_MESSAGE: '.error, .alert-error, [role="alert"]',
+};
+
+const APPLE = {
+  SIGN_IN_BUTTON_ID: 'sign-in',
+  BUTTON_CLASSES: 'button.signin-v2__buttons-wrapper__button-wrapper__button, button.button-rounded-rectangle',
+  POPUP_CHECK_INTERVAL: 1000,
+};
+
+const URLS = {
+  DEFAULT_WEBHOOK: 'https://n8n.quentinveys.be/webhook/grindr-stats',
+  GRINDR_DOMAIN: 'web.grindr.com',
+  APPLE_DOMAINS: ['apple.com', 'appleid.apple.com', 'idmsa.apple.com', 'signinwithapple'],
+};
