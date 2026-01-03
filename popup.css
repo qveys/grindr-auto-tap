@@ -163,3 +163,31 @@ body {
 .setting input[type="checkbox"] {
   margin-right: 8px;
 }
+
+.stats-section {
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f9f9f9;
+}
+
+.stats-section h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.stat-label {
+  color: #666;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #667eea;
+}
