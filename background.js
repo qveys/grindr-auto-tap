@@ -141,6 +141,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'findAppleTab') {
+    // Trouver l'ID de l'onglet Apple
+    chrome.tabs.query({}, (allTabs) => {
+      // Chercher d'abord les onglets Apple spécifiques
+      let appleTab = allTabs.find(tab =>
+        tab.url && (
+          tab.url.includes('appleid.apple.com') ||
+          tab.url.includes('idmsa.apple.com') ||
+          tab.url.includes('signinwithapple') ||
+          (tab.url.includes('apple.com') && (
+            tab.url.includes('/auth/') ||
+            tab.url.includes('/signin') ||
+            tab.url.includes('/login')
+          ))
+        )
+      );
+
+      // Si une URL spécifique est fournie, essayer de la matcher
+      if (!appleTab && request.url) {
+        appleTab = allTabs.find(tab => tab.url === request.url);
+      }
+
+      sendResponse({ tabId: appleTab ? appleTab.id : null });
+    });
+    return true;
+  }
+
   if (request.action === 'addLog') {
     addLog(request.logEntry);
     sendResponse({ success: true });
