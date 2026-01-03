@@ -25,3 +25,34 @@ function formatTimestamp(timestamp) {
   const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
   return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}.${milliseconds}`;
 }
+
+/**
+ * Add a log entry
+ */
+function addLog(level, location, message, data = null) {
+  const logEntry = {
+    timestamp: Date.now(),
+    level: level,
+    location: location || 'unknown',
+    message: message,
+    data: data
+  };
+
+  // Also log to console for debugging
+  const consoleMethod = level === 'error' ? console.error :
+    level === 'warn' ? console.warn :
+      level === 'debug' ? console.debug :
+        console.log;
+  consoleMethod(`[${logEntry.location}] ${logEntry.message}`, data || '');
+
+  // Send to background script to store
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    chrome.runtime.sendMessage({
+      action: 'addLog',
+      logEntry: logEntry
+    }).catch(err => {
+      // Silently fail if background script is not available
+      console.error('Failed to send log to background:', err);
+    });
+  }
+}
