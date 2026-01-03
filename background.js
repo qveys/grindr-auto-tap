@@ -1,11 +1,33 @@
-/**
- * Background Service Worker for Grindr Auto Tap extension
- * Manages logs storage and messaging from content scripts
- */
+// Background script pour gérer les onglets, les requêtes n8n et le storage
 
-// Storage for logs
-let logs = [];
-const MAX_LOGS = 1000;
+// Logger function pour le background script
+function logger(level, location, message, data = null) {
+  const logEntry = {
+    timestamp: Date.now(),
+    level: level,
+    location: location || 'Background',
+    message: message,
+    data: data
+  };
+
+  // Log to console as well
+  const consoleMethod = level === 'error' ? console.error :
+    level === 'warn' ? console.warn :
+      level === 'debug' ? console.debug :
+        console.log;
+  consoleMethod(`[${location}] ${message}`, data || '');
+
+  // Store directly in chrome.storage.local
+  chrome.storage.local.get(['extensionLogs'], (result) => {
+    const logs = result.extensionLogs || [];
+    logs.push(logEntry);
+    // Garder seulement les 1000 derniers logs
+    if (logs.length > 1000) {
+      logs.shift();
+    }
+    chrome.storage.local.set({ extensionLogs: logs });
+  });
+}
 
 /**
  * Handle messages from content scripts and popup
