@@ -39,3 +39,13 @@ function addLog(logEntry) {
     console.error('Failed to save logs to storage:', err);
   });
 }
+
+/**
+ * Clear all logs
+ */
+function clearLogs() {
+  logs = [];
+  chrome.storage.local.set({ logs: [] }).catch(err => {
+    console.error('Failed to clear logs from storage:', err);
+  });
+}
