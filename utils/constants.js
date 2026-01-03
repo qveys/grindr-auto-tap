@@ -67,5 +67,15 @@ window.Constants = {
     PASSWORD_INPUT: 'input[type="password"], input[name*="password" i], input[id*="password" i]',
     LOGIN_BUTTON: 'button[type="submit"], form button, button.btn-primary, button.primary',
     CAPTCHA: '[data-captcha], iframe[src*="recaptcha"], .g-recaptcha',
+
+    // Profile
+    NEXT_PROFILE: 'img[alt="Next Profile"]',
+    TAP_BUTTON: 'button[aria-label="Tap"]',
+    PROFILE_GRIDCELL: 'div[role="gridcell"]',
+    BETA_DISMISS: '#beta-dismiss-btn',
+
+    // Login status
+    PROFILE_INDICATORS: 'img[alt="Next Profile"], button[aria-label="Tap"], [data-testid*="profile"], nav, header',
+    PROFILE_VIEW: '[data-testid*="profile-view"], [class*="profile-view"], [class*="ProfileView"]',
   },
 };
