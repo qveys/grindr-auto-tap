@@ -1,18 +1,12 @@
 /**
  * Authentication module for Grindr Auto Tap extension
  * Handles login via email, Facebook, Google, and Apple
- *
+ * 
  * Note: This file is loaded as a global script, not as an ES module
  * Functions are attached to window.AuthModule
  */
 
 // Dependencies will be loaded via script tags in manifest.json
-
-// Extract constants from window for easier access
-const { SELECTORS, DELAYS, TIMEOUTS, LIMITS, URLS, APPLE } = window.Constants || {};
-
-// Utility function for delays
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Logger function for auth module
 function logger(level, location, message, data = null) {
@@ -38,7 +32,6 @@ function logger(level, location, message, data = null) {
       logEntry: logEntry
     }).catch(err => {
       // Silently fail if background script is not available
-      console.error('Failed to send log to background:', err);
     });
   }
 }
@@ -47,7 +40,7 @@ function logger(level, location, message, data = null) {
  * Check if user is currently logged in
  * @returns {boolean} True if logged in, false otherwise
  */
-function checkLoginStatus() {
+export function checkLoginStatus() {
   const loginPage = document.querySelector(SELECTORS.EMAIL_INPUT);
   if (loginPage) {
     return false;
@@ -58,331 +51,435 @@ function checkLoginStatus() {
     return true;
   }
 
-  return !(window.location.pathname.includes('/login') || window.location.pathname.includes('/signin'));
+  if (window.location.pathname.includes('/login') || window.location.pathname.includes('/signin')) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
- * Fill email and password fields with human-like delays
- * @param {string} email - Email address to fill
- * @param {string} password - Password to fill
- * @returns {Promise<Object>} Object with emailField and passwordField references
+ * Fill login form with email and password
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @returns {Promise<Object>} Promise resolving to email and password fields
  */
-async function fillLoginForm(email, password) {
+export async function fillLoginForm(email, password) {
   const emailField = document.querySelector(SELECTORS.EMAIL_INPUT);
   const passwordField = document.querySelector(SELECTORS.PASSWORD_INPUT);
 
   if (!emailField || !passwordField) {
-    logger('error', 'fillLoginForm', 'Email or password field not found');
-    throw new Error('Login form fields not found');
+    throw new Error('Champs de connexion introuvables');
   }
 
-  // Fill email field with human-like typing
   emailField.focus();
   emailField.value = '';
+  await delay(DELAYS.MEDIUM);
+
   for (const char of email) {
     emailField.value += char;
     emailField.dispatchEvent(new Event('input', { bubbles: true }));
-    emailField.dispatchEvent(new Event('change', { bubbles: true }));
-    await delay(DELAYS.SHORT);
+    await delay(DELAYS.RANDOM_MIN + Math.random() * DELAYS.RANDOM_MAX);
   }
 
+  emailField.dispatchEvent(new Event('change', { bubbles: true }));
   await delay(DELAYS.NORMAL);
 
-  // Fill password field with human-like typing
   passwordField.focus();
   passwordField.value = '';
+  await delay(DELAYS.MEDIUM);
+
   for (const char of password) {
     passwordField.value += char;
     passwordField.dispatchEvent(new Event('input', { bubbles: true }));
-    passwordField.dispatchEvent(new Event('change', { bubbles: true }));
-    await delay(DELAYS.SHORT);
+    await delay(DELAYS.RANDOM_MIN + Math.random() * DELAYS.RANDOM_MAX);
   }
 
-  logger('info', 'fillLoginForm', 'Login form filled successfully');
+  passwordField.dispatchEvent(new Event('change', { bubbles: true }));
+  await delay(DELAYS.NORMAL);
+
   return { emailField, passwordField };
 }
 
 /**
- * Click the login button to submit credentials
- * @returns {Promise<void>}
+ * Click the login button
+ * @returns {Promise<boolean>} Promise resolving to true if successful
  */
-async function clickLoginButton() {
+export async function clickLoginButton() {
   const loginButton = document.querySelector(SELECTORS.LOGIN_BUTTON);
-
   if (!loginButton) {
-    logger('error', 'clickLoginButton', 'Login button not found');
-    throw new Error('Login button not found');
+    throw new Error('Bouton de connexion introuvable');
   }
 
-  await delay(DELAYS.NORMAL);
+  const captcha = document.querySelector(SELECTORS.CAPTCHA);
+  if (captcha) {
+    throw new Error('Captcha détecté - action manuelle requise');
+  }
+
   loginButton.click();
-  logger('info', 'clickLoginButton', 'Login button clicked');
+  await delay(DELAYS.SECOND);
+
+  return true;
 }
 
 /**
  * Wait for login to complete
- * @returns {Promise<void>}
+ * @param {number} maxWait - Maximum wait time in milliseconds
+ * @returns {Promise<boolean>} Promise resolving to true if login successful
  */
-async function waitForLogin() {
+export async function waitForLogin(maxWait = TIMEOUTS.LOGIN) {
   const startTime = Date.now();
-  const timeout = TIMEOUTS.LOGIN;
 
-  while (Date.now() - startTime < timeout) {
-    // Check if login form is gone (indicating successful login)
-    const loginForm = document.querySelector(SELECTORS.EMAIL_INPUT);
-    if (!loginForm) {
-      logger('info', 'waitForLogin', 'Login completed, form is gone');
-      await delay(DELAYS.SECOND);
-      return;
+  while (Date.now() - startTime < maxWait) {
+    await delay(DELAYS.VERY_LONG);
+
+    if (checkLoginStatus()) {
+      return true;
     }
 
-    // Check if profile indicators exist (indicating successful login)
-    const profileElements = document.querySelector(SELECTORS.PROFILE_INDICATORS);
-    if (profileElements) {
-      logger('info', 'waitForLogin', 'Login completed, profile elements found');
-      return;
+    const errorMessage = document.querySelector(SELECTORS.ERROR_MESSAGE);
+    if (errorMessage && (errorMessage.textContent.toLowerCase().includes('incorrect') ||
+      errorMessage.textContent.toLowerCase().includes('wrong'))) {
+      throw new Error('Identifiants incorrects');
     }
 
-    // Check for error messages
-    const errorElement = document.querySelector(SELECTORS.ERROR_MESSAGE);
-    if (errorElement && errorElement.textContent) {
-      const errorMessage = errorElement.textContent.trim();
-      logger('error', 'waitForLogin', 'Login failed with error', { error: errorMessage });
-      throw new Error(`Login failed: ${errorMessage}`);
+    const captcha = document.querySelector(SELECTORS.CAPTCHA);
+    if (captcha) {
+      throw new Error('Captcha détecté - action manuelle requise');
     }
-
-    await delay(DELAYS.MEDIUM);
   }
 
-  logger('error', 'waitForLogin', 'Login timeout exceeded');
-  throw new Error('Login timeout');
+  throw new Error('Timeout lors de l\'attente de la connexion');
 }
 
 /**
- * Perform email login flow
- * @param {string} email - Email address
- * @param {string} password - Password
- * @returns {Promise<boolean>} True if successful, false otherwise
+ * Perform email login
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @returns {Promise<Object>} Promise resolving to login result
  */
-async function performEmailLogin(email, password) {
+export async function performEmailLogin(email, password) {
   try {
-    logger('info', 'performEmailLogin', 'Starting email login flow');
+    logger('info', 'Auth', '📧 Connexion par email...');
+
+    if (!email || !password) {
+      throw new Error('Email et mot de passe requis pour la connexion par email');
+    }
 
     await fillLoginForm(email, password);
+    logger('info', 'Auth', '📝 Formulaire rempli');
+
     await clickLoginButton();
+    logger('info', 'Auth', '🖱️ Bouton de connexion cliqué');
+
     await waitForLogin();
 
-    logger('info', 'performEmailLogin', 'Email login completed successfully');
-    return true;
+    logger('info', 'Auth', '✅ Connexion réussie');
+    return { success: true };
+
   } catch (error) {
-    logger('error', 'performEmailLogin', 'Email login failed', { error: error.message });
-    return false;
+    logger('error', 'Auth', '❌ Erreur lors de la connexion email: ' + error.message);
+    return { success: false, error: error.message };
   }
 }
 
 /**
- * Perform Facebook login flow
- * @returns {Promise<boolean>} True if successful, false otherwise
+ * Perform Facebook login
+ * @returns {Promise<Object>} Promise resolving to login result
  */
-async function performFacebookLogin() {
+export async function performFacebookLogin() {
   try {
-    logger('info', 'performFacebookLogin', 'Starting Facebook login flow');
+    logger('info', 'Auth', '📘 Connexion par Facebook...');
 
-    const facebookButton = document.querySelector(SELECTORS.FACEBOOK_BUTTON);
+    const facebookButton = document.querySelector(SELECTORS.FACEBOOK_BUTTON) ||
+      Array.from(document.querySelectorAll('button')).find(btn =>
+        btn.getAttribute('title')?.toLowerCase().includes('facebook') ||
+        btn.textContent.toLowerCase().includes('facebook') ||
+        btn.textContent.toLowerCase().includes('log in with facebook')
+      );
+
     if (!facebookButton) {
-      logger('error', 'performFacebookLogin', 'Facebook button not found');
-      return false;
+      throw new Error('Bouton "Log In With Facebook" introuvable');
     }
 
-    await delay(DELAYS.NORMAL);
+    logger('info', 'Auth', '🖱️ Clic sur le bouton Facebook...');
     facebookButton.click();
-    logger('info', 'performFacebookLogin', 'Facebook button clicked, waiting for popup');
+    await delay(DELAYS.TWO_SECONDS);
 
-    await waitForLogin();
+    // TODO: Implémenter la gestion du popup Facebook
+    logger('warn', 'Auth', '⚠️ Gestion du popup Facebook non encore implémentée');
+    return { success: false, error: 'Gestion du popup Facebook non encore implémentée' };
 
-    logger('info', 'performFacebookLogin', 'Facebook login completed successfully');
-    return true;
   } catch (error) {
-    logger('error', 'performFacebookLogin', 'Facebook login failed', { error: error.message });
-    return false;
+    logger('error', 'Auth', '❌ Erreur lors de la connexion Facebook: ' + error.message);
+    return { success: false, error: error.message };
   }
 }
 
 /**
- * Perform Google login flow
- * @returns {Promise<boolean>} True if successful, false otherwise
+ * Perform Google login
+ * @returns {Promise<Object>} Promise resolving to login result
  */
-async function performGoogleLogin() {
+export async function performGoogleLogin() {
   try {
-    logger('info', 'performGoogleLogin', 'Starting Google login flow');
+    logger('info', 'Auth', '🔵 Connexion par Google...');
 
-    const googleButton = document.querySelector(SELECTORS.GOOGLE_BUTTON);
+    const googleButton = document.querySelector(SELECTORS.GOOGLE_BUTTON) ||
+      Array.from(document.querySelectorAll('button')).find(btn =>
+        btn.getAttribute('title')?.toLowerCase().includes('google') ||
+        btn.textContent.toLowerCase().includes('google') ||
+        btn.textContent.toLowerCase().includes('log in with google')
+      );
+
     if (!googleButton) {
-      logger('error', 'performGoogleLogin', 'Google button not found');
-      return false;
+      throw new Error('Bouton "Log In With Google" introuvable');
     }
 
-    await delay(DELAYS.NORMAL);
+    logger('info', 'Auth', '🖱️ Clic sur le bouton Google...');
     googleButton.click();
-    logger('info', 'performGoogleLogin', 'Google button clicked, waiting for popup');
+    await delay(DELAYS.TWO_SECONDS);
 
-    await waitForLogin();
+    // TODO: Implémenter la gestion du popup Google
+    logger('warn', 'Auth', '⚠️ Gestion du popup Google non encore implémentée');
+    return { success: false, error: 'Gestion du popup Google non encore implémentée' };
 
-    logger('info', 'performGoogleLogin', 'Google login completed successfully');
-    return true;
   } catch (error) {
-    logger('error', 'performGoogleLogin', 'Google login failed', { error: error.message });
-    return false;
+    logger('error', 'Auth', '❌ Erreur lors de la connexion Google: ' + error.message);
+    return { success: false, error: error.message };
   }
 }
 
 /**
  * Wait for Apple popup window to open
- * @returns {Promise<Window>} Reference to popup window
+ * @param {number} maxWait - Maximum wait time in milliseconds
+ * @param {Window} popupWindowRef - Reference to popup window if available
+ * @returns {Promise<number>} Promise resolving to Apple tab ID
  */
-async function waitForApplePopupWindow() {
-  const startTime = Date.now();
-  const timeout = TIMEOUTS.APPLE_POPUP;
-  let popupWindow = null;
+export async function waitForApplePopupWindow(maxWait = TIMEOUTS.APPLE_POPUP, popupWindowRef = null) {
+  return new Promise((resolve, reject) => {
+    let resolved = false;
 
-  const originalWindowOpen = window.open;
-  let windowOpenCalled = false;
-
-  // Override window.open to capture popup
-  window.open = function(...args) {
-    windowOpenCalled = true;
-    popupWindow = originalWindowOpen.apply(window, args);
-    logger('info', 'waitForApplePopupWindow', 'Popup window opened');
-    return popupWindow;
-  };
-
-  while (Date.now() - startTime < timeout) {
-    if (windowOpenCalled && popupWindow) {
-      window.open = originalWindowOpen;
-      return popupWindow;
-    }
-    await delay(DELAYS.MEDIUM);
-  }
-
-  window.open = originalWindowOpen;
-  logger('error', 'waitForApplePopupWindow', 'Apple popup timeout');
-  throw new Error('Apple popup window did not open');
-}
-
-/**
- * Click the Apple sign-in button in the popup window
- * @param {Window} popupWindow - Reference to popup window
- * @returns {Promise<void>}
- */
-async function clickAppleButtonInTab(popupWindow) {
-  try {
-    const startTime = Date.now();
-    const timeout = TIMEOUTS.APPLE_POPUP;
-
-    while (Date.now() - startTime < timeout) {
-      try {
-        const signInButton = popupWindow.document.getElementById(APPLE.SIGN_IN_BUTTON_ID);
-        if (signInButton) {
-          await delay(DELAYS.NORMAL);
-          signInButton.click();
-          logger('info', 'clickAppleButtonInTab', 'Apple sign-in button clicked in popup');
-          return;
-        }
-      } catch (error) {
-        // Popup may not be fully loaded yet
+    const messageListener = (request, sender, sendResponse) => {
+      if (request.action === 'applePopupDetected' && !resolved) {
+        logger('info', 'Auth', '✅ Onglet Apple détecté par le background script: ' + request.appleTabId);
+        resolved = true;
+        chrome.runtime.onMessage.removeListener(messageListener);
+        clearInterval(checkInterval);
+        resolve(request.appleTabId);
       }
+    };
 
-      await delay(DELAYS.MEDIUM);
-    }
+    chrome.runtime.onMessage.addListener(messageListener);
 
-    logger('error', 'clickAppleButtonInTab', 'Apple button not found in popup');
-    throw new Error('Apple button not found in popup');
-  } catch (error) {
-    logger('error', 'clickAppleButtonInTab', 'Failed to click Apple button', { error: error.message });
-    throw error;
-  }
+    const checkInterval = setInterval(() => {
+      if (resolved) return;
+
+      chrome.runtime.sendMessage({
+        action: 'findAppleTab'
+      }, (response) => {
+        if (response && response.tabId && !resolved) {
+          logger('info', 'Auth', '✅ Onglet Apple trouvé via recherche: ' + response.tabId);
+          resolved = true;
+          clearInterval(checkInterval);
+          chrome.runtime.onMessage.removeListener(messageListener);
+          resolve(response.tabId);
+        }
+      });
+
+      if (popupWindowRef && !popupWindowRef.closed && !resolved) {
+        try {
+          const popupUrl = popupWindowRef.location.href;
+          if (popupUrl && URLS.APPLE_DOMAINS.some(domain => popupUrl.includes(domain))) {
+            logger('info', 'Auth', '✅ Fenêtre popup Apple confirmée via window.open: ' + popupUrl);
+            chrome.runtime.sendMessage({
+              action: 'findAppleTab',
+              url: popupUrl
+            }, (response) => {
+              if (response && response.tabId && !resolved) {
+                resolved = true;
+                clearInterval(checkInterval);
+                chrome.runtime.onMessage.removeListener(messageListener);
+                resolve(response.tabId);
+              }
+            });
+          }
+        } catch (e) {
+          // Cross-origin, cannot access location.href
+        }
+      }
+    }, TIMEOUTS.APPLE_TAB_CHECK);
+
+    setTimeout(() => {
+      if (!resolved) {
+        clearInterval(checkInterval);
+        chrome.runtime.onMessage.removeListener(messageListener);
+        reject(new Error('Timeout: Fenêtre popup Apple non détectée'));
+      }
+    }, maxWait);
+  });
 }
 
 /**
- * Wait for Apple popup window to close
- * @param {Window} popupWindow - Reference to popup window
- * @returns {Promise<void>}
+ * Click a button in Apple tab via script injection
+ * @param {number} tabId - Apple tab ID
+ * @param {string} buttonValue - Button value to search for
+ * @param {string} searchType - Search type ('id' or 'text')
+ * @param {number} maxRetries - Maximum number of retries
+ * @returns {Promise<boolean>} Promise resolving to true if successful
  */
-async function waitForApplePopupClose(popupWindow) {
-  try {
-    const startTime = Date.now();
-    const timeout = TIMEOUTS.APPLE_POPUP_CLOSE;
-
-    while (Date.now() - startTime < timeout) {
-      try {
-        if (popupWindow.closed) {
-          logger('info', 'waitForApplePopupClose', 'Apple popup closed');
-          return;
-        }
-      } catch (error) {
-        // Popup reference lost, assume closed
-        logger('info', 'waitForApplePopupClose', 'Popup reference lost, assuming closed');
+export async function clickAppleButtonInTab(tabId, buttonValue, searchType = 'id', maxRetries = LIMITS.MAX_APPLE_BUTTON_RETRIES) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({
+      action: 'clickButtonInAppleTab',
+      tabId: tabId,
+      buttonValue: buttonValue,
+      searchType: searchType,
+      maxRetries: maxRetries
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
         return;
       }
 
-      await delay(DELAYS.MEDIUM);
-    }
-
-    logger('error', 'waitForApplePopupClose', 'Apple popup close timeout');
-    throw new Error('Apple popup did not close');
-  } catch (error) {
-    logger('error', 'waitForApplePopupClose', 'Failed to wait for popup close', { error: error.message });
-    throw error;
-  }
+      if (response && response.success) {
+        logger('info', 'Auth', `✅ Bouton "${buttonValue}" cliqué dans l'onglet Apple`);
+        resolve(true);
+      } else {
+        reject(new Error(response?.error || 'Échec du clic sur le bouton'));
+      }
+    });
+  });
 }
 
 /**
- * Perform Apple login flow
- * @returns {Promise<boolean>} True if successful, false otherwise
+ * Wait for Apple popup to close
+ * @param {number} maxWait - Maximum wait time in milliseconds
+ * @returns {Promise<boolean>} Promise resolving to true if popup closed
  */
-async function performAppleLogin() {
-  try {
-    logger('info', 'performAppleLogin', 'Starting Apple login flow');
+export async function waitForApplePopupClose(maxWait = TIMEOUTS.APPLE_POPUP_CLOSE) {
+  const startTime = Date.now();
 
-    const appleButton = document.querySelector(SELECTORS.APPLE_BUTTON);
+  while (Date.now() - startTime < maxWait) {
+    await delay(DELAYS.VERY_LONG);
+
+    const appleIframes = Array.from(document.querySelectorAll('iframe')).filter(iframe => {
+      try {
+        return iframe.src && (
+          iframe.src.includes('apple.com') ||
+          iframe.src.includes('appleid.apple.com')
+        );
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (appleIframes.length === 0) {
+      logger('info', 'Auth', '✅ Popup Apple fermé');
+      return true;
+    }
+  }
+
+  logger('warn', 'Auth', '⚠️ Timeout lors de l\'attente de fermeture du popup Apple');
+  return false;
+}
+
+/**
+ * Perform Apple login
+ * @returns {Promise<Object>} Promise resolving to login result
+ */
+export async function performAppleLogin() {
+  try {
+    logger('info', 'Auth', '🍎 Connexion par Apple...');
+
+    const appleButton = document.querySelector(SELECTORS.APPLE_BUTTON) ||
+      Array.from(document.querySelectorAll('button')).find(btn =>
+        btn.getAttribute('title')?.toLowerCase().includes('apple') ||
+        btn.textContent.toLowerCase().includes('apple') ||
+        btn.textContent.toLowerCase().includes('log in with apple')
+      );
+
     if (!appleButton) {
-      logger('error', 'performAppleLogin', 'Apple button not found');
-      return false;
+      throw new Error('Bouton "Log In With Apple" introuvable');
     }
 
-    // Wait for popup window
-    const popupPromise = waitForApplePopupWindow();
-    await delay(DELAYS.NORMAL);
+    logger('info', 'Auth', '🖱️ Clic sur le bouton Apple...');
+
+    let popupWindow = null;
+    const originalOpen = window.open;
+
+    if (originalOpen) {
+      window.open = function (...args) {
+        popupWindow = originalOpen.apply(this, args);
+        logger('info', 'Auth', '🔍 Nouvelle fenêtre détectée via window.open');
+        return popupWindow;
+      };
+    }
+
     appleButton.click();
-    logger('info', 'performAppleLogin', 'Apple button clicked, waiting for popup');
+    await delay(DELAYS.TWO_SECONDS);
 
-    const popupWindow = await popupPromise;
-    await clickAppleButtonInTab(popupWindow);
-    await waitForApplePopupClose(popupWindow);
-    await waitForLogin();
+    logger('info', 'Auth', '⏳ Attente de la nouvelle fenêtre Apple...');
+    const appleTabId = await waitForApplePopupWindow(TIMEOUTS.APPLE_POPUP, popupWindow);
+    if (!appleTabId) {
+      throw new Error('Fenêtre popup Apple non détectée');
+    }
 
-    logger('info', 'performAppleLogin', 'Apple login completed successfully');
-    return true;
+    logger('info', 'Auth', '📱 Fenêtre popup Apple détectée (onglet ID: ' + appleTabId + ')');
+    await delay(DELAYS.TWO_SECONDS);
+
+    if (originalOpen) {
+      window.open = originalOpen;
+    }
+
+    logger('info', 'Auth', '⏳ Injection du script dans l\'onglet Apple...');
+
+    logger('info', 'Auth', '⏳ Attente du bouton sign-in...');
+    await delay(DELAYS.TWO_SECONDS);
+    await clickAppleButtonInTab(appleTabId, APPLE.SIGN_IN_BUTTON_ID, 'id');
+    await delay(DELAYS.TWO_AND_HALF_SECONDS);
+
+    logger('info', 'Auth', '⏳ Attente du bouton Sign In...');
+    await delay(1500);
+    await clickAppleButtonInTab(appleTabId, 'Sign In', 'text');
+    await delay(DELAYS.TWO_AND_HALF_SECONDS);
+
+    logger('info', 'Auth', '⏳ Attente du dernier bouton Continue...');
+    await delay(1500);
+    await clickAppleButtonInTab(appleTabId, 'Continue', 'text');
+    await delay(DELAYS.THREE_SECONDS);
+
+    await waitForApplePopupClose();
+    await delay(DELAYS.TWO_SECONDS);
+
+    await waitForLogin(TIMEOUTS.APPLE_LOGIN);
+
+    console.log('[Auth] ✅ Connexion Apple réussie');
+    return { success: true };
+
   } catch (error) {
-    logger('error', 'performAppleLogin', 'Apple login failed', { error: error.message });
-    return false;
+    logger('error', 'Auth', '❌ Erreur lors de la connexion Apple: ' + error.message);
+    return { success: false, error: error.message };
   }
 }
 
 /**
- * Main login router - selects method based on login type
- * @param {string} loginMethod - 'email', 'facebook', 'google', or 'apple'
- * @param {string} email - Email address (required for email login)
- * @param {string} password - Password (required for email login)
- * @returns {Promise<boolean>} True if successful, false otherwise
+ * Main login function that routes to the appropriate method
+ * @param {string} loginMethod - Login method ('email', 'facebook', 'google', 'apple')
+ * @param {Object} credentials - Credentials object (email, password for email method)
+ * @returns {Promise<Object>} Promise resolving to login result
  */
-async function performLogin(loginMethod, email, password) {
+export async function performLogin(loginMethod, credentials = {}) {
   try {
-    logger('info', 'performLogin', 'Starting login flow', { method: loginMethod });
+    logger('info', 'Auth', `🔐 Début de la connexion avec la méthode: ${loginMethod}`);
+
+    if (checkLoginStatus()) {
+      logger('info', 'Auth', '✅ Déjà connecté');
+      return { success: true, alreadyLoggedIn: true };
+    }
 
     switch (loginMethod) {
       case 'email':
-        return await performEmailLogin(email, password);
+        return await performEmailLogin(credentials.email, credentials.password);
       case 'facebook':
         return await performFacebookLogin();
       case 'google':
@@ -390,24 +487,11 @@ async function performLogin(loginMethod, email, password) {
       case 'apple':
         return await performAppleLogin();
       default:
-        logger('error', 'performLogin', 'Unknown login method', { method: loginMethod });
-        return false;
+        throw new Error(`Méthode de connexion inconnue: ${loginMethod}`);
     }
   } catch (error) {
-    logger('error', 'performLogin', 'Login failed', { error: error.message });
-    return false;
+    logger('error', 'Auth', '❌ Erreur lors de la connexion: ' + error.message);
+    return { success: false, error: error.message };
   }
 }
 
-// Export AuthModule for global access
-window.AuthModule = {
-  checkLoginStatus,
-  fillLoginForm,
-  clickLoginButton,
-  waitForLogin,
-  performEmailLogin,
-  performFacebookLogin,
-  performGoogleLogin,
-  performAppleLogin,
-  performLogin,
-};
