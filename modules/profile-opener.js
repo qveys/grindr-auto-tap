@@ -51,3 +51,17 @@ function isProfileVisible() {
   const profileView = document.querySelector(SELECTORS.PROFILE_VIEW);
   return profileView !== null;
 }
+
+/**
+ * Find the tap button on current profile
+ * @returns {Element|null} Tap button element or null if not found
+ */
+function findTapButton() {
+  const tapButton = document.querySelector(SELECTORS.TAP_BUTTON);
+  if (tapButton) {
+    logger('debug', 'findTapButton', 'Tap button found');
+    return tapButton;
+  }
+  logger('debug', 'findTapButton', 'Tap button not found');
+  return null;
+}
