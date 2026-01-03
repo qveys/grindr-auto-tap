@@ -548,3 +548,189 @@ async function performLogin(loginMethod, credentials = {}) {
     return { success: false, error: error.message };
   }
 }
+// ============================================================================
+// PROFILE OPENER MODULE
+// ============================================================================
+
+async function dismissBetaBanner() {
+  const betaDismissBtn = document.getElementById('beta-dismiss-btn');
+  if (betaDismissBtn) {
+    logger('info', 'Content', '🔘 Clic sur le bouton beta-dismiss-btn...');
+    betaDismissBtn.click();
+    await delay(DELAYS.SECOND);
+  } else {
+    logger('info', 'Content', 'ℹ️ Bouton beta-dismiss-btn non trouvé (peut-être déjà fermé)');
+  }
+}
+
+function findFirstProfileGridCell() {
+  return document.querySelector(SELECTORS.PROFILE_GRIDCELL);
+}
+
+function verifyProfileOpened() {
+  const currentURL = window.location.href;
+  const urlContainsProfile = currentURL.includes('?profile=true') || currentURL.includes('&profile=true');
+  const nextProfileBtn = document.querySelector(SELECTORS.NEXT_PROFILE);
+  const tapButton = document.querySelector(SELECTORS.TAP_BUTTON);
+  const profileView = document.querySelector(SELECTORS.PROFILE_VIEW);
+
+  return urlContainsProfile || !!(nextProfileBtn || tapButton || profileView);
+}
+
+async function attemptProfileClick(gridCell) {
+  try {
+    logger('info', 'Content', '👤 Ouverture du premier profil...');
+
+    // Trouver l'élément interactif dans le gridcell
+    // Priorité: data-testid="cascadeCellContainer", puis onclick, puis href, puis data-*
+    const allDescendants = Array.from(gridCell.querySelectorAll('*'));
+    let targetElement = null;
+
+    // Chercher d'abord cascadeCellContainer
+    let cascadeContainer = null;
+    for (const elem of allDescendants) {
+      if (elem.getAttribute('data-testid') === 'cascadeCellContainer') {
+        cascadeContainer = elem;
+        break;
+      }
+    }
+
+    // Si cascadeCellContainer trouvé, chercher un enfant interactif dedans
+    if (cascadeContainer) {
+      const cascadeChildren = Array.from(cascadeContainer.querySelectorAll('*'));
+      // Prioriser les éléments avec onclick, href, ou data-*
+      for (const child of cascadeChildren) {
+        const hasOnClick = child.onclick || child.getAttribute('onclick');
+        const hasHref = child.href || child.getAttribute('href');
+        const hasDataAttr = Array.from(child.attributes).some(attr => attr.name.startsWith('data-'));
+
+        if (hasOnClick || hasHref || hasDataAttr) {
+          targetElement = child;
+          logger('debug', 'Content', '🔍 Enfant interactif trouvé dans cascadeCellContainer: ' + child.tagName + ' ' + (child.getAttribute('data-testid') || child.id || ''));
+          break;
+        }
+      }
+      // Si pas d'enfant interactif, utiliser le container lui-même
+      if (!targetElement) {
+        targetElement = cascadeContainer;
+        logger('debug', 'Content', '🎯 Utilisation du cascadeCellContainer lui-même');
+      }
+    } else {
+      // Sinon, chercher un élément avec onclick, href, ou data-*
+      for (const elem of allDescendants) {
+        const hasOnClick = elem.onclick || elem.getAttribute('onclick');
+        const hasHref = elem.href || elem.getAttribute('href');
+        const hasDataAttr = Array.from(elem.attributes).some(attr => attr.name.startsWith('data-'));
+
+        if (hasOnClick || hasHref || hasDataAttr) {
+          targetElement = elem;
+          break;
+        }
+      }
+
+      // Fallback: utiliser le gridcell lui-même
+      if (!targetElement) {
+        targetElement = gridCell;
+      }
+    }
+
+    logger('debug', 'Content', '🎯 Élément cible trouvé: ' + targetElement.tagName + ' ' + (targetElement.getAttribute('data-testid') || targetElement.id || ''));
+
+    // Scroller vers l'élément
+    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await delay(DELAYS.LONG);
+
+    // Obtenir les coordonnées de l'élément
+    const rect = targetElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    // Créer un MouseEvent avec des propriétés réalistes
+    const mouseEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      screenX: centerX + window.screenX,
+      screenY: centerY + window.screenY,
+      clientX: centerX,
+      clientY: centerY,
+      button: 0,
+      buttons: 1
+    });
+
+    // Écouter les changements d'URL
+    let urlChangedDetected = false;
+    const urlChangeListener = () => {
+      const currentURL = window.location.href;
+      if (currentURL.includes('?profile=true') || currentURL.includes('&profile=true')) {
+        urlChangedDetected = true;
+      }
+    };
+    window.addEventListener('popstate', urlChangeListener);
+    window.addEventListener('hashchange', urlChangeListener);
+
+    // Dispatcher l'événement
+    logger('debug', 'Content', '🖱️ Clic sur l\'élément avec dispatchEvent...');
+    targetElement.dispatchEvent(mouseEvent);
+
+    // Vérifier périodiquement si l'URL a changé ou si le profil s'est ouvert
+    for (let i = 0; i < 20; i++) {
+      await delay(DELAYS.NORMAL);
+
+      const currentURL = window.location.href;
+      if (currentURL.includes('?profile=true') || currentURL.includes('&profile=true')) {
+        urlChangedDetected = true;
+      }
+
+      if (urlChangedDetected || verifyProfileOpened()) {
+        window.removeEventListener('popstate', urlChangeListener);
+        window.removeEventListener('hashchange', urlChangeListener);
+        logger('info', 'Content', '✅ Profil ouvert détecté');
+        return true;
+      }
+    }
+
+    window.removeEventListener('popstate', urlChangeListener);
+    window.removeEventListener('hashchange', urlChangeListener);
+
+    // Vérification finale
+    const isOpened = verifyProfileOpened();
+    if (isOpened) {
+      logger('info', 'Content', '✅ Profil ouvert (vérification finale)');
+    } else {
+      logger('warn', 'Content', '⚠️ Profil non ouvert après toutes les tentatives');
+    }
+    return isOpened;
+  } catch (error) {
+    logger('warn', 'Content', '⚠️ Erreur lors du clic sur le profil: ' + error.message);
+    return false;
+  }
+}
+
+async function performPreScriptActions() {
+  try {
+    logger('info', 'Content', '🔧 Exécution des actions préalables...');
+
+    await dismissBetaBanner();
+    await delay(DELAYS.SECOND);
+
+    const firstGridCell = findFirstProfileGridCell();
+    if (!firstGridCell) {
+      logger('warn', 'Content', '⚠️ Aucun div avec role="gridcell" trouvé');
+      return false;
+    }
+
+    const profileOpened = await attemptProfileClick(firstGridCell);
+
+    if (profileOpened) {
+      logger('info', 'Content', '✅ Actions préalables terminées - Profil ouvert');
+      return true;
+    } else {
+      logger('warn', 'Content', '⚠️ Actions préalables terminées - Profil non ouvert');
+      return false;
+    }
+  } catch (error) {
+    logger('warn', 'Content', '⚠️ Erreur lors des actions préalables: ' + error.message);
+    return verifyProfileOpened();
+  }
+}
