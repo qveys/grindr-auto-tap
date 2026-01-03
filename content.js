@@ -1069,3 +1069,31 @@ if (!window.__grindrErrorHandlersAdded) {
 
   window.__grindrErrorHandlersAdded = true;
 }
+// ============================================================================
+// MESSAGE LISTENERS
+// ============================================================================
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'startScript') {
+    initAndRun().then(() => {
+      sendResponse({ success: true });
+    }).catch((error) => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+
+  if (request.action === 'stopScript') {
+    window.__grindrRunning = false;
+    window.__grindrStopped = true;
+    window.__grindrStats = null;
+    logger('info', 'Content', '⏹️ Script arrêté manuellement');
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'getScriptStatus') {
+    sendResponse({ isRunning: window.__grindrRunning || false });
+    return true;
+  }
+});
