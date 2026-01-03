@@ -109,3 +109,38 @@ function finalizeStats(stats) {
   });
   return stats;
 }
+
+/**
+ * Send statistics to N8N webhook
+ * @param {Object} stats - Finalized statistics object
+ * @param {string} webhookUrl - Webhook URL to send to
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function sendWebhook(stats, webhookUrl) {
+  try {
+    logger('info', 'sendWebhook', 'Sending statistics to webhook', { url: webhookUrl });
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(stats),
+      timeout: TIMEOUTS.WEBHOOK_REQUEST,
+    });
+
+    if (response.ok) {
+      logger('info', 'sendWebhook', 'Webhook sent successfully');
+      return true;
+    } else {
+      logger('error', 'sendWebhook', 'Webhook request failed', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      return false;
+    }
+  } catch (error) {
+    logger('error', 'sendWebhook', 'Failed to send webhook', { error: error.message });
+    return false;
+  }
+}
