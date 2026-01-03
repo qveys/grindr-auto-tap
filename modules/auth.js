@@ -42,3 +42,25 @@ function logger(level, location, message, data = null) {
     });
   }
 }
+
+/**
+ * Check if user is currently logged in
+ * @returns {boolean} True if logged in, false otherwise
+ */
+function checkLoginStatus() {
+  const loginPage = document.querySelector(SELECTORS.EMAIL_INPUT);
+  if (loginPage) {
+    return false;
+  }
+
+  const profileElements = document.querySelector(SELECTORS.PROFILE_INDICATORS);
+  if (profileElements) {
+    return true;
+  }
+
+  if (window.location.pathname.includes('/login') || window.location.pathname.includes('/signin')) {
+    return false;
+  }
+
+  return true;
+}
