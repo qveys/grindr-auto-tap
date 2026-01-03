@@ -67,6 +67,48 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // Écouter les messages du content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'getCredentials') {
+    // Récupérer les identifiants depuis le storage
+    chrome.storage.local.get(['loginMethod', 'grindrEmail', 'grindrPassword', 'autoLogin'], (result) => {
+      sendResponse({
+        loginMethod: result.loginMethod || 'email',
+        email: result.grindrEmail || null,
+        password: result.grindrPassword || null,
+        autoLogin: result.autoLogin !== false // true par défaut
+      });
+    });
+    return true;
+  }
+
+  if (request.action === 'saveCredentials') {
+    // Sauvegarder les identifiants dans le storage
+    const dataToSave = {
+      loginMethod: request.loginMethod || 'email',
+      autoLogin: request.autoLogin !== false
+    };
+
+    // Sauvegarder email/password seulement si fournis (pour compatibilité avec les autres méthodes)
+    if (request.email) {
+      dataToSave.grindrEmail = request.email;
+    }
+    if (request.password) {
+      dataToSave.grindrPassword = request.password;
+    }
+
+    chrome.storage.local.set(dataToSave, () => {
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
+  if (request.action === 'deleteCredentials') {
+    // Supprimer les identifiants
+    chrome.storage.local.remove(['loginMethod', 'grindrEmail', 'grindrPassword', 'autoLogin'], () => {
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
   if (request.action === 'addLog') {
     addLog(request.logEntry);
     sendResponse({ success: true });
