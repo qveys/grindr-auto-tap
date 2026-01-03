@@ -29,9 +29,21 @@ function logger(level, location, message, data = null) {
   });
 }
 
-/**
- * Handle messages from content scripts and popup
- */
+// Détecter les onglets web.grindr.com et injecter automatiquement
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('web.grindr.com')) {
+    // Injecter le content script si ce n'est pas déjà fait
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      files: ['content.js']
+    }).catch(err => {
+      // Ignorer les erreurs si le script est déjà injecté
+      logger('debug', 'Background', 'Script déjà injecté ou erreur: ' + (err?.message || String(err)));
+    });
+  }
+});
+
+// Écouter les messages du content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'addLog') {
     addLog(request.logEntry);
