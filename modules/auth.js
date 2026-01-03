@@ -58,11 +58,7 @@ function checkLoginStatus() {
     return true;
   }
 
-  if (window.location.pathname.includes('/login') || window.location.pathname.includes('/signin')) {
-    return false;
-  }
-
-  return true;
+  return !(window.location.pathname.includes('/login') || window.location.pathname.includes('/signin'));
 }
 
 /**
