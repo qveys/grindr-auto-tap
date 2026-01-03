@@ -35,6 +35,21 @@ function logger(level, location, message, data = null) {
 }
 
 /**
+ * Dismiss beta banner if present
+ * @returns {Promise<void>}
+ */
+export async function dismissBetaBanner() {
+  const betaDismissBtn = document.getElementById('beta-dismiss-btn');
+  if (betaDismissBtn) {
+    logger('info', 'ProfileOpener', '🔘 Clic sur le bouton beta-dismiss-btn...');
+    betaDismissBtn.click();
+    await delay(DELAYS.SECOND);
+  } else {
+    logger('info', 'ProfileOpener', 'ℹ️ Bouton beta-dismiss-btn non trouvé (peut-être déjà fermé)');
+  }
+}
+
+/**
  * Check if profile is currently displayed
  * @returns {boolean} True if profile is visible, false otherwise
  */
