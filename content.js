@@ -521,3 +521,30 @@ async function performAppleLogin() {
     return { success: false, error: error.message };
   }
 }
+
+async function performLogin(loginMethod, credentials = {}) {
+  try {
+    logger('info', 'Auth', `🔐 Début de la connexion avec la méthode: ${loginMethod}`);
+
+    if (checkLoginStatus()) {
+      logger('info', 'Auth', '✅ Déjà connecté');
+      return { success: true, alreadyLoggedIn: true };
+    }
+
+    switch (loginMethod) {
+      case 'email':
+        return await performEmailLogin(credentials.email, credentials.password);
+      case 'facebook':
+        return await performFacebookLogin();
+      case 'google':
+        return await performGoogleLogin();
+      case 'apple':
+        return await performAppleLogin();
+      default:
+        throw new Error(`Méthode de connexion inconnue: ${loginMethod}`);
+    }
+  } catch (error) {
+    logger('error', 'Auth', '❌ Erreur lors de la connexion: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
