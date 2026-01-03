@@ -47,4 +47,16 @@ window.Constants = {
     AUTO_START: true,
     LOGIN_METHOD: 'email',
   },
+
+  // URLs
+  URLS: {
+    DEFAULT_WEBHOOK: 'https://n8n.quentinveys.be/webhook/grindr-stats',
+    GRINDR_DOMAIN: 'web.grindr.com',
+    APPLE_DOMAINS: [
+      'apple.com',
+      'appleid.apple.com',
+      'idmsa.apple.com',
+      'signinwithapple',
+    ],
+  },
 };
