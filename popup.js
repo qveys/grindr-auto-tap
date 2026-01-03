@@ -16,8 +16,11 @@ function logger(level, location, message, data = null) {
     data: data
   };
 
-  // Send to background script to store
-  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+  // Send to background script to store using centralized messaging
+  if (typeof window !== 'undefined' && window.sendLog) {
+    window.sendLog(logEntry);
+  } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    // Fallback for backwards compatibility
     chrome.runtime.sendMessage({
       action: 'addLog',
       logEntry: logEntry

@@ -28,6 +28,7 @@
       ],
       "js": [
         "utils/constants.js",
+        "utils/messaging.js",
         "utils/logger.js",
         "utils/formatters.js",
         "utils/dom-helpers.js",

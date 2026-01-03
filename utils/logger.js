@@ -30,7 +30,11 @@
     consoleMethod(`[${location}] ${message}`, data || '');
 
     // Send to background script to store
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    // Use centralized messaging utility if available
+    if (typeof window !== 'undefined' && window.sendLog) {
+      window.sendLog(logEntry);
+    } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      // Fallback to direct chrome.runtime.sendMessage if messaging utility not loaded
       chrome.runtime.sendMessage({
         action: 'addLog',
         logEntry: logEntry
