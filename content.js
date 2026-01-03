@@ -331,3 +331,67 @@ async function performGoogleLogin() {
     return { success: false, error: error.message };
   }
 }
+
+async function waitForApplePopupWindow(maxWait = TIMEOUTS.APPLE_POPUP, popupWindowRef = null) {
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+
+    const messageListener = (request, sender, sendResponse) => {
+      if (request.action === 'applePopupDetected' && !resolved) {
+        logger('info', 'Auth', '✅ Onglet Apple détecté par le background script: ' + request.appleTabId);
+        resolved = true;
+        chrome.runtime.onMessage.removeListener(messageListener);
+        clearInterval(checkInterval);
+        resolve(request.appleTabId);
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(messageListener);
+
+    const checkInterval = setInterval(() => {
+      if (resolved) return;
+
+      chrome.runtime.sendMessage({
+        action: 'findAppleTab'
+      }, (response) => {
+        if (response && response.tabId && !resolved) {
+          logger('info', 'Auth', '✅ Onglet Apple trouvé via recherche: ' + response.tabId);
+          resolved = true;
+          clearInterval(checkInterval);
+          chrome.runtime.onMessage.removeListener(messageListener);
+          resolve(response.tabId);
+        }
+      });
+
+      if (popupWindowRef && !popupWindowRef.closed && !resolved) {
+        try {
+          const popupUrl = popupWindowRef.location.href;
+          if (popupUrl && URLS.APPLE_DOMAINS.some(domain => popupUrl.includes(domain))) {
+            logger('info', 'Auth', '✅ Fenêtre popup Apple confirmée via window.open: ' + popupUrl);
+            chrome.runtime.sendMessage({
+              action: 'findAppleTab',
+              url: popupUrl
+            }, (response) => {
+              if (response && response.tabId && !resolved) {
+                resolved = true;
+                clearInterval(checkInterval);
+                chrome.runtime.onMessage.removeListener(messageListener);
+                resolve(response.tabId);
+              }
+            });
+          }
+        } catch (e) {
+          // Cross-origin, cannot access location.href
+        }
+      }
+    }, TIMEOUTS.APPLE_TAB_CHECK);
+
+    setTimeout(() => {
+      if (!resolved) {
+        clearInterval(checkInterval);
+        chrome.runtime.onMessage.removeListener(messageListener);
+        reject(new Error('Timeout: Fenêtre popup Apple non détectée'));
+      }
+    }, maxWait);
+  });
+}
