@@ -56,3 +56,46 @@ function addLog(level, location, message, data = null) {
     });
   }
 }
+
+/**
+ * Logger object with methods for different log levels
+ */
+const logger = {
+  /**
+   * Log an info message
+   */
+  info: function (location, message, data = null) {
+    addLog(LOG_LEVELS.INFO, location, message, data);
+  },
+
+  /**
+   * Log a warning message
+   */
+  warn: function (location, message, data = null) {
+    addLog(LOG_LEVELS.WARN, location, message, data);
+  },
+
+  /**
+   * Log an error message
+   */
+  error: function (location, message, data = null) {
+    addLog(LOG_LEVELS.ERROR, location, message, data);
+  },
+
+  /**
+   * Log a debug message
+   */
+  debug: function (location, message, data = null) {
+    addLog(LOG_LEVELS.DEBUG, location, message, data);
+  },
+
+  /**
+   * Format timestamp for display
+   */
+  formatTimestamp: formatTimestamp
+};
+
+// Export for use in modules
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = logger;
+}
