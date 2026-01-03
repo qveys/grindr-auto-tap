@@ -1020,3 +1020,52 @@ async function autoTapAndNext() {
     window.__grindrLastRun = Date.now();
   }
 }
+// ============================================================================
+// GLOBAL ERROR HANDLERS
+// ============================================================================
+
+if (!window.__grindrErrorHandlersAdded) {
+  window.addEventListener('error', async (event) => {
+    logger('error', 'Content', '❌ Erreur globale capturée: ' + (event.error?.message || String(event.error)), event.error);
+
+    if (window.__grindrStats) {
+      const endTime = Date.now();
+      const duration = endTime - window.__grindrStats.startTime;
+      const totalCount = window.__grindrStats.alreadyTappedCount + window.__grindrStats.tappedCount;
+
+      const stats = createErrorStats({
+        startTime: window.__grindrStats.startTime,
+        endTime: endTime,
+        duration: duration,
+        alreadyTappedCount: window.__grindrStats.alreadyTappedCount,
+        tappedCount: window.__grindrStats.tappedCount,
+        totalCount: totalCount
+      }, event.error);
+
+      await sendFinalStats(stats, true);
+    }
+  });
+
+  window.addEventListener('unhandledrejection', async (event) => {
+    logger('error', 'Content', '❌ Promesse rejetée non gérée: ' + (event.reason?.message || String(event.reason)), event.reason);
+
+    if (window.__grindrStats) {
+      const endTime = Date.now();
+      const duration = endTime - window.__grindrStats.startTime;
+      const totalCount = window.__grindrStats.alreadyTappedCount + window.__grindrStats.tappedCount;
+
+      const stats = createErrorStats({
+        startTime: window.__grindrStats.startTime,
+        endTime: endTime,
+        duration: duration,
+        alreadyTappedCount: window.__grindrStats.alreadyTappedCount,
+        tappedCount: window.__grindrStats.tappedCount,
+        totalCount: totalCount
+      }, event.reason);
+
+      await sendFinalStats(stats, true);
+    }
+  });
+
+  window.__grindrErrorHandlersAdded = true;
+}
