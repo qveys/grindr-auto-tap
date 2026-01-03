@@ -157,3 +157,25 @@ async function waitForLogin() {
   logger('error', 'waitForLogin', 'Login timeout exceeded');
   throw new Error('Login timeout');
 }
+
+/**
+ * Perform email login flow
+ * @param {string} email - Email address
+ * @param {string} password - Password
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function performEmailLogin(email, password) {
+  try {
+    logger('info', 'performEmailLogin', 'Starting email login flow');
+
+    await fillLoginForm(email, password);
+    await clickLoginButton();
+    await waitForLogin();
+
+    logger('info', 'performEmailLogin', 'Email login completed successfully');
+    return true;
+  } catch (error) {
+    logger('error', 'performEmailLogin', 'Email login failed', { error: error.message });
+    return false;
+  }
+}
