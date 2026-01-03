@@ -19,5 +19,23 @@
     "scripts": [
       "background.js"
     ]
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://web.grindr.com/*"
+      ],
+      "js": [
+        "utils/constants.js",
+        "utils/formatters.js",
+        "utils/storage.js",
+        "modules/logger.js",
+        "modules/auth.js",
+        "modules/profile-opener.js",
+        "modules/stats.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
 }
