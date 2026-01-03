@@ -245,3 +245,16 @@ style.textContent = `
   }
 `;
 document.head.appendChild(style);
+
+// Event listeners
+startButton.addEventListener('click', handleStartClick);
+stopButton.addEventListener('click', handleStopClick);
+saveButton.addEventListener('click', saveSettings);
+clearLogsButton.addEventListener('click', handleClearLogs);
+
+// Clean up on popup close
+window.addEventListener('unload', () => {
+  if (logsPoller) {
+    clearInterval(logsPoller);
+  }
+});
