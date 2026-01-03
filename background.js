@@ -21,3 +21,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 });
+
+/**
+ * Add a log entry to the logs array
+ * @param {Object} logEntry - Log entry object
+ */
+function addLog(logEntry) {
+  logs.push(logEntry);
+
+  // Keep logs size manageable
+  if (logs.length > MAX_LOGS) {
+    logs = logs.slice(-MAX_LOGS);
+  }
+
+  // Also save to chrome storage for persistence
+  chrome.storage.local.set({ logs: logs }).catch(err => {
+    console.error('Failed to save logs to storage:', err);
+  });
+}
