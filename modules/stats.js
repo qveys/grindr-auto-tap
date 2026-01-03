@@ -42,3 +42,21 @@ function logger(level, location, message, data = null) {
     });
   }
 }
+
+/**
+ * Initialize statistics object with default values
+ * @returns {Object} Statistics object
+ */
+function initializeStats() {
+  const stats = {
+    startTime: Date.now(),
+    endTime: null,
+    totalTaps: 0,
+    successfulTaps: 0,
+    failedTaps: 0,
+    duration: 0,
+    timestamp: new Date().toISOString(),
+  };
+  logger('debug', 'initializeStats', 'Statistics initialized', stats);
+  return stats;
+}
