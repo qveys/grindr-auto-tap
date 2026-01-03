@@ -78,3 +78,19 @@ async function saveSettings() {
     showNotification('Failed to save settings', 'error');
   }
 }
+
+/**
+ * Update UI state based on running status
+ */
+function updateUI() {
+  startButton.disabled = isRunning;
+  stopButton.disabled = !isRunning;
+
+  if (isRunning) {
+    statusIndicator.classList.add('active');
+    statusText.textContent = 'Running';
+  } else {
+    statusIndicator.classList.remove('active');
+    statusText.textContent = 'Ready';
+  }
+}
