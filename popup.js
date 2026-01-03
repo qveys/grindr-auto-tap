@@ -34,3 +34,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateUI();
   pollLogs();
 });
+
+/**
+ * Load settings from storage
+ */
+async function loadSettings() {
+  try {
+    const result = await chrome.storage.local.get([
+      'loginMethod',
+      'grindrEmail',
+      'grindrPassword',
+      'autoLogin',
+      'n8nWebhookURL'
+    ]);
+
+    if (result.loginMethod) loginMethodSelect.value = result.loginMethod;
+    if (result.grindrEmail) emailInput.value = result.grindrEmail;
+    if (result.grindrPassword) passwordInput.value = result.grindrPassword;
+    if (result.autoLogin !== undefined) autoLoginCheckbox.checked = result.autoLogin;
+    if (result.n8nWebhookURL) webhookURLInput.value = result.n8nWebhookURL;
+  } catch (error) {
+    console.error('Failed to load settings:', error);
+  }
+}
