@@ -1,179 +1,88 @@
-# Grindr Auto Tap Extension
+# Extension Firefox - Grindr Auto Tap
 
-A Firefox WebExtension that automates the profile tapping functionality on Grindr web.
+Extension Firefox pour automatiser les actions sur Grindr et envoyer les statistiques vers n8n.
 
-## Features
+## Fonctionnalités
 
-- **Multi-Method Authentication**: Support for email, Facebook, Google, and Apple Sign-in
-- **Auto-Login**: Automatically log in on startup
-- **Auto-Tap**: Automatically tap profiles with configurable settings
-- **Statistics Tracking**: Track and send statistics to N8N webhooks
-- **Comprehensive Logging**: Built-in logging system for debugging and monitoring
-- **Modern UI**: Clean and intuitive popup interface
+- ✅ Détection automatique des onglets web.grindr.com
+- ✅ Authentification automatique avec identifiants sauvegardés
+- ✅ Exécution automatique du script de tap
+- ✅ Envoi des statistiques vers n8n (contourne la CSP)
+- ✅ Interface de configuration via popup
+- ✅ Gestion sécurisée des identifiants (stockage local)
 
 ## Installation
 
-### For Development
-
-1. Clone or download this repository
-2. Open Firefox
-3. Go to `about:debugging#/runtime/this-firefox`
-4. Click "Load Temporary Add-on"
-5. Select the `manifest.json` file from this directory
-
-### For Production
-
-Once built, the extension can be packaged as a `.xpi` file and distributed.
+1. Ouvrir Firefox
+2. Aller dans `about:debugging`
+3. Cliquer sur "Ce Firefox" dans le menu de gauche
+4. Cliquer sur "Charger un module complémentaire temporaire"
+5. Sélectionner le fichier `manifest.json` dans le dossier `extension`
 
 ## Configuration
 
-### Settings
+### 1. Ajouter les identifiants
 
-The extension stores the following settings in `chrome.storage.local`:
+1. Cliquer sur l'icône de l'extension dans la barre d'outils
+2. Entrer votre email et mot de passe
+3. Cocher "Connexion automatique" si souhaité
+4. Cliquer sur "Sauvegarder les identifiants"
 
-- `loginMethod`: Login method to use (email, facebook, google, apple)
-- `grindrEmail`: Email address for email-based login
-- `grindrPassword`: Password for email-based login
-- `autoLogin`: Enable auto-login on startup (default: true)
-- `n8nWebhookURL`: N8N webhook URL for statistics (default: https://n8n.quentinveys.be/webhook/grindr-stats)
-- `autoStart`: Enable auto-tap on startup (default: true)
-- `minDelayHours`: Minimum delay between auto-tap sessions in hours (default: 12)
+### 2. Configurer l'URL du webhook n8n
 
-### Webhook Format
+1. Dans le popup, entrer l'URL de votre webhook n8n
+2. Cliquer sur "Sauvegarder l'URL"
 
-Statistics are sent as JSON POST requests to the configured N8N webhook:
-```json
-{
-  "startTime": 1234567890,
-  "endTime": 1234567900,
-  "totalTaps": 25,
-  "successfulTaps": 24,
-  "failedTaps": 1,
-  "duration": 10000,
-  "successRate": "96.00",
-  "timestamp": "2024-01-03T12:34:56.000Z"
-}
-```
+## Utilisation
 
-## Project Structure
-```
-├── manifest.json              # Extension manifest
-├── background.js              # Service worker for log management
-├── content.js                 # Content script orchestrator
-├── popup.html                 # UI popup interface
-├── popup.css                  # Popup styles
-├── popup.js                   # Popup functionality
-├── utils/
-│   ├── constants.js          # Constants and selectors
-│   ├── formatters.js         # Utility functions
-│   └── storage.js            # Chrome storage wrapper
-└── modules/
-    ├── logger.js              # Centralized logging
-    ├── auth.js                # Authentication logic
-    ├── profile-opener.js      # Profile interaction
-    └── stats.js               # Statistics and webhooks
-```
+### Automatique
 
-## Module Architecture
+L'extension démarre automatiquement quand vous ouvrez web.grindr.com si :
+- La connexion automatique est activée
+- Les identifiants sont configurés
+- Vous êtes connecté ou la connexion automatique réussit
 
-### Constants (`utils/constants.js`)
+### Manuel
 
-Centralized configuration including:
-- DOM selectors for UI elements
-- Timing constants (delays, timeouts)
-- API URLs
-- Retry limits
+1. Ouvrir web.grindr.com
+2. Cliquer sur l'icône de l'extension
+3. Cliquer sur "Démarrer le script" ou "Arrêter le script"
 
-### Logger (`modules/logger.js`)
+### Depuis la console
 
-Provides a centralized logging system that:
-- Logs to browser console
-- Sends logs to background script
-- Stores up to 1000 logs in memory
+Vous pouvez aussi contrôler le script depuis la console du navigateur :
 
-### Authentication (`modules/auth.js`)
-
-Handles user login with support for:
-- Email/password login
-- Facebook OAuth
-- Google OAuth
-- Apple Sign-in (with popup window handling)
-
-### Profile Opener (`modules/profile-opener.js`)
-
-Manages profile interactions:
-- Detects visible profiles
-- Finds and clicks tap buttons
-- Waits for next profile to load
-
-### Statistics (`modules/stats.js`)
-
-Tracks and reports usage:
-- Counts successful/failed taps
-- Calculates success rate
-- Sends data to N8N webhooks
-
-## Development
-
-### Adding New Features
-
-1. **New Module**: Create a new file in `modules/` following the pattern in existing modules
-2. **New Utility**: Add to appropriate file in `utils/` or create a new one
-3. **New Selector**: Add to `utils/constants.js` in the `SELECTORS` object
-4. **Testing**: Test in Firefox Developer Edition with about:debugging
-
-### Code Style
-
-- Use async/await for asynchronous operations
-- Extract constants to the top of modules
-- Use JSDoc comments for all functions
-- Include error handling with logging
-- Attach exported functions to `window.ModuleName`
-
-## Logging
-
-All modules implement the same logging pattern:
 ```javascript
-logger('info', 'functionName', 'Message', { optional: 'data' });
+// Démarrer le script
+window.grindrAutoTap.start();
+
+// Arrêter le script
+window.grindrAutoTap.stop();
+
+// Vérifier l'état de connexion
+window.grindrAutoTap.checkStatus();
 ```
 
-Log levels:
-- `info`: General information
-- `warn`: Warning messages
-- `error`: Error conditions
-- `debug`: Debug information
+## Structure des fichiers
 
-## Security Considerations
+- `manifest.json` - Configuration de l'extension
+- `background.js` - Service worker pour gestion des onglets, requêtes n8n et storage
+- `content.js` - Script principal adapté depuis autoTapGrindr.js avec authentification
+- `auth.js` - Module d'authentification (référence, fonctions intégrées dans content.js)
+- `popup.html` - Interface utilisateur
+- `popup.js` - Logique du popup
+- `icons/` - Dossier pour les icônes de l'extension
 
-- Passwords are stored in `chrome.storage.local` (not encrypted)
-- Do not commit credentials to version control
-- Review webhook URLs before configuring
-- Use HTTPS for webhook URLs
+## Sécurité
 
-## Troubleshooting
+- Les identifiants sont stockés localement dans `chrome.storage.local`
+- Les identifiants ne sont jamais synchronisés avec le cloud
+- Les identifiants ne sont jamais exposés dans les logs
+- L'extension ne fonctionne que sur web.grindr.com
 
-### Extension not working
+## Notes
 
-1. Check Firefox console for errors (Ctrl+Shift+K)
-2. Check about:debugging logs
-3. Verify manifest.json is valid
+- Les icônes doivent être ajoutées dans le dossier `icons/` (16x16, 48x48, 128x128 pixels)
+- L'extension nécessite les permissions `tabs`, `scripting`, `storage` et `activeTab`
+- L'extension fonctionne uniquement sur `*://web.grindr.com/*`
 
-### Auto-tap not starting
-
-1. Check that you're logged in to Grindr
-2. Verify auto-login settings
-3. Check logs for errors
-
-### Webhook not sending
-
-1. Verify webhook URL is correct
-2. Check network tab in browser dev tools
-3. Ensure N8N endpoint is accessible
-
-## License
-
-Proprietary - All rights reserved
-
-## Version
-
-1.0.0 - Initial release
