@@ -792,3 +792,98 @@ function createErrorStats(baseStats, error) {
     errorMessage: error?.message || String(error) || 'Erreur inconnue'
   };
 }
+// ============================================================================
+// MAIN FUNCTIONS
+// ============================================================================
+
+async function getCredentialsFromBackground() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'getCredentials' }, (response) => {
+      if (chrome.runtime.lastError) {
+        logger('error', 'Content', 'Erreur récupération identifiants: ' + chrome.runtime.lastError.message);
+        resolve(null);
+      } else {
+        resolve(response);
+      }
+    });
+  });
+}
+
+async function initAndRun() {
+  if (window.__grindrRunning) {
+    logger('warn', 'Content', '⚠️ Le script est déjà en cours d\'exécution. Attendez la fin ou rechargez la page.');
+    return;
+  }
+
+  if (window.__grindrStopped) {
+    logger('info', 'Content', 'ℹ️ Script arrêté manuellement. Utilisez le bouton "Démarrer" pour le relancer.');
+    return;
+  }
+
+  window.__grindrRunning = true;
+  window.__grindrStopped = false;
+
+  try {
+    logger('info', 'Content', '🔍 Vérification de l\'état de connexion...');
+    const isLoggedIn = checkLoginStatus();
+
+    if (!isLoggedIn) {
+      logger('info', 'Content', '🔐 Non connecté, tentative de connexion automatique...');
+
+      const credentials = await getCredentialsFromBackground();
+
+      if (credentials && credentials.autoLogin) {
+        const loginMethod = credentials.loginMethod || DEFAULTS.LOGIN_METHOD;
+        logger('info', 'Content', `🔑 Méthode de connexion: ${loginMethod}`);
+
+        if (loginMethod === 'email' && (!credentials.email || !credentials.password)) {
+          logger('warn', 'Content', '⚠️ Email et mot de passe requis pour la connexion par email');
+          window.__grindrRunning = false;
+          return;
+        }
+
+        logger('info', 'Content', '🔐 Connexion en cours...');
+        const loginResult = await performLogin(loginMethod, {
+          email: credentials.email,
+          password: credentials.password
+        });
+
+        if (!loginResult.success) {
+          logger('error', 'Content', '❌ Échec de la connexion: ' + loginResult.error);
+          window.__grindrRunning = false;
+          return;
+        }
+
+        await delay(DELAYS.TWO_SECONDS);
+      } else {
+        logger('warn', 'Content', '⚠️ Aucune configuration trouvée ou connexion automatique désactivée');
+        logger('warn', 'Content', '💡 Configurez votre méthode de connexion dans le popup de l\'extension');
+        window.__grindrRunning = false;
+        return;
+      }
+    } else {
+      logger('info', 'Content', '✅ Déjà connecté');
+    }
+
+    const stillLoggedIn = checkLoginStatus();
+    if (!stillLoggedIn) {
+      logger('error', 'Content', '❌ Échec de la connexion ou déconnexion détectée');
+      window.__grindrRunning = false;
+      return;
+    }
+
+    const profileOpened = await performPreScriptActions();
+
+    if (!profileOpened) {
+      logger('error', 'Content', '❌ Le profil n\'a pas pu être ouvert. Le script ne sera pas exécuté.');
+      window.__grindrRunning = false;
+      return;
+    }
+
+    await autoTapAndNext();
+
+  } catch (error) {
+    logger('error', 'Content', '❌ Erreur fatale: ' + error.message, error);
+    window.__grindrRunning = false;
+  }
+}
