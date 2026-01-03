@@ -25,3 +25,12 @@ const durationSpan = document.getElementById('duration');
 
 let isRunning = false;
 let logsPoller = null;
+
+/**
+ * Initialize popup when DOM is ready
+ */
+document.addEventListener('DOMContentLoaded', async () => {
+  loadSettings();
+  updateUI();
+  pollLogs();
+});
