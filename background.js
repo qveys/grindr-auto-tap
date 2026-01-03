@@ -109,6 +109,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'getWebhookURL') {
+    // Récupérer l'URL du webhook n8n
+    chrome.storage.local.get(['n8nWebhookURL'], (result) => {
+      sendResponse({
+        url: result.n8nWebhookURL || 'https://n8n.quentinveys.be/webhook/grindr-stats'
+      });
+    });
+    return true;
+  }
+
+  if (request.action === 'saveWebhookURL') {
+    // Sauvegarder l'URL du webhook
+    chrome.storage.local.set({
+      n8nWebhookURL: request.url
+    }, () => {
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
   if (request.action === 'addLog') {
     addLog(request.logEntry);
     sendResponse({ success: true });
