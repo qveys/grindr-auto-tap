@@ -67,6 +67,12 @@ function setupAuthListeners() {
     editModeManagers.webhook.saveCallback = saveWebhook;
     editModeManagers.webhook.loadEditCallback = loadWebhookToEdit;
   }
+
+  // Set save callback for minDelay edit mode manager
+  if (editModeManagers && editModeManagers.minDelay) {
+    editModeManagers.minDelay.saveCallback = saveMinDelay;
+    editModeManagers.minDelay.loadEditCallback = loadMinDelayToEdit;
+  }
 }
 
 /**
@@ -260,9 +266,104 @@ async function loadWebhookToEdit() {
   }
 }
 
+/**
+ * Save min delay
+ */
+async function saveMinDelay() {
+  const minDelayHoursInput = document.getElementById('minDelayHours');
+  if (!minDelayHoursInput) return;
+
+  const hours = parseFloat(minDelayHoursInput.value);
+
+  // Validate hours >= 0
+  if (isNaN(hours) || hours < 0) {
+    showStatus('Hours must be >= 0', 'error');
+    return;
+  }
+
+  try {
+    await chrome.storage.local.set({ minDelayHours: hours });
+    showStatus('Min delay saved', 'success');
+    if (editModeManagers && editModeManagers.minDelay) {
+      editModeManagers.minDelay.exitEditMode();
+    }
+    await loadMinDelayDisplay();
+  } catch (error) {
+    logger('error', 'saveMinDelay', 'Failed to save min delay', { error: error.message });
+    showStatus('Failed to save min delay', 'error');
+  }
+}
+
+/**
+ * Save auto-start
+ */
+async function saveAutoStart() {
+  const autoStartCheckbox = document.getElementById('autoStart');
+  if (!autoStartCheckbox) return;
+
+  const autoStart = autoStartCheckbox.checked;
+
+  try {
+    await chrome.storage.local.set({ autoStart: autoStart });
+    // No status message for auto-start (direct save)
+  } catch (error) {
+    logger('error', 'saveAutoStart', 'Failed to save auto-start', { error: error.message });
+  }
+}
+
+/**
+ * Load min delay display
+ */
+async function loadMinDelayDisplay() {
+  try {
+    const result = await chrome.storage.local.get(['minDelayHours']);
+    const hours = result.minDelayHours !== undefined ? result.minDelayHours : 12;
+
+    const minDelayDisplay = document.getElementById('minDelayDisplay');
+    if (minDelayDisplay) {
+      minDelayDisplay.textContent = `${hours}h`;
+    }
+  } catch (error) {
+    logger('error', 'loadMinDelayDisplay', 'Failed to load min delay display', { error: error.message });
+  }
+}
+
+/**
+ * Load min delay to edit form
+ */
+async function loadMinDelayToEdit() {
+  try {
+    const result = await chrome.storage.local.get(['minDelayHours']);
+    const hours = result.minDelayHours !== undefined ? result.minDelayHours : 12;
+
+    const minDelayHoursInput = document.getElementById('minDelayHours');
+    if (minDelayHoursInput) {
+      minDelayHoursInput.value = hours;
+    }
+  } catch (error) {
+    logger('error', 'loadMinDelayToEdit', 'Failed to load min delay to edit', { error: error.message });
+  }
+}
+
+/**
+ * Load auto-start
+ */
+async function loadAutoStart() {
+  try {
+    const result = await chrome.storage.local.get(['autoStart']);
+    const autoStart = result.autoStart !== undefined ? result.autoStart : true;
+
+    const autoStartCheckbox = document.getElementById('autoStart');
+    if (autoStartCheckbox) {
+      autoStartCheckbox.checked = autoStart;
+      autoStartCheckbox.addEventListener('change', saveAutoStart);
+    }
+  } catch (error) {
+    logger('error', 'loadAutoStart', 'Failed to load auto-start', { error: error.message });
+  }
+}
+
 // Placeholder functions (will be implemented in later commits)
-async function loadMinDelayDisplay() {}
-async function loadAutoStart() {}
 async function loadLogs() {}
 function showStatus(message, type) {}
 async function showConfirm(title, message) { return false; }
