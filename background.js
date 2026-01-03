@@ -41,6 +41,28 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       logger('debug', 'Background', 'Script déjà injecté ou erreur: ' + (err?.message || String(err)));
     });
   }
+
+  // Détecter les onglets Apple qui s'ouvrent pour la connexion
+  if (changeInfo.status === 'complete' && tab.url && (
+    tab.url.includes('apple.com') ||
+    tab.url.includes('appleid.apple.com') ||
+    tab.url.includes('idmsa.apple.com') ||
+    tab.url.includes('signinwithapple')
+  )) {
+    logger('info', 'Background', '🔍 Onglet Apple détecté: ' + tab.url);
+    // Notifier le content script de la page Grindr qu'un onglet Apple a été détecté
+    chrome.tabs.query({ url: '*://web.grindr.com/*' }, (grindrTabs) => {
+      if (grindrTabs.length > 0) {
+        chrome.tabs.sendMessage(grindrTabs[0].id, {
+          action: 'applePopupDetected',
+          appleTabId: tabId,
+          appleTabUrl: tab.url
+        }).catch(err => {
+          logger('warn', 'Background', 'Impossible d\'envoyer le message au content script: ' + (err?.message || String(err)));
+        });
+      }
+    });
+  }
 });
 
 // Écouter les messages du content script
