@@ -120,3 +120,46 @@ body {
   padding: 6px 12px;
   font-size: 12px;
 }
+
+.settings-section {
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.setting {
+  margin-bottom: 16px;
+}
+
+.setting label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.setting input[type="text"],
+.setting input[type="email"],
+.setting input[type="password"],
+.setting select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.3s ease;
+}
+
+.setting input[type="text"]:focus,
+.setting input[type="email"]:focus,
+.setting input[type="password"]:focus,
+.setting select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.setting input[type="checkbox"] {
+  margin-right: 8px;
+}
