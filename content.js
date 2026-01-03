@@ -275,3 +275,59 @@ async function performEmailLogin(email, password) {
     return { success: false, error: error.message };
   }
 }
+
+async function performFacebookLogin() {
+  try {
+    logger('info', 'Auth', '📘 Connexion par Facebook...');
+
+    const facebookButton = document.querySelector(SELECTORS.FACEBOOK_BUTTON) ||
+      Array.from(document.querySelectorAll('button')).find(btn =>
+        btn.getAttribute('title')?.toLowerCase().includes('facebook') ||
+        btn.textContent.toLowerCase().includes('facebook') ||
+        btn.textContent.toLowerCase().includes('log in with facebook')
+      );
+
+    if (!facebookButton) {
+      throw new Error('Bouton "Log In With Facebook" introuvable');
+    }
+
+    logger('info', 'Auth', '🖱️ Clic sur le bouton Facebook...');
+    facebookButton.click();
+    await delay(DELAYS.TWO_SECONDS);
+
+    logger('warn', 'Auth', '⚠️ Gestion du popup Facebook non encore implémentée');
+    return { success: false, error: 'Gestion du popup Facebook non encore implémentée' };
+
+  } catch (error) {
+    logger('error', 'Auth', '❌ Erreur lors de la connexion Facebook: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+async function performGoogleLogin() {
+  try {
+    logger('info', 'Auth', '🔵 Connexion par Google...');
+
+    const googleButton = document.querySelector(SELECTORS.GOOGLE_BUTTON) ||
+      Array.from(document.querySelectorAll('button')).find(btn =>
+        btn.getAttribute('title')?.toLowerCase().includes('google') ||
+        btn.textContent.toLowerCase().includes('google') ||
+        btn.textContent.toLowerCase().includes('log in with google')
+      );
+
+    if (!googleButton) {
+      throw new Error('Bouton "Log In With Google" introuvable');
+    }
+
+    logger('info', 'Auth', '🖱️ Clic sur le bouton Google...');
+    googleButton.click();
+    await delay(DELAYS.TWO_SECONDS);
+
+    logger('warn', 'Auth', '⚠️ Gestion du popup Google non encore implémentée');
+    return { success: false, error: 'Gestion du popup Google non encore implémentée' };
+
+  } catch (error) {
+    logger('error', 'Auth', '❌ Erreur lors de la connexion Google: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
