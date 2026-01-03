@@ -50,6 +50,51 @@ export async function dismissBetaBanner() {
 }
 
 /**
+ * Find the first profile grid cell
+ * @returns {HTMLElement|null} First grid cell element or null
+ */
+export function findFirstProfileGridCell() {
+  return document.querySelector(SELECTORS.PROFILE_GRIDCELL);
+}
+
+/**
+ * Verify if profile is opened
+ * @returns {boolean} True if profile is opened
+ */
+export function verifyProfileOpened() {
+  const currentURL = window.location.href;
+  const urlContainsProfile = currentURL.includes('?profile=true') || currentURL.includes('&profile=true');
+  const nextProfileBtn = document.querySelector(SELECTORS.NEXT_PROFILE);
+  const tapButton = document.querySelector(SELECTORS.TAP_BUTTON);
+  const profileView = document.querySelector(SELECTORS.PROFILE_VIEW);
+
+  return urlContainsProfile || !!(nextProfileBtn || tapButton || profileView);
+}
+
+/**
+ * Attempt to open profile by clicking on grid cell
+ * @param {HTMLElement} gridCell - Grid cell element to click
+ * @returns {Promise<boolean>} True if profile opened successfully
+ */
+export async function attemptProfileClick(gridCell) {
+  try {
+    logger('info', 'ProfileOpener', '👤 Ouverture du premier profil...');
+
+    // Simple click on the grid cell
+    gridCell.click();
+    await delay(DELAYS.VERY_LONG);
+
+    // Wait a bit and check if profile opened
+    await delay(DELAYS.SECOND);
+
+    return verifyProfileOpened();
+  } catch (error) {
+    logger('warn', 'ProfileOpener', '⚠️ Erreur lors du clic sur le profil: ' + error.message);
+    return false;
+  }
+}
+
+/**
  * Check if profile is currently displayed
  * @returns {boolean} True if profile is visible, false otherwise
  */
