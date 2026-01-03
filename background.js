@@ -168,6 +168,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'clickButtonInAppleTab') {
+    // Injecter un script dans l'onglet Apple pour cliquer sur un bouton
+    const tabId = request.tabId;
+    const buttonValue = request.buttonValue;
+    const searchType = request.searchType || 'id'; // 'id' ou 'text'
+    const maxRetries = request.maxRetries || 8;
+
+    if (!tabId || tabId === 'window-ref') {
+      // Si on n'a pas d'ID d'onglet, chercher l'onglet Apple
+      chrome.tabs.query({ url: '*://*apple.com/*' }, (tabs) => {
+        const appleTab = tabs.find(tab =>
+          tab.url && (
+            tab.url.includes('appleid.apple.com') ||
+            tab.url.includes('idmsa.apple.com') ||
+            tab.url.includes('signinwithapple')
+          )
+        );
+
+        if (appleTab) {
+          injectAndClickButton(appleTab.id, buttonValue, searchType, maxRetries, sendResponse);
+        } else {
+          sendResponse({ success: false, error: 'Onglet Apple non trouvé' });
+        }
+      });
+    } else {
+      injectAndClickButton(tabId, buttonValue, searchType, maxRetries, sendResponse);
+    }
+    return true;
+  }
+
   if (request.action === 'addLog') {
     addLog(request.logEntry);
     sendResponse({ success: true });
@@ -216,6 +246,72 @@ chrome.storage.local.get(['logs'], (result) => {
     console.log(`Loaded ${logs.length} logs from storage`);
   }
 });
+
+// Fonction pour injecter un script et cliquer sur un bouton dans l'onglet Apple
+function injectAndClickButton(tabId, buttonValue, searchType, maxRetries, sendResponse) {
+  // Fonction à injecter pour chercher et cliquer sur le bouton
+  function clickButtonInAppleTab(btnValue, searchBy, maxAttempts) {
+    function findAndClickButton() {
+      let button = null;
+
+      if (searchBy === 'id') {
+        // Chercher par ID
+        button = document.getElementById(btnValue) ||
+          document.querySelector('#' + btnValue) ||
+          document.querySelector('button#' + btnValue) ||
+          document.querySelector('[id="' + btnValue + '"]');
+      } else if (searchBy === 'text') {
+        // Chercher par texte
+        const buttons = Array.from(document.querySelectorAll('button')).filter(function (btn) {
+          const text = btn.textContent.trim();
+          return text.toLowerCase().includes(btnValue.toLowerCase());
+        });
+        button = buttons[0];
+      }
+
+      if (button) {
+        console.log('[Apple Tab] ✅ Bouton trouvé:', btnValue);
+        button.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(function () {
+          button.click();
+          console.log('[Apple Tab] 🖱️ Bouton cliqué:', btnValue);
+        }, 500);
+        return true;
+      }
+      return false;
+    }
+
+    // Essayer plusieurs fois
+    let attempts = 0;
+    const interval = setInterval(function () {
+      attempts++;
+      if (findAndClickButton()) {
+        clearInterval(interval);
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+        console.error('[Apple Tab] ❌ Bouton non trouvé après', maxAttempts, 'tentatives');
+      }
+    }, 2000);
+  }
+
+  // Injecter le script dans l'onglet
+  chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    func: clickButtonInAppleTab,
+    args: [buttonValue, searchType, maxRetries]
+  }, (results) => {
+    if (chrome.runtime.lastError) {
+      sendResponse({ success: false, error: chrome.runtime.lastError.message });
+    } else {
+      // Attendre un peu pour que le clic se produise
+      setTimeout(() => {
+        sendResponse({ success: true });
+      }, 1000);
+    }
+  });
+}
 
 // Fonction pour envoyer vers n8n (contourne la CSP)
 async function sendToN8NWebhook(stats, retries = 2) {
