@@ -95,6 +95,42 @@ export async function attemptProfileClick(gridCell) {
 }
 
 /**
+ * Perform pre-script actions: dismiss banner and open first profile
+ * @returns {Promise<boolean>} True if profile opened successfully
+ */
+export async function performPreScriptActions() {
+  try {
+    logger('info', 'ProfileOpener', '🔧 Exécution des actions préalables...');
+
+    // 1. Dismiss beta banner
+    await dismissBetaBanner();
+    await delay(DELAYS.SECOND);
+
+    // 2. Find and click first profile
+    const firstGridCell = findFirstProfileGridCell();
+    if (!firstGridCell) {
+      logger('warn', 'ProfileOpener', '⚠️ Aucun div avec role="gridcell" trouvé');
+      return false;
+    }
+
+    // 3. Attempt to open profile
+    const profileOpened = await attemptProfileClick(firstGridCell);
+
+    if (profileOpened) {
+      logger('info', 'ProfileOpener', '✅ Actions préalables terminées - Profil ouvert');
+      return true;
+    } else {
+      logger('warn', 'ProfileOpener', '⚠️ Actions préalables terminées - Profil non ouvert');
+      return false;
+    }
+  } catch (error) {
+    logger('warn', 'ProfileOpener', '⚠️ Erreur lors des actions préalables: ' + error.message);
+    // In case of error, check if profile is opened anyway
+    return verifyProfileOpened();
+  }
+}
+
+/**
  * Check if profile is currently displayed
  * @returns {boolean} True if profile is visible, false otherwise
  */
