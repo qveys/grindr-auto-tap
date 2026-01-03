@@ -1133,3 +1133,20 @@ if (window.location.hostname.includes('web.grindr.com')) {
     }
   });
 }
+// ============================================================================
+// EXPORTS FOR CONSOLE
+// ============================================================================
+
+window.grindrAutoTap = {
+  start: () => {
+    window.__grindrStopped = false;
+    initAndRun();
+  },
+  stop: () => {
+    window.__grindrRunning = false;
+    window.__grindrStopped = true;
+    window.__grindrStats = null;
+    logger('info', 'Content', '⏹️ Script arrêté manuellement');
+  },
+  checkStatus: checkLoginStatus
+};
