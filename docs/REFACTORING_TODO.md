@@ -473,6 +473,91 @@ tests/
 
 ---
 
+## 🔧 Refactorings de Polish & Documentation
+
+### 10. 🟢 BASSE : Documentation Inline
+
+**Source:** `ARCHITECTURAL_ANALYSIS.md` section 5.3  
+**Priorité:** 🟢 **BASSE**  
+**Statut:** ❌ **NON DÉMARRÉ**  
+**Temps estimé:** 4 heures
+
+#### Problème
+
+Logique complexe sans commentaires explicatifs :
+- `auto-tap.js` : `processProfile()` sans explication de la logique
+- Logique du modal "Match" pas expliquée
+- Pourquoi chercher modalRoot ?
+
+#### Solution
+
+Ajouter commentaires explicatifs dans :
+- `modules/auto-tap.js` (processProfile)
+- Logique complexe dans autres modules
+- Créer `API.md` pour documentation d'API globale
+
+**Code complet fourni dans** `ARCHITECTURAL_ANALYSIS.md` section 5.3 (lignes 1146-1211)
+
+---
+
+### 11. 🟢 BASSE : Validation & Sécurité
+
+**Source:** `ARCHITECTURAL_ANALYSIS.md` section 8.4, 8.5  
+**Priorité:** 🟢 **BASSE**  
+**Statut:** ❌ **NON DÉMARRÉ**  
+**Temps estimé:** 2 heures
+
+#### Problèmes
+
+1. **Webhooks acceptent HTTP** : devrait forcer HTTPS
+2. **Apple tab injection** : pas de validation stricte des inputs
+
+#### Solution
+
+1. Forcer HTTPS pour webhooks (validation protocole)
+2. Whitelist des valeurs autorisées pour Apple tab injection
+
+**Code complet fourni dans** `ARCHITECTURAL_ANALYSIS.md` section 8.4, 8.5
+
+---
+
+### 12. 🟡 MOYENNE : Injection de Dépendances pour Testabilité
+
+**Source:** `ARCHITECTURAL_ANALYSIS.md` section 10  
+**Priorité:** 🟡 **MOYENNE**  
+**Statut:** ❌ **NON DÉMARRÉ**  
+**Temps estimé:** 6 heures
+
+#### Problème
+
+Modules difficiles à tester en isolation :
+- Dépendances hardcodées (document, logger, delay, window.__grindrStats)
+- Impossible de tester sans mocker tout le DOM
+
+#### Solution
+
+Refactorer avec factory pattern pour injection de dépendances :
+```javascript
+function createProfileProcessor(deps) {
+  const {
+    querySelector = (sel) => document.querySelector(sel),
+    logger = window.logger,
+    delay = window.DOMHelpers.delay,
+    stateManager = window.StateManager
+  } = deps;
+  // ...
+}
+```
+
+**Code complet fourni dans** `ARCHITECTURAL_ANALYSIS.md` section 10 (lignes 2651-2769)
+
+**Bénéfices:**
+- ✅ Tests unitaires possibles sans DOM réel
+- ✅ Mocks faciles : injection simple
+- ✅ Tests rapides : pas de délais réels
+
+---
+
 ## 📊 Bilan des Refactorings Complétés
 
 ### Refactorings #1-6 et #8 (COMPLÉTÉS)
@@ -491,31 +576,100 @@ Tous ces refactorings ont été complétés avec succès lors des sessions préc
 
 ---
 
-## 🎯 Recommandations
+## 🎯 Plan d'Action Prioritaire
 
-### Priorité Immédiate
+### 🔥 Phase 1 : Corrections Critiques (1-2 jours, 11h)
 
-1. **🔥 CRITIQUE : Compléter les tests unitaires** (Refactoring #7)
-   - Commencer par `modules/auth.js` et `modules/auto-tap.js`
-   - Mettre en place les mocks nécessaires
-   - Objectif: atteindre >80% de couverture
+**Priorité 1.1 : Supprimer Duplication Constants** (2h) 🔥 CRITIQUE
+- Garder SEULEMENT `shared-constants.js`
+- Supprimer `utils/constants.js`
+- Mettre à jour `manifest.json`
 
-### Moyen Terme
+**Priorité 1.2 : Créer StateManager** (4h) 🔥 CRITIQUE
+- Créer `utils/state-manager.js`
+- Remplacer `window.__grindrRunning` par `StateManager.isRunning()`
+- Remplacer `window.__grindrStats` par `StateManager.getStats()`
 
-2. **🟡 Tests d'intégration**
-   - Tester les flux complets (login → auto-tap)
-   - Valider la robustesse globale de l'extension
+**Priorité 1.3 : Consolider Logger** (3h) 🔥 HAUTE
+- Créer `utils/universal-logger.js`
+- Remplacer logger dans `background.js` et `popup.js`
+- Économie: -90 lignes
 
-3. **🟢 Documentation des tests**
-   - Documenter les stratégies de mocking
-   - Créer des exemples pour nouveaux tests
+**Priorité 1.4 : Fix Silent Failures** (2h) 🔥 HAUTE
+- Modifier `utils/messaging.js` `sendToBackground()`
+- Retourner `{success, data, error, errorType}` au lieu de `null`
 
-### Long Terme (Optionnel)
+### 🟡 Phase 2 : Améliorations Structurelles (2-3 jours, 21h)
 
-4. **Migration TypeScript** (mentionné dans opportunités)
-   - Typage statique pour réduire les erreurs
-   - Amélioration de l'autocomplétion IDE
-   - Investissement: 1-2 semaines
+**Priorité 2.1 : Restructurer background.js** (6h) 🟡 MOYENNE
+- Créer structure `background/handlers/`
+- Extraire handlers (auth, webhook, log, storage, tab)
+- Simplifier `background.js` à <50 lignes
+
+**Priorité 2.2 : Restructurer popup.js** (8h) 🟡 MOYENNE
+- Créer structure `popup/managers/`
+- Extraire managers (tab, storage, script, log)
+- Simplifier `popup.js` à <100 lignes
+
+**Priorité 2.3 : Restructurer content.js** (4h) 🟡 MOYENNE
+- Extraire en sous-modules (orchestrator, listeners, auto-start, etc.)
+- Simplifier `content.js` à <50 lignes
+
+**Priorité 2.4 : Event-Driven Popup** (3h) 🟡 MOYENNE
+- Implémenter listeners dans `content.js`
+- Supprimer polling dans `popup.js`
+- Économie: polling 2s → événements instantanés
+
+### 🟢 Phase 3 : Polish & Documentation (1-2 jours, 20h)
+
+**Priorité 3.1 : Documentation Inline** (4h) 🟢 BASSE
+- Ajouter commentaires dans `processProfile()`
+- Documenter logique complexe
+- Créer `API.md`
+
+**Priorité 3.2 : Validation & Sécurité** (2h) 🟢 BASSE
+- Forcer HTTPS pour webhooks
+- Valider inputs Apple tab injection
+- Ajouter edge case validation
+
+**Priorité 3.3 : Tests Unitaires** (8h) 🟢 BASSE
+- Compléter tests pour modules métier
+- Objectif: >80% couverture
+
+**Priorité 3.4 : Injection de Dépendances** (6h) 🟡 MOYENNE
+- Refactorer pour testabilité
+- Factory pattern pour injection
+
+---
+
+## 📊 Tableau Récapitulatif
+
+| Refactoring | Source | Priorité | Temps | Statut |
+|-------------|--------|----------|-------|--------|
+| **Supprimer duplication constants** | ARCH | 🔥 Critique | 2h | ❌ |
+| **Créer StateManager** | ARCH | 🔥 Critique | 4h | ❌ |
+| **Consolider logger** | ARCH | 🔥 Haute | 3h | ❌ |
+| **Fix silent failures** | ARCH | 🔥 Haute | 2h | ❌ |
+| **Restructurer background.js** | ARCH | 🟡 Moyenne | 6h | ❌ |
+| **Restructurer popup.js** | ARCH | 🟡 Moyenne | 8h | ❌ |
+| **Restructurer content.js** | ARCH | 🟡 Moyenne | 4h | ❌ |
+| **Event-driven popup** | ARCH | 🟡 Moyenne | 3h | ❌ |
+| **Documentation inline** | ARCH | 🟢 Basse | 4h | ❌ |
+| **Validation sécurité** | ARCH | 🟢 Basse | 2h | ❌ |
+| **Injection dépendances** | ARCH | 🟡 Moyenne | 6h | ❌ |
+| **Tests unitaires** | OPP | 🔥 Haute | 3-4j | ⏳ 25% |
+
+**Total Phase 1 (Critique):** 11h  
+**Total Phase 2 (Structurelle):** 21h  
+**Total Phase 3 (Polish):** 20h  
+**TOTAL:** ~52h de travail
+
+**Gains estimés:**
+- **-300+ lignes de code dupliqué**
+- **+60% maintenabilité**
+- **+80% testabilité**
+- **+100% gestion d'état**
+- **+50% performance (polling → events)**
 
 ---
 
