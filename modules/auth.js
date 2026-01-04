@@ -13,7 +13,17 @@
 
   /**
    * Check if user is currently logged in
-   * @returns {boolean} True if logged in, false otherwise
+   * Checks for absence of login form fields and presence of profile elements.
+   * Also checks URL path for login/signin indicators.
+   *
+   * @returns {boolean} True if user is logged in, false if on login page
+   *
+   * @example
+   * if (checkLoginStatus()) {
+   *   logger('info', 'Auth', 'Already logged in, skipping login');
+   * } else {
+   *   await performLogin('email', credentials);
+   * }
    */
   function checkLoginStatus() {
     const loginPage = document.querySelector(SELECTORS.AUTH.EMAIL_INPUT);
@@ -35,9 +45,17 @@
 
   /**
    * Fill login form with email and password
-   * @param {string} email - Email address
-   * @param {string} password - Password
-   * @returns {Promise<{emailField: Element, passwordField: Element}>}
+   * Simulates human typing with random delays between characters.
+   * Dispatches input and change events to trigger form validation.
+   *
+   * @param {string} email - Email address to fill
+   * @param {string} password - Password to fill
+   * @returns {Promise<{emailField: Element, passwordField: Element}>} Object with references to filled fields
+   * @throws {Error} If email or password fields are not found in DOM
+   *
+   * @example
+   * const { emailField, passwordField } = await fillLoginForm('user@example.com', 'password123');
+   * // Form is now filled with simulated human typing
    */
   async function fillLoginForm(email, password) {
     const emailField = document.querySelector(SELECTORS.AUTH.EMAIL_INPUT);
@@ -153,9 +171,20 @@
 
   /**
    * Perform email login
-   * @param {string} email - Email address
-   * @param {string} password - Password
-   * @returns {Promise<{success: boolean, error?: string}>}
+   * Completes the full email login flow: fill form, click button, wait for completion.
+   * Includes captcha detection and error handling.
+   *
+   * @param {string} email - Email address for login
+   * @param {string} password - Password for login
+   * @returns {Promise<{success: boolean, error?: string}>} Object indicating success or failure with error message
+   *
+   * @example
+   * const result = await performEmailLogin('user@example.com', 'password123');
+   * if (result.success) {
+   *   logger('info', 'Auth', 'Login successful');
+   * } else {
+   *   logger('error', 'Auth', 'Login failed: ' + result.error);
+   * }
    */
   async function performEmailLogin(email, password) {
     try {
@@ -445,7 +474,23 @@
 
   /**
    * Perform Apple login
-   * @returns {Promise<{success: boolean, error?: string}>}
+   * Handles the complete Apple authentication flow:
+   * 1. Click Apple login button
+   * 2. Wait for popup window to appear
+   * 3. Inject script to click authentication buttons in popup
+   * 4. Wait for popup to close
+   * 5. Wait for login to complete
+   *
+   * Temporarily overrides window.open to capture popup reference.
+   * Background script handles popup tab detection and button clicking.
+   *
+   * @returns {Promise<{success: boolean, error?: string}>} Object indicating success or failure with error message
+   *
+   * @example
+   * const result = await performAppleLogin();
+   * if (result.success) {
+   *   logger('info', 'Auth', 'Apple login successful');
+   * }
    */
   async function performAppleLogin() {
     let originalOpen = null;
@@ -475,9 +520,27 @@
 
   /**
    * Perform login with specified method
-   * @param {string} loginMethod - Login method: 'email', 'facebook', 'google', 'apple'
-   * @param {Object} credentials - Credentials object (email, password for email method)
-   * @returns {Promise<{success: boolean, error?: string, alreadyLoggedIn?: boolean}>}
+   * Main authentication entry point that routes to the appropriate login method.
+   * Checks if user is already logged in before attempting login.
+   *
+   * @param {'email'|'facebook'|'google'|'apple'} loginMethod - Login method to use
+   * @param {{email?: string, password?: string}} [credentials={}] - Credentials object (required for email method: email and password)
+   * @returns {Promise<{success: boolean, error?: string, alreadyLoggedIn?: boolean}>} Object indicating success, error message, or already logged in status
+   * @throws {Error} If login method is unknown
+   *
+   * @example
+   * // Email login
+   * const result = await performLogin('email', {
+   *   email: 'user@example.com',
+   *   password: 'password123'
+   * });
+   *
+   * @example
+   * // Apple login
+   * const result = await performLogin('apple');
+   * if (result.alreadyLoggedIn) {
+   *   logger('info', 'Auth', 'Already logged in');
+   * }
    */
   async function performLogin(loginMethod, credentials = {}) {
     try {
