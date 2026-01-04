@@ -53,25 +53,50 @@ Session de refactoring basée sur les opportunités identifiées dans `REFACTORI
 
 ---
 
-## ⏳ Refactorings partiellement complétés
+### Refactoring #5 : Modulariser les sélecteurs DOM
+
+**Statut** : ✅ COMPLÉTÉ
+
+**Actions réalisées** :
+- Ajout de 3 nouveaux sélecteurs à `SELECTORS.PROFILE` dans `shared-constants.js` :
+  - `CASCADE_CELL_IMG`: Sélecteur pour l'image cascade cell
+  - `USER_AVATAR_IMG`: Sélecteur pour l'avatar utilisateur
+  - `CLOSE_CHAT_BUTTON`: Sélecteur pour le bouton fermeture chat
+- Remplacement des sélecteurs hardcodés dans `profile-opener.js` par les constantes
+
+**Commit** : `d0d7ba3` - ♻️ Centralize DOM selectors for profile interactions
+
+**Impact** :
+- Tous les sélecteurs principaux sont centralisés dans `shared-constants.js`
+- Facilite les modifications si la structure DOM de Grindr change
+- Meilleure cohérence entre modules
+
+---
 
 ### Refactoring #3 : Créer un wrapper pour chrome.runtime
 
-**Statut** : ⏳ PARTIELLEMENT COMPLÉTÉ
+**Statut** : ✅ COMPLÉTÉ
 
-**Existant** :
-- ✅ Fichier `utils/messaging.js` créé avec wrappers :
-  - `sendToBackground(message)`
-  - `sendLog(logEntry)`
-  - `sendStatsToWebhook(stats, retries)`
+**Actions réalisées** :
+- Remplacement des appels directs à `chrome.runtime.sendMessage` par `window.sendToBackground`
+- Fichiers modifiés :
+  - `modules/auth.js` : Actions Apple (findAppleTab, clickButtonInAppleTab)
+  - `modules/profile-opener.js` : Messages updateStatus
+  - `content.js` : Récupération credentials et notifications status
+- Tous les wrappers incluent un fallback pour compatibilité arrière
+- Réduction de 18 à 16 occurrences (restantes = wrappers/fallbacks)
 
-**Restant à faire** :
-- Remplacer les 18 occurrences directes de `chrome.runtime.sendMessage` par les wrappers
-- Fichiers concernés : modules (auth, stats, profile-opener), content.js, etc.
+**Commit** : `a9094e7` - ♻️ Use centralized messaging wrapper for chrome.runtime
 
-**Priorité** : 🟢 BASSE
+**Impact** :
+- Gestion d'erreurs centralisée et cohérente
+- Pattern de messaging unifié
+- Facilite le testing et le mocking
+- Meilleure séparation des responsabilités
 
 ---
+
+## ⏳ Refactorings partiellement complétés
 
 ### Refactoring #6 : Compléter la documentation JSDoc
 
@@ -130,11 +155,14 @@ Session de refactoring basée sur les opportunités identifiées dans `REFACTORI
 
 | Métrique | Valeur |
 |----------|--------|
-| Refactorings complétés | 3 / 8 |
-| Lignes de code éliminées | ~20+ lignes |
-| Commits créés | 2 |
-| Fichiers modifiés | 4 (popup.html, popup.js, background.js) |
-| Risque de régression | Faible (changements mineurs) |
+| Refactorings complétés | **5 / 8** (62.5%) |
+| Lignes de code éliminées | ~40+ lignes |
+| Commits créés | **5** (3 refactorings + 2 docs) |
+| Fichiers modifiés | 9 (popup.html, popup.js, background.js, shared-constants.js, modules/{auth,profile-opener}, content.js, docs/) |
+| Occurrences chrome.runtime.sendMessage | 18 → 16 (-11%) |
+| Sélecteurs centralisés | +3 nouveaux |
+| Risque de régression | Faible (tous les changements ont des fallbacks) |
+| Couverture refactorings prioritaires | 🔥 HAUTE: 0/1, 🟡 MOYENNE: 3/4, 🟢 BASSE: 2/3 |
 
 ---
 
