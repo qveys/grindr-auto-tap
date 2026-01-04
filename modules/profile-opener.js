@@ -137,11 +137,14 @@
       // Vérifier que le profil est ouvert
       if (verifyProfileOpened()) {
         logger('info', 'Content', '✅ Profil ouvert avec succès !');
-        chrome.runtime.sendMessage({
-          action: 'updateStatus',
-          message: '✅ Profil ouvert !',
-          type: 'success'
-        });
+        // Use centralized messaging utility if available
+        if (typeof window !== 'undefined' && window.sendToBackground) {
+          window.sendToBackground({
+            action: 'updateStatus',
+            message: '✅ Profil ouvert !',
+            type: 'success'
+          });
+        }
         return true;
       } else {
         logger('warn', 'Content', '⚠️ Le profil ne semble pas être ouvert');

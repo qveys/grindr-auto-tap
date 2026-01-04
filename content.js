@@ -30,16 +30,21 @@
    * @returns {Promise<Object|null>} Credentials object or null
    */
   async function getCredentialsFromBackground() {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'getCredentials' }, (response) => {
-        if (chrome.runtime.lastError) {
-          logger('error', 'Content', 'Erreur récupération identifiants: ' + chrome.runtime.lastError.message);
-          resolve(null);
-        } else {
-          resolve(response);
-        }
-      });
-    });
+    // Use centralized messaging utility if available
+    const sendMessage = (typeof window !== 'undefined' && window.sendToBackground)
+      ? window.sendToBackground
+      : (msg) => new Promise((res) => {
+          chrome.runtime.sendMessage(msg, (response) => {
+            if (chrome.runtime.lastError) {
+              logger('error', 'Content', 'Erreur récupération identifiants: ' + chrome.runtime.lastError.message);
+              res(null);
+            } else {
+              res(response);
+            }
+          });
+        });
+
+    return await sendMessage({ action: 'getCredentials' });
   }
 
   /**
@@ -47,12 +52,20 @@
    * @param {boolean} isRunning - Whether script is running
    */
   function notifyPopupScriptStatus(isRunning) {
-    chrome.runtime.sendMessage({
-      action: 'scriptStatusChanged',
-      isRunning: isRunning
-    }).catch(err => {
-      // Ignorer les erreurs si le popup n'est pas ouvert
-    });
+    // Use centralized messaging utility if available
+    if (typeof window !== 'undefined' && window.sendToBackground) {
+      window.sendToBackground({
+        action: 'scriptStatusChanged',
+        isRunning: isRunning
+      });
+    } else {
+      chrome.runtime.sendMessage({
+        action: 'scriptStatusChanged',
+        isRunning: isRunning
+      }).catch(err => {
+        // Ignorer les erreurs si le popup n'est pas ouvert
+      });
+    }
   }
 
   /**
