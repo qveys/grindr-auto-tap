@@ -13,7 +13,14 @@
 
   /**
    * Dismiss the beta banner if present
-   * @returns {Promise<void>}
+   * Searches for the beta dismiss button and clicks it if found.
+   * This prevents the banner from interfering with profile interactions.
+   *
+   * @returns {Promise<void>} Resolves after attempting to dismiss the banner
+   *
+   * @example
+   * await dismissBetaBanner();
+   * // Banner will be dismissed if present, no action if not found
    */
   async function dismissBetaBanner() {
     const betaDismissBtn = document.getElementById('beta-dismiss-btn');
@@ -28,7 +35,17 @@
 
   /**
    * Verify that a profile is currently opened
-   * @returns {boolean} True if profile is open, false otherwise
+   * Checks for the presence of profile DOM elements (buttons and views).
+   * URL alone is not sufficient - DOM elements must be present.
+   *
+   * @returns {boolean} True if profile elements are present in DOM, false otherwise
+   *
+   * @example
+   * if (verifyProfileOpened()) {
+   *   logger('info', 'Content', 'Profile is open, ready to tap');
+   * } else {
+   *   logger('warn', 'Content', 'Profile not open yet');
+   * }
    */
   function verifyProfileOpened() {
     const currentURL = window.location.href;
@@ -56,7 +73,23 @@
 
   /**
    * Open the first profile by performing necessary actions
+   * Executes a series of clicks to navigate to the first profile:
+   * 1. Dismiss beta banner if present
+   * 2. Click on cascade cell container image
+   * 3. Click on user avatar image
+   * 4. Close chat if open
+   * 5. Verify profile is opened
+   *
+   * Respects script stop flags to allow graceful interruption.
+   *
    * @returns {Promise<boolean>} True if profile opened successfully, false otherwise
+   *
+   * @example
+   * const opened = await openProfile();
+   * if (opened) {
+   *   // Start auto-tap loop
+   *   await autoTapAndNext();
+   * }
    */
   async function openProfile() {
     try {
