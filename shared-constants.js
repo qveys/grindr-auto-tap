@@ -1,6 +1,24 @@
-// Shared constants for Grindr Auto Tap extension
-// Works in both service workers and content scripts
+/**
+ * @fileoverview Shared constants for Grindr Auto Tap extension
+ * Centralized configuration for delays, timeouts, limits, selectors, and URLs.
+ * Compatible with both service workers (background.js) and content scripts.
+ *
+ * All timing values are in milliseconds unless otherwise specified.
+ * Constants are exported to window/self scope for easy access across modules.
+ */
 
+/**
+ * @typedef {Object} SharedConstants
+ * @property {Object} DELAYS - Timing delays for various operations
+ * @property {Object} TIMEOUTS - Maximum wait times for operations
+ * @property {Object} LIMITS - Safety limits (iterations, duration, retries)
+ * @property {Object} LOGGING - Logging configuration
+ * @property {Object} DEFAULTS - Default values for configuration
+ * @property {Object} URLS - URLs and domains
+ * @property {Object} SELECTORS - DOM selectors organized by functional domain
+ * @property {Object} STATUS_TIMEOUTS - Status message display durations
+ * @property {Object} APPLE - Apple login specific configuration
+ */
 const SharedConstants = {
   // Delays (in milliseconds)
   DELAYS: {

@@ -1,4 +1,15 @@
-// Popup script pour gérer l'interface utilisateur avec mode affichage/édition
+/**
+ * @fileoverview Popup UI script for Grindr Auto Tap extension
+ * Manages user interface with display/edit mode system for configuration.
+ * Handles authentication settings, webhook configuration, auto-start settings, and log viewer.
+ *
+ * Features:
+ * - Edit/display mode for all configuration sections
+ * - Real-time log viewer with auto-scroll
+ * - Script start/stop controls
+ * - Periodic status checks to sync with content script
+ * - Tab-based navigation (Auth, Webhook, Settings, Logs)
+ */
 
 // Initialize edit mode managers
 let editModeManagers = null;

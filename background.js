@@ -1,6 +1,15 @@
 // Background script pour gérer les onglets, les requêtes n8n et le storage
 
-// Logger function pour le background script
+/**
+ * Logger function for the background script
+ * Logs to console and stores directly in chrome.storage.local.
+ * Unlike content script logger, this stores directly instead of sending a message.
+ *
+ * @param {string} level - Log level: 'info', 'warn', 'error', 'debug'
+ * @param {string} location - Location/module name (defaults to 'Background')
+ * @param {string} message - Log message
+ * @param {*} [data=null] - Optional data to log
+ */
 function logger(level, location, message, data = null) {
   const logEntry = {
     timestamp: Date.now(),
@@ -271,8 +280,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-
-// Fonction pour injecter un script et cliquer sur un bouton dans l'onglet Apple
+/**
+ * Inject script into Apple tab and click a button
+ * Injects a script that searches for and clicks a button in the Apple authentication popup.
+ * Retries multiple times with exponential backoff if button not found immediately.
+ *
+ * @param {number} tabId - Tab ID where to inject the script
+ * @param {string} buttonValue - Button ID or text to search for
+ * @param {string} searchType - Search type: 'id' or 'text'
+ * @param {number} maxRetries - Maximum number of retry attempts
+ * @param {Function} sendResponse - Callback function to send response back to caller
+ */
 function injectAndClickButton(tabId, buttonValue, searchType, maxRetries, sendResponse) {
   // Fonction à injecter pour chercher et cliquer sur le bouton
   function clickButtonInAppleTab(btnValue, searchBy, maxAttempts) {
@@ -338,7 +356,21 @@ function injectAndClickButton(tabId, buttonValue, searchType, maxRetries, sendRe
   });
 }
 
-// Fonction pour envoyer vers n8n (contourne la CSP)
+/**
+ * Send statistics to n8n webhook
+ * Background script handles webhook requests to bypass Content Security Policy restrictions.
+ * Implements retry logic with exponential backoff and timeout protection.
+ *
+ * @param {Object} stats - Statistics object to send
+ * @param {number} stats.startTime - Start timestamp
+ * @param {number} stats.endTime - End timestamp
+ * @param {number} stats.duration - Duration in milliseconds
+ * @param {number} stats.alreadyTappedCount - Count of profiles already tapped
+ * @param {number} stats.tappedCount - Count of newly tapped profiles
+ * @param {number} stats.totalCount - Total count of profiles processed
+ * @param {number} [retries=2] - Number of retry attempts on failure
+ * @returns {Promise<boolean>} True if sent successfully, false otherwise
+ */
 async function sendToN8NWebhook(stats, retries = 2) {
   // Récupérer l'URL du webhook depuis le storage
   return new Promise((resolve) => {
