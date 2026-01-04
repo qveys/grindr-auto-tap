@@ -32,6 +32,7 @@
         "utils/logger.js",
         "utils/formatters.js",
         "utils/dom-helpers.js",
+        "utils/async-helpers.js",
         "modules/auth.js",
         "modules/profile-opener.js",
         "modules/stats.js",
