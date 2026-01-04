@@ -6,29 +6,11 @@ if (typeof createEditModeManagers === 'function') {
   editModeManagers = createEditModeManagers();
 }
 
-// Logger function pour le popup
-function logger(level, location, message, data = null) {
-  const logEntry = {
-    timestamp: Date.now(),
-    level: level,
-    location: location || 'Popup',
-    message: message,
-    data: data
-  };
-
-  // Send to background script to store using centralized messaging
-  if (typeof window !== 'undefined' && window.sendLog) {
-    window.sendLog(logEntry);
-  } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-    // Fallback for backwards compatibility
-    chrome.runtime.sendMessage({
-      action: 'addLog',
-      logEntry: logEntry
-    }).catch(err => {
-      // Silently fail if background script is not available
-    });
-  }
-}
+// Use centralized logger from utils/logger.js
+const logger = window.logger || function(level, location, message, data = null) {
+  // Fallback logger if centralized logger not loaded
+  console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : level === 'debug' ? 'debug' : 'log'](`[${location}] ${message}`, data || '');
+};
 
 // Éléments DOM
 const loginMethodSelect = document.getElementById('loginMethod');
