@@ -42,8 +42,8 @@ Since this is a Firefox extension with no build process, development is done dir
 - Injected into web.grindr.com pages
 - Main entry point that orchestrates modules
 - Modules loaded via manifest.json in dependency order:
-  - **Utils**: constants, logger, formatters, dom-helpers
-  - **Modules**: auth, profile-opener, stats, auto-tap
+   - **Utils**: constants, logger, formatters, dom-helpers
+   - **Modules**: auth, profile-opener, stats, auto-tap
 - Communicates with background script via chrome.runtime.sendMessage
 - Exports `window.grindrAutoTap` API for console control
 
@@ -181,28 +181,28 @@ Using `chrome.storage.local`:
 
 ```javascript
 {
-  // Authentication
-  loginMethod: 'email' | 'facebook' | 'google' | 'apple',
-  grindrEmail: string,
-  grindrPassword: string,
-  autoLogin: boolean,
+   // Authentication
+   loginMethod: 'email' | 'facebook' | 'google' | 'apple',
+           grindrEmail: string,
+           grindrPassword: string,
+           autoLogin: boolean,
 
-  // Configuration
-  n8nWebhookURL: string,
-  autoStart: boolean,
-  minDelayHours: number,
+           // Configuration
+           n8nWebhookURL: string,
+           autoStart: boolean,
+           minDelayHours: number,
 
-  // Logs
-  extensionLogs: Array<{
-    timestamp: number,
-    level: 'info' | 'warn' | 'error' | 'debug',
-    location: string,
-    message: string,
-    data: any
-  }>,
+           // Logs
+           extensionLogs: Array<{
+      timestamp: number,
+      level: 'info' | 'warn' | 'error' | 'debug',
+      location: string,
+      message: string,
+      data: any
+   }>,
 
-  // Debug (legacy)
-  debugLogs: Array<...>
+           // Debug (legacy)
+           debugLogs: Array<...>
 }
 ```
 
@@ -237,6 +237,14 @@ Using `chrome.storage.local`:
 **Cross-Origin Bypass**: Background script makes webhook requests (content CSP restriction)
 **Module Pattern**: IIFE modules that export to `window.*` for Manifest V3 compatibility
 **Dependency Injection**: Modules access dependencies via `window.*` objects
+
+## Documentation
+
+All project documentation is located in the `docs/` directory:
+- `ARCHITECTURAL_ANALYSIS.md`: Comprehensive architectural analysis and design decisions
+- `REFACTORING_PROGRESS.md`: Track of completed refactoring tasks
+- `REFACTORING_OPPORTUNITIES.md`: Documentation of improvement opportunities for future releases
+- `release-notes/`: Release notes for each version
 
 ## Important Notes
 

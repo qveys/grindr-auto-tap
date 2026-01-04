@@ -86,6 +86,14 @@ extension/
 │   ├── stats.js           # Statistics management and webhook sending
 │   └── auto-tap.js        # Main automatic tap loop
 │
+├── docs/                  # Documentation
+│   ├── ARCHITECTURAL_ANALYSIS.md
+│   ├── REFACTORING_PROGRESS.md
+│   ├── REFACTORING_OPPORTUNITIES.md
+│   └── release-notes/     # Release notes
+│       ├── RELEASE_NOTE_1.0.0.md
+│       └── RELEASE_NOTE_1.0.1.md
+│
 ├── popup.html             # User interface
 ├── popup.js               # Popup logic
 ├── shared-constants.js    # Shared constants (service worker + content scripts)
