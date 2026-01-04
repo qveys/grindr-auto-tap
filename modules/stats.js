@@ -13,11 +13,25 @@
 
   /**
    * Send statistics to n8n webhook via background script
+   * Uses centralized messaging utility (window.sendStatsToWebhook)
    * @param {Object} stats - Statistics object
    * @param {number} retries - Number of retries
    * @returns {Promise<boolean>} True if sent successfully
    */
   async function sendToN8NWebhook(stats, retries = LIMITS.DEFAULT_RETRIES) {
+    // Use centralized messaging utility if available
+    if (typeof window !== 'undefined' && window.sendStatsToWebhook) {
+      const response = await window.sendStatsToWebhook(stats, retries);
+      if (response && response.success) {
+        logger('info', 'Content', '📤 Récapitulatif envoyé à n8n avec succès');
+        return true;
+      } else {
+        logger('error', 'Content', '❌ Erreur lors de l\'envoi du webhook: ' + (response?.error || 'Erreur inconnue'));
+        return false;
+      }
+    }
+
+    // Fallback to direct chrome.runtime.sendMessage if messaging utility not loaded
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({
         action: 'sendToN8N',
