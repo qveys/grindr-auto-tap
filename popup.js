@@ -328,17 +328,14 @@ function saveCredentials() {
     return;
   }
 
-  chrome.runtime.sendMessage({
+  sendToBackground({
     action: 'saveCredentials',
     loginMethod: loginMethod,
     email: email,
     password: password,
     autoLogin: autoLogin
-  }, (response) => {
-    if (chrome.runtime.lastError) {
-      showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
-      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde des identifiants: ' + chrome.runtime.lastError.message);
-    } else if (response && response.success) {
+  }).then((response) => {
+    if (response && response.success) {
       showStatus('✅ Configuration sauvegardée', 'success');
       logger('info', 'Popup', `✅ Configuration d'authentification sauvegardée (méthode: ${loginMethod}, auto-login: ${autoLogin})`);
       // Sortir du mode édition
@@ -385,11 +382,8 @@ function showConfirm(message, onConfirm) {
 // Fonction pour supprimer les identifiants
 function deleteCredentials() {
   showConfirm('Êtes-vous sûr de vouloir supprimer la configuration ?', () => {
-    chrome.runtime.sendMessage({ action: 'deleteCredentials' }, (response) => {
-      if (chrome.runtime.lastError) {
-        showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
-        logger('error', 'Popup', '❌ Erreur lors de la suppression des identifiants: ' + chrome.runtime.lastError.message);
-      } else if (response && response.success) {
+    sendToBackground({ action: 'deleteCredentials' }).then((response) => {
+      if (response && response.success) {
         showStatus('✅ Configuration supprimée', 'success');
         logger('info', 'Popup', '✅ Configuration d\'authentification supprimée');
         loginMethodSelect.value = 'email';
@@ -422,14 +416,11 @@ function saveWebhook() {
     return;
   }
 
-  chrome.runtime.sendMessage({
+  sendToBackground({
     action: 'saveWebhookURL',
     url: url
-  }, (response) => {
-    if (chrome.runtime.lastError) {
-      showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
-      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde de l\'URL webhook: ' + chrome.runtime.lastError.message);
-    } else if (response && response.success) {
+  }).then((response) => {
+    if (response && response.success) {
       showStatus('✅ URL sauvegardée', 'success');
       logger('info', 'Popup', `✅ URL webhook n8n mise à jour: ${url}`);
       // Sortir du mode édition
@@ -673,8 +664,8 @@ function formatTimestamp(timestamp) {
 
 // Charger et afficher les logs
 function loadLogs() {
-  chrome.runtime.sendMessage({ action: 'getLogs' }, (response) => {
-    if (chrome.runtime.lastError) {
+  sendToBackground({ action: 'getLogs' }).then((response) => {
+    if (!response) {
       logsContainer.innerHTML = '<div style="color: var(--color-error); padding: var(--spacing-md); text-align: center;">Erreur lors du chargement des logs</div>';
       return;
     }
@@ -778,13 +769,8 @@ function clearLogs() {
     // Vider immédiatement le conteneur pour un feedback visuel instantané
     logsContainer.innerHTML = '<div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">Suppression en cours...</div>';
 
-    chrome.runtime.sendMessage({ action: 'clearLogs' }, (response) => {
-      if (chrome.runtime.lastError) {
-        showStatus('❌ Erreur: ' + chrome.runtime.lastError.message, 'error');
-        logger('error', 'Popup', '❌ Erreur lors de l\'effacement des logs: ' + chrome.runtime.lastError.message);
-        // Recharger les logs en cas d'erreur
-        loadLogs();
-      } else if (response && response.success) {
+    sendToBackground({ action: 'clearLogs' }).then((response) => {
+      if (response && response.success) {
         showStatus('✅ Logs effacés', 'success');
         // Afficher immédiatement le message "Aucun log disponible"
         logsContainer.innerHTML = '<div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">Aucun log disponible</div>';
