@@ -4,6 +4,12 @@
 *.crx
 *.pem
 
+# Scripts de nettoyage
+clean_commit.sh
+clean_commit_messages.ps1
+process_commits.sh
+process.sh
+
 # Fichiers système
 .DS_Store
 .DS_Store?
