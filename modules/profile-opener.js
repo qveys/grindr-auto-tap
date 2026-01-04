@@ -33,9 +33,9 @@
   function verifyProfileOpened() {
     const currentURL = window.location.href;
     const urlContainsProfile = currentURL.includes('?profile=true') || currentURL.includes('&profile=true');
-    const nextProfileBtn = document.querySelector(SELECTORS.NEXT_PROFILE);
-    const tapButton = document.querySelector(SELECTORS.TAP_BUTTON);
-    const profileView = document.querySelector(SELECTORS.PROFILE_VIEW);
+    const nextProfileBtn = document.querySelector(SELECTORS.PROFILE.NEXT_PROFILE);
+    const tapButton = document.querySelector(SELECTORS.PROFILE.TAP_BUTTON);
+    const profileView = document.querySelector(SELECTORS.PROFILE.VIEW);
 
     // Un profil est considéré comme ouvert SEULEMENT si les boutons/vue sont présents
     // L'URL seule ne suffit PAS (car elle peut être changée sans que le DOM se mette à jour)

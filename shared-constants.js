@@ -67,31 +67,29 @@ const SharedConstants = {
     ],
   },
 
-  // DOM Selectors
+  // DOM Selectors - Organized by functional domain
   SELECTORS: {
-    // Login
-    EMAIL_INPUT: 'input[type="email"], input[type="text"][name*="email" i], input[type="text"][placeholder*="email" i], input[type="text"][id*="email" i]',
-    PASSWORD_INPUT: 'input[type="password"], input[name*="password" i], input[id*="password" i]',
-    LOGIN_BUTTON: 'button[type="submit"], form button, button.btn-primary, button.primary',
-    CAPTCHA: '[data-captcha], iframe[src*="recaptcha"], .g-recaptcha',
+    // Authentication selectors
+    AUTH: {
+      EMAIL_INPUT: 'input[type="email"], input[type="text"][name*="email" i], input[type="text"][placeholder*="email" i], input[type="text"][id*="email" i]',
+      PASSWORD_INPUT: 'input[type="password"], input[name*="password" i], input[id*="password" i]',
+      LOGIN_BUTTON: 'button[type="submit"], form button, button.btn-primary, button.primary',
+      CAPTCHA: '[data-captcha], iframe[src*="recaptcha"], .g-recaptcha',
+      FACEBOOK_BUTTON: 'button[title="Log In With Facebook"], button[title*="Facebook" i], button[aria-label*="Facebook" i], button[data-provider="facebook"]',
+      GOOGLE_BUTTON: 'button[title="Log In With Google"], button[title*="Google" i], button[aria-label*="Google" i], button[data-provider="google"]',
+      APPLE_BUTTON: 'button[title="Log In With Apple"], button[title*="Apple" i], button[aria-label*="Apple" i], button[data-provider="apple"]',
+      ERROR_MESSAGE: '.error, .alert-error, [role="alert"]',
+    },
 
-    // Profile
-    NEXT_PROFILE: 'img[alt="Next Profile"]',
-    TAP_BUTTON: 'button[aria-label="Tap"]',
-    PROFILE_GRIDCELL: 'div[role="gridcell"]',
-    BETA_DISMISS: '#beta-dismiss-btn',
-
-    // Login status
-    PROFILE_INDICATORS: 'img[alt="Next Profile"], button[aria-label="Tap"], [data-testid*="profile"], nav, header',
-    PROFILE_VIEW: '[data-testid*="profile-view"], [class*="profile-view"], [class*="ProfileView"]',
-
-    // Social login buttons
-    FACEBOOK_BUTTON: 'button[title="Log In With Facebook"], button[title*="Facebook" i], button[aria-label*="Facebook" i], button[data-provider="facebook"]',
-    GOOGLE_BUTTON: 'button[title="Log In With Google"], button[title*="Google" i], button[aria-label*="Google" i], button[data-provider="google"]',
-    APPLE_BUTTON: 'button[title="Log In With Apple"], button[title*="Apple" i], button[aria-label*="Apple" i], button[data-provider="apple"]',
-
-    // Error messages
-    ERROR_MESSAGE: '.error, .alert-error, [role="alert"]',
+    // Profile interaction selectors
+    PROFILE: {
+      NEXT_PROFILE: 'img[alt="Next Profile"]',
+      TAP_BUTTON: 'button[aria-label="Tap"]',
+      GRIDCELL: 'div[role="gridcell"]',
+      BETA_DISMISS: '#beta-dismiss-btn',
+      INDICATORS: 'img[alt="Next Profile"], button[aria-label="Tap"], [data-testid*="profile"], nav, header',
+      VIEW: '[data-testid*="profile-view"], [class*="profile-view"], [class*="ProfileView"]',
+    },
   },
 
   // Status message timeouts (in milliseconds)

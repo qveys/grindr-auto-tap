@@ -19,8 +19,8 @@
    * @returns {Promise<{processed: boolean, shouldContinue: boolean}>}
    */
   async function processProfile(counters) {
-    const tapBtn = document.querySelector(SELECTORS.TAP_BUTTON);
-    const nextBtn = document.querySelector(SELECTORS.NEXT_PROFILE);
+    const tapBtn = document.querySelector(SELECTORS.PROFILE.TAP_BUTTON);
+    const nextBtn = document.querySelector(SELECTORS.PROFILE.NEXT_PROFILE);
 
     if (!nextBtn) {
       logger('warn', 'Content', '⚠️ Bouton "Next Profile" introuvable, arrêt de la boucle');
@@ -67,14 +67,14 @@
    */
   async function waitForNextProfileButton() {
     const waitStartTime = Date.now();
-    while (!document.querySelector(SELECTORS.NEXT_PROFILE) && (Date.now() - waitStartTime) < TIMEOUTS.BUTTON_WAIT) {
+    while (!document.querySelector(SELECTORS.PROFILE.NEXT_PROFILE) && (Date.now() - waitStartTime) < TIMEOUTS.BUTTON_WAIT) {
       if (!window.__grindrRunning || window.__grindrStopped) {
         logger('info', 'Content', '⏹️ Script arrêté pendant l\'attente du bouton');
         return false;
       }
       await delay(DELAYS.MEDIUM);
     }
-    return !!document.querySelector(SELECTORS.NEXT_PROFILE);
+    return !!document.querySelector(SELECTORS.PROFILE.NEXT_PROFILE);
   }
 
   /**
@@ -134,7 +134,7 @@
       }
 
       // Main loop
-      while (document.querySelector(SELECTORS.NEXT_PROFILE) && shouldContinue(startTime, iterationCount)) {
+      while (document.querySelector(SELECTORS.PROFILE.NEXT_PROFILE) && shouldContinue(startTime, iterationCount)) {
         iterationCount++;
 
         try {

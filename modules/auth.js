@@ -16,12 +16,12 @@
    * @returns {boolean} True if logged in, false otherwise
    */
   function checkLoginStatus() {
-    const loginPage = document.querySelector(SELECTORS.EMAIL_INPUT);
+    const loginPage = document.querySelector(SELECTORS.AUTH.EMAIL_INPUT);
     if (loginPage) {
       return false;
     }
 
-    const profileElements = document.querySelector(SELECTORS.PROFILE_INDICATORS);
+    const profileElements = document.querySelector(SELECTORS.PROFILE.INDICATORS);
     if (profileElements) {
       return true;
     }
@@ -40,8 +40,8 @@
    * @returns {Promise<{emailField: Element, passwordField: Element}>}
    */
   async function fillLoginForm(email, password) {
-    const emailField = document.querySelector(SELECTORS.EMAIL_INPUT);
-    const passwordField = document.querySelector(SELECTORS.PASSWORD_INPUT);
+    const emailField = document.querySelector(SELECTORS.AUTH.EMAIL_INPUT);
+    const passwordField = document.querySelector(SELECTORS.AUTH.PASSWORD_INPUT);
 
     if (!emailField || !passwordField) {
       throw new Error('Champs de connexion introuvables');
@@ -81,12 +81,12 @@
    * @returns {Promise<boolean>}
    */
   async function clickLoginButton() {
-    const loginButton = document.querySelector(SELECTORS.LOGIN_BUTTON);
+    const loginButton = document.querySelector(SELECTORS.AUTH.LOGIN_BUTTON);
     if (!loginButton) {
       throw new Error('Bouton de connexion introuvable');
     }
 
-    const captcha = document.querySelector(SELECTORS.CAPTCHA);
+    const captcha = document.querySelector(SELECTORS.AUTH.CAPTCHA);
     if (captcha) {
       throw new Error('Captcha détecté - action manuelle requise');
     }
@@ -112,13 +112,13 @@
         return true;
       }
 
-      const errorMessage = document.querySelector(SELECTORS.ERROR_MESSAGE);
+      const errorMessage = document.querySelector(SELECTORS.AUTH.ERROR_MESSAGE);
       if (errorMessage && (errorMessage.textContent.toLowerCase().includes('incorrect') ||
         errorMessage.textContent.toLowerCase().includes('wrong'))) {
         throw new Error('Identifiants incorrects');
       }
 
-      const captcha = document.querySelector(SELECTORS.CAPTCHA);
+      const captcha = document.querySelector(SELECTORS.AUTH.CAPTCHA);
       if (captcha) {
         throw new Error('Captcha détecté - action manuelle requise');
       }
@@ -190,7 +190,7 @@
     try {
       logger('info', 'Auth', '📘 Connexion par Facebook...');
 
-      const facebookButton = findSocialLoginButton('facebook', SELECTORS.FACEBOOK_BUTTON);
+      const facebookButton = findSocialLoginButton('facebook', SELECTORS.AUTH.FACEBOOK_BUTTON);
       if (!facebookButton) {
         throw new Error('Bouton "Log In With Facebook" introuvable');
       }
@@ -216,7 +216,7 @@
     try {
       logger('info', 'Auth', '🔵 Connexion par Google...');
 
-      const googleButton = findSocialLoginButton('google', SELECTORS.GOOGLE_BUTTON);
+      const googleButton = findSocialLoginButton('google', SELECTORS.AUTH.GOOGLE_BUTTON);
       if (!googleButton) {
         throw new Error('Bouton "Log In With Google" introuvable');
       }
@@ -373,7 +373,7 @@
    * @returns {Promise<{popupWindow: Window|null, originalOpen: Function}>}
    */
   async function initiateAppleLogin() {
-    const appleButton = findSocialLoginButton('apple', SELECTORS.APPLE_BUTTON);
+    const appleButton = findSocialLoginButton('apple', SELECTORS.AUTH.APPLE_BUTTON);
     if (!appleButton) {
       throw new Error('Bouton "Log In With Apple" introuvable');
     }
