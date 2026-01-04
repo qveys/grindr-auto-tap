@@ -106,7 +106,7 @@
 
       // Action 1: Clic sur cascadeCellContainer img
       logger('info', 'Content', '🎯 Action 1: Clic sur cascadeCellContainer img...');
-      const cascadeImg = document.querySelector('[data-testid="cascadeCellContainer"] img');
+      const cascadeImg = document.querySelector(SELECTORS.PROFILE.CASCADE_CELL_IMG);
       if (cascadeImg) {
         cascadeImg.click();
         await delay(DELAYS.SECOND);
@@ -116,7 +116,7 @@
 
       // Action 2: Clic sur userAvatar img
       logger('info', 'Content', '🎯 Action 2: Clic sur userAvatar img...');
-      const userAvatarImg = document.querySelector('[data-testid="userAvatar"] img');
+      const userAvatarImg = document.querySelector(SELECTORS.PROFILE.USER_AVATAR_IMG);
       if (userAvatarImg) {
         userAvatarImg.click();
         await delay(DELAYS.SECOND);
@@ -126,7 +126,7 @@
 
       // Action 3: Fermeture du chat
       logger('info', 'Content', '🎯 Action 3: Fermeture du chat...');
-      const closeChatBtn = document.querySelector('[aria-label="close chat"]');
+      const closeChatBtn = document.querySelector(SELECTORS.PROFILE.CLOSE_CHAT_BUTTON);
       if (closeChatBtn) {
         closeChatBtn.click();
         await delay(DELAYS.SECOND);

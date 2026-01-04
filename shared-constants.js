@@ -89,6 +89,9 @@ const SharedConstants = {
       BETA_DISMISS: '#beta-dismiss-btn',
       INDICATORS: 'img[alt="Next Profile"], button[aria-label="Tap"], [data-testid*="profile"], nav, header',
       VIEW: '[data-testid*="profile-view"], [class*="profile-view"], [class*="ProfileView"]',
+      CASCADE_CELL_IMG: '[data-testid="cascadeCellContainer"] img',
+      USER_AVATAR_IMG: '[data-testid="userAvatar"] img',
+      CLOSE_CHAT_BUTTON: '[aria-label="close chat"]',
     },
   },
 
