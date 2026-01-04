@@ -347,9 +347,9 @@ async function sendToN8NWebhook(stats, retries = 2) {
 
       for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-          // Timeout de 10 secondes
+          // Timeout défini dans shared-constants.js (TIMEOUTS.WEBHOOK_REQUEST)
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          const timeoutId = setTimeout(() => controller.abort(), TIMEOUTS.WEBHOOK_REQUEST);
 
           const response = await fetch(webhookURL, {
             method: 'POST',
@@ -372,7 +372,7 @@ async function sendToN8NWebhook(stats, retries = 2) {
         } catch (error) {
           if (attempt < retries) {
             logger('warn', 'Background', `⚠️ Tentative ${attempt + 1}/${retries + 1} échouée, nouvel essai dans 2s...`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, DELAYS.TWO_SECONDS));
           } else {
             logger('error', 'Background', '❌ Erreur lors de l\'envoi du webhook après ' + (retries + 1) + ' tentatives: ' + error.message);
             resolve(false);

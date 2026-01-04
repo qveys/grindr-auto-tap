@@ -625,7 +625,8 @@ function showStatus(message, type = 'info') {
   statusDiv.className = 'status ' + type;
   statusDiv.style.display = 'block';
 
-  const timeout = type === 'success' ? 3000 : (type === 'error' ? 5000 : 4000);
+  const timeout = type === 'success' ? STATUS_TIMEOUTS.SUCCESS :
+                  (type === 'error' ? STATUS_TIMEOUTS.ERROR : STATUS_TIMEOUTS.INFO);
   setTimeout(() => {
     statusDiv.style.display = 'none';
   }, timeout);
