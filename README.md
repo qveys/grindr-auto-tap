@@ -69,16 +69,33 @@ window.grindrAutoTap.checkStatus();
 ```
 extension/
 ├── manifest.json          # Extension configuration
-├── background.js          # Service worker (tabs management, n8n webhooks, storage)
+├── background.js          # Service worker (orchestration)
 ├── content.js             # Main entry point (orchestration)
+├── shared-constants.js    # Shared constants (service worker + content scripts)
+│
+├── background/            # Background script handlers
+│   └── handlers/
+│       ├── apple-handler.js    # Apple authentication popup handling
+│       ├── log-handler.js      # Log management
+│       ├── storage-handler.js  # Storage operations
+│       ├── tab-handler.js      # Tab detection and management
+│       └── webhook-handler.js  # n8n webhook requests
+│
+├── content/               # Content script handlers
+│   └── handlers/
+│       ├── auto-start.js       # Automatic script startup
+│       ├── error-handler.js    # Error handling
+│       ├── message-handler.js  # Message routing
+│       └── script-lifecycle.js # Script lifecycle management
 │
 ├── utils/                 # Shared utilities
-│   ├── constants.js       # Constants (delays, timeouts, selectors, etc.)
-│   ├── logger.js          # Centralized logging system
+│   ├── async-helpers.js   # Async utilities (retry, timeout, etc.)
+│   ├── dom-helpers.js     # DOM helpers (delay, getTextNodes, etc.)
 │   ├── formatters.js      # Date and duration formatting
+│   ├── logger.js          # Centralized logging system
 │   ├── messaging.js       # Centralized messaging utilities
-│   ├── storage.js         # Storage utilities
-│   └── dom-helpers.js     # DOM helpers (delay, getTextNodes, etc.)
+│   ├── state-manager.js   # State management
+│   └── storage.js         # Storage utilities
 │
 ├── modules/               # Functional modules
 │   ├── auth.js            # Authentication module (email, Apple, Facebook, Google)
@@ -86,28 +103,50 @@ extension/
 │   ├── stats.js           # Statistics management and webhook sending
 │   └── auto-tap.js        # Main automatic tap loop
 │
+├── popup/                 # Popup interface
+│   ├── edit-mode.js       # Edit/display mode system
+│   ├── managers/
+│   │   ├── log-manager.js      # Log management
+│   │   ├── script-manager.js   # Script control
+│   │   ├── storage-manager.js  # Storage operations
+│   │   └── tab-manager.js      # Tab operations
+│   └── ui/
+│       └── status-display.js   # Status display component
+│
+├── popup.html             # User interface
+├── popup.js               # Popup logic
+│
 ├── docs/                  # Documentation
 │   ├── ARCHITECTURAL_ANALYSIS.md
 │   ├── REFACTORING_PROGRESS.md
 │   ├── REFACTORING_OPPORTUNITIES.md
+│   ├── REFACTORING_SESSION_2026-01-05.md
+│   ├── REFACTORING_TODO.md
 │   └── release-notes/     # Release notes
 │       ├── RELEASE_NOTE_1.0.0.md
 │       └── RELEASE_NOTE_1.0.1.md
 │
-├── popup.html             # User interface
-├── popup.js               # Popup logic
-├── shared-constants.js    # Shared constants (service worker + content scripts)
+├── tests/                 # Test suite
+│   ├── README.md
+│   ├── runner.html        # Test runner interface
+│   ├── test-framework.js  # Custom test framework
+│   └── utils/             # Test utilities
+│
 └── icons/                 # Extension icons
 ```
 
 ### 🏗️ Modular Architecture
 
 The code is organized into separate modules for better maintainability:
-- **Utils** : Reusable utility functions
+- **Handlers** : Organized by component (background/content/popup) for separation of concerns
+- **Utils** : Reusable utility functions (logging, messaging, formatting, async helpers)
 - **Modules** : Business logic organized by responsibility (SOLID principles)
-- **Content.js** : Entry point that orchestrates the modules
+- **Entry Points** : `background.js` and `content.js` orchestrate handlers and modules
 
-Modules are loaded in dependency order via `manifest.json`.
+All components are loaded in dependency order via `manifest.json`. The architecture follows a handler-based pattern where:
+- Background handlers manage storage, webhooks, tabs, and logs
+- Content handlers manage script lifecycle, messaging, errors, and auto-start
+- Popup managers handle UI operations and state synchronization
 
 ## 🔐 Security
 

@@ -32,7 +32,10 @@ Since this is a Firefox extension with no build process, development is done dir
 ### Extension Components (Manifest V3)
 
 **Background Script** (`background.js`):
-- Service worker that acts as message broker between components
+- Service worker that orchestrates background handlers
+- Handlers loaded via manifest.json in dependency order:
+  - **Handlers**: log-handler, storage-handler, webhook-handler, apple-handler, tab-handler
+- Acts as message broker between components
 - Handles n8n webhook requests (bypasses CSP restrictions)
 - Manages credential storage via chrome.storage.local
 - Detects and interacts with Apple authentication popup tabs
@@ -40,12 +43,26 @@ Since this is a Firefox extension with no build process, development is done dir
 
 **Content Script** (`content.js`):
 - Injected into web.grindr.com pages
-- Main entry point that orchestrates modules
-- Modules loaded via manifest.json in dependency order:
-   - **Utils**: constants, logger, formatters, dom-helpers
+- Main entry point that orchestrates handlers and modules
+- Components loaded via manifest.json in dependency order:
+  - **Utils**: shared-constants, state-manager, messaging, logger, formatters, dom-helpers, async-helpers
    - **Modules**: auth, profile-opener, stats, auto-tap
-- Communicates with background script via chrome.runtime.sendMessage
+  - **Handlers**: script-lifecycle, message-handler, error-handler, auto-start
+- Communicates with background script via centralized messaging utilities
 - Exports `window.grindrAutoTap` API for console control
+
+**Background Handlers** (`background/handlers/`):
+- **log-handler.js**: Centralized log management and storage
+- **storage-handler.js**: Credential and configuration storage operations
+- **webhook-handler.js**: n8n webhook requests with retry logic
+- **apple-handler.js**: Apple authentication popup detection and interaction
+- **tab-handler.js**: Tab detection and management
+
+**Content Handlers** (`content/handlers/`):
+- **script-lifecycle.js**: Script start/stop lifecycle management
+- **message-handler.js**: Message routing and handling
+- **error-handler.js**: Centralized error handling and recovery
+- **auto-start.js**: Automatic script startup logic
 
 **Modules** (loaded via manifest.json):
 - **Authentication Module** (`modules/auth.js`): Multi-method login (email, Apple, Facebook, Google)
@@ -56,6 +73,13 @@ Since this is a Firefox extension with no build process, development is done dir
 **Popup** (`popup.html`, `popup.js`):
 - User interface for configuration and control
 - Edit/display mode system (see `popup/edit-mode.js`)
+- Managers organized by responsibility:
+  - **log-manager.js**: Log retrieval and display
+  - **script-manager.js**: Script control operations
+  - **storage-manager.js**: Storage read/write operations
+  - **tab-manager.js**: Tab operations
+- UI components in `popup/ui/`:
+  - **status-display.js**: Status display component
 - Tabs: Auth, Webhook, Settings, Logs
 - Real-time log viewer with auto-scroll
 
@@ -93,13 +117,14 @@ The extension uses Chrome Extension messaging API for inter-component communicat
 Modules are loaded via manifest.json and share global scope via `window.*`:
 
 **Utils** (`utils/`):
-- `shared-constants.js`: All constants (DELAYS, TIMEOUTS, LIMITS, SELECTORS, etc.) → `window.Constants`
+- `shared-constants.js`: All constants (DELAYS, TIMEOUTS, LIMITS, SELECTORS, etc.) → `window.Constants` (loaded separately in manifest)
 - `state-manager.js`: State management → `window.StateManager`
 - `messaging.js`: Chrome runtime messaging wrapper → `window.sendToBackground`
 - `logger.js`: Centralized logging → `window.Logger`, `window.logger`
 - `formatters.js`: Date and duration formatting → `window.Formatters`
 - `dom-helpers.js`: DOM utilities (delay, getTextNodes) → `window.DOMHelpers`
-- `async-helpers.js`: Async utilities → `window.AsyncHelpers`
+- `async-helpers.js`: Async utilities (safeAsync, retry, sleep, parallelLimit, debounce) → `window.AsyncHelpers`
+- `storage.js`: Storage utilities (legacy, most operations use handlers)
 
 **Modules** (`modules/`):
 - `auth.js`: Authentication logic → `window.Auth`
