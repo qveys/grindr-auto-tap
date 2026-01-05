@@ -54,7 +54,7 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/popup.html",
     "default_title": "Grindr Auto Tap",
     "default_icon": {
       "16": "icons/favicon-16x16.png",
