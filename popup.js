@@ -44,6 +44,9 @@
     // Initialize tabs
     PopupTabManager.initializeTabs();
 
+    // Set up edit mode cancellation
+    PopupTabManager.setupEditModeCancellation();
+
     // Check script status after short delay (let content script initialize)
     setTimeout(() => {
       PopupScriptManager.checkScriptStatus(0, false);
@@ -78,6 +81,12 @@
 
     if (stopScriptBtn) {
       stopScriptBtn.addEventListener('click', () => PopupScriptManager.stopScript());
+    }
+
+    // Auto start checkbox
+    const autoStartCheckbox = document.getElementById('autoStart');
+    if (autoStartCheckbox) {
+      autoStartCheckbox.addEventListener('change', () => PopupStorageManager.saveAutoStart());
     }
 
     // Edit buttons
