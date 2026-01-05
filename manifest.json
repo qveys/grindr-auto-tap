@@ -48,7 +48,7 @@
         "content/handlers/message-handler.js",
         "content/handlers/error-handler.js",
         "content/handlers/auto-start.js",
-        "content.js"
+        "content/content.js"
       ],
       "run_at": "document_idle"
     }

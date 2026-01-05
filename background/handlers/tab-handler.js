@@ -48,7 +48,7 @@
   function injectContentScript(tabId) {
     chrome.scripting.executeScript({
       target: { tabId: tabId },
-      files: ['content.js']
+      files: ['content/content.js']
     }).catch(err => {
       // Ignore errors if script already injected
       logger('debug', 'TabHandler', `Script already injected or error: ${err?.message || String(err)}`);

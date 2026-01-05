@@ -13,19 +13,19 @@ Firefox browser extension that automates actions on web.grindr.com (Grindr Auto 
 Since this is a Firefox extension with no build process, development is done directly with source files:
 
 1. **Load extension in Firefox**:
-   - Navigate to `about:debugging#/runtime/this-firefox`
-   - Click "Load Temporary Add-on"
-   - Select `manifest.json` from the extension folder
+    - Navigate to `about:debugging#/runtime/this-firefox`
+    - Click "Load Temporary Add-on"
+    - Select `manifest.json` from the extension folder
 
 2. **View console logs**:
-   - Background script logs: `about:debugging` → This Firefox → Inspect (on the extension)
-   - Content script logs: F12 developer tools on web.grindr.com tab
-   - Popup logs: Right-click extension icon → Inspect
+    - Background script logs: `about:debugging` → This Firefox → Inspect (on the extension)
+    - Content script logs: F12 developer tools on web.grindr.com tab
+    - Popup logs: Right-click extension icon → Inspect
 
 3. **Test changes**:
-   - Modify source files directly
-   - Click "Reload" in `about:debugging` to apply changes
-   - Refresh web.grindr.com page to reload content scripts
+    - Modify source files directly
+    - Click "Reload" in `about:debugging` to apply changes
+    - Refresh web.grindr.com page to reload content scripts
 
 ## Architecture
 
@@ -34,20 +34,20 @@ Since this is a Firefox extension with no build process, development is done dir
 **Background Script** (`background.js`):
 - Service worker that orchestrates background handlers
 - Handlers loaded via manifest.json in dependency order:
-  - **Handlers**: log-handler, storage-handler, webhook-handler, apple-handler, tab-handler
+    - **Handlers**: log-handler, storage-handler, webhook-handler, apple-handler, tab-handler
 - Acts as message broker between components
 - Handles n8n webhook requests (bypasses CSP restrictions)
 - Manages credential storage via chrome.storage.local
 - Detects and interacts with Apple authentication popup tabs
 - Stores logs centrally (max 1000 entries)
 
-**Content Script** (`content.js`):
+**Content Script** (`content/content.js`):
 - Injected into web.grindr.com pages
 - Main entry point that orchestrates handlers and modules
 - Components loaded via manifest.json in dependency order:
-  - **Utils**: shared-constants, state-manager, messaging, logger, formatters, dom-helpers, async-helpers
-   - **Modules**: auth, profile-opener, stats, auto-tap
-  - **Handlers**: script-lifecycle, message-handler, error-handler, auto-start
+    - **Utils**: shared-constants, state-manager, messaging, logger, formatters, dom-helpers, async-helpers
+    - **Modules**: auth, profile-opener, stats, auto-tap
+    - **Handlers**: script-lifecycle, message-handler, error-handler, auto-start
 - Communicates with background script via centralized messaging utilities
 - Exports `window.grindrAutoTap` API for console control
 
@@ -74,12 +74,12 @@ Since this is a Firefox extension with no build process, development is done dir
 - User interface for configuration and control
 - Edit/display mode system (see `popup/edit-mode.js`)
 - Managers organized by responsibility:
-  - **log-manager.js**: Log retrieval and display
-  - **script-manager.js**: Script control operations
-  - **storage-manager.js**: Storage read/write operations
-  - **tab-manager.js**: Tab operations
+    - **log-manager.js**: Log retrieval and display
+    - **script-manager.js**: Script control operations
+    - **storage-manager.js**: Storage read/write operations
+    - **tab-manager.js**: Tab operations
 - UI components in `popup/ui/`:
-  - **status-display.js**: Status display component
+    - **status-display.js**: Status display component
 - Tabs: Auth, Webhook, Settings, Logs
 - Real-time log viewer with auto-scroll
 
@@ -138,10 +138,10 @@ Modules use dependency injection via window objects (e.g., `const { logger } = w
 
 1. **Email Login**: Fill form → click button → wait for navigation
 2. **Apple Login**:
-   - Click Apple button → popup opens
-   - Background script detects popup tab via URL monitoring
-   - Inject script into popup to click buttons: "sign-in" → "Sign In" → "Continue"
-   - Wait for popup close → verify login
+    - Click Apple button → popup opens
+    - Background script detects popup tab via URL monitoring
+    - Inject script into popup to click buttons: "sign-in" → "Sign In" → "Continue"
+    - Wait for popup close → verify login
 3. **Facebook/Google**: Button click only (popup handling not implemented)
 
 ### Auto-Tap Main Loop
@@ -150,10 +150,10 @@ Located in `modules/auto-tap.js` (`autoTapAndNext()`):
 
 1. Wait for "Next Profile" button to appear
 2. Loop while button exists and script is running:
-   - Check for "Tap" button presence
-   - If exists: Click Tap → Click Next → Increment tappedCount
-   - If not exists: Click Next → Increment alreadyTappedCount
-   - Check max iterations (10,000) and max duration (2 hours)
+    - Check for "Tap" button presence
+    - If exists: Click Tap → Click Next → Increment tappedCount
+    - If not exists: Click Next → Increment alreadyTappedCount
+    - Check max iterations (10,000) and max duration (2 hours)
 3. Send final statistics to n8n webhook
 4. Clean up global state
 
@@ -182,7 +182,7 @@ The codebase uses a modular architecture with clear separation of concerns:
 - Each module has a single responsibility
 - Modules communicate via well-defined interfaces
 
-**Entry Point** (`content.js`):
+**Entry Point** (`content/content.js`):
 - Orchestrates modules
 - Handles message listeners
 - Manages auto-start logic
@@ -209,28 +209,28 @@ Using `chrome.storage.local`:
 
 ```javascript
 {
-   // Authentication
-   loginMethod: 'email' | 'facebook' | 'google' | 'apple',
-           grindrEmail: string,
-           grindrPassword: string,
-           autoLogin: boolean,
+  // Authentication
+  loginMethod: 'email' | 'facebook' | 'google' | 'apple',
+    grindrEmail: string,
+    grindrPassword: string,
+    autoLogin: boolean,
 
-           // Configuration
-           n8nWebhookURL: string,
-           autoStart: boolean,
-           minDelayHours: number,
+    // Configuration
+    n8nWebhookURL: string,
+    autoStart: boolean,
+    minDelayHours: number,
 
-           // Logs
-           extensionLogs: Array<{
-      timestamp: number,
-      level: 'info' | 'warn' | 'error' | 'debug',
-      location: string,
-      message: string,
-      data: any
-   }>,
+    // Logs
+    extensionLogs: Array<{
+    timestamp: number,
+    level: 'info' | 'warn' | 'error' | 'debug',
+    location: string,
+    message: string,
+    data: any
+  }>,
 
-           // Debug (legacy)
-           debugLogs: Array<...>
+    // Debug (legacy)
+    debugLogs: Array<...>
 }
 ```
 

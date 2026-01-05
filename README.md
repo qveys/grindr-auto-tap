@@ -70,7 +70,6 @@ window.grindrAutoTap.checkStatus();
 extension/
 ├── manifest.json          # Extension configuration
 ├── background.js          # Service worker (orchestration)
-├── content.js             # Main entry point (orchestration)
 ├── shared-constants.js    # Shared constants (service worker + content scripts)
 │
 ├── background/            # Background script handlers
@@ -82,6 +81,7 @@ extension/
 │       └── webhook-handler.js  # n8n webhook requests
 │
 ├── content/               # Content script handlers
+│   └── content.js              # Main entry point (orchestration)
 │   └── handlers/
 │       ├── auto-start.js       # Automatic script startup
 │       ├── error-handler.js    # Error handling
@@ -141,7 +141,7 @@ The code is organized into separate modules for better maintainability:
 - **Handlers** : Organized by component (background/content/popup) for separation of concerns
 - **Utils** : Reusable utility functions (logging, messaging, formatting, async helpers)
 - **Modules** : Business logic organized by responsibility (SOLID principles)
-- **Entry Points** : `background.js` and `content.js` orchestrate handlers and modules
+- **Entry Points** : `background.js` and `content/content.js` orchestrate handlers and modules
 
 All components are loaded in dependency order via `manifest.json`. The architecture follows a handler-based pattern where:
 - Background handlers manage storage, webhooks, tabs, and logs
