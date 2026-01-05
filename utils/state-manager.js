@@ -372,6 +372,7 @@
     set: (value) => {
       console.warn('DEPRECATED: Use StateManager.setState() instead of window.__grindrRunning');
       if (value && canStart()) {
+        setState(State.STARTING);
         setState(State.RUNNING);
       } else if (!value && isRunning()) {
         setState(State.STOPPING);
