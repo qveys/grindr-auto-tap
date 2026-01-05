@@ -101,65 +101,79 @@
    */
   async function injectAndClickButton(tabId, buttonValue, searchType, maxRetries, sendResponse) {
     // Function to inject into the Apple tab
-    function clickButtonInAppleTab(btnValue, searchBy, maxAttempts) {
-      function findAndClickButton() {
-        let button = null;
+    // IMPORTANT: This function runs in the Apple tab's context, not the extension's
+    // It MUST NOT reference any extension variables/constants
+    function clickButtonInAppleTab(btnValue, searchBy, maxAttempts, retryInterval) {
+      return new Promise((resolve) => {
+        function findAndClickButton() {
+          let button = null;
 
-        if (searchBy === 'id') {
-          // Search by ID
-          button = document.getElementById(btnValue) ||
-            document.querySelector('#' + btnValue) ||
-            document.querySelector('button#' + btnValue) ||
-            document.querySelector('[id="' + btnValue + '"]');
-        } else if (searchBy === 'text') {
-          // Search by text
-          const buttons = Array.from(document.querySelectorAll('button')).filter(function (btn) {
-            const text = btn.textContent.trim();
-            return text.toLowerCase().includes(btnValue.toLowerCase());
-          });
-          button = buttons[0];
+          if (searchBy === 'id') {
+            // Search by ID
+            button = document.getElementById(btnValue) ||
+              document.querySelector('#' + btnValue) ||
+              document.querySelector('button#' + btnValue) ||
+              document.querySelector('[id="' + btnValue + '"]');
+          } else if (searchBy === 'text') {
+            // Search by text
+            const buttons = Array.from(document.querySelectorAll('button')).filter(function (btn) {
+              const text = btn.textContent.trim();
+              return text.toLowerCase().includes(btnValue.toLowerCase());
+            });
+            button = buttons[0];
+          }
+
+          if (button) {
+            console.log('[Apple Tab] ✅ Button found:', btnValue);
+            button.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(function () {
+              button.click();
+              console.log('[Apple Tab] 🖱️ Button clicked:', btnValue);
+            }, 500);
+            return true;
+          }
+          return false;
         }
 
-        if (button) {
-          console.log('[Apple Tab] ✅ Button found:', btnValue);
-          button.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setTimeout(function () {
-            button.click();
-            console.log('[Apple Tab] 🖱️ Button clicked:', btnValue);
-          }, 500);
-          return true;
-        }
-        return false;
-      }
-
-      // Retry multiple times
-      let attempts = 0;
-      const interval = setInterval(function () {
-        attempts++;
-        if (findAndClickButton()) {
-          clearInterval(interval);
-          return;
-        }
-        if (attempts >= maxAttempts) {
-          clearInterval(interval);
-          console.error('[Apple Tab] ❌ Button not found after', maxAttempts, 'attempts');
-        }
-      }, TIMEOUTS.APPLE_BUTTON_RETRY || 2000);
+        // Retry multiple times
+        let attempts = 0;
+        const interval = setInterval(function () {
+          attempts++;
+          if (findAndClickButton()) {
+            clearInterval(interval);
+            resolve({ success: true, buttonValue: btnValue });
+            return;
+          }
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            console.error('[Apple Tab] ❌ Button not found after', maxAttempts, 'attempts');
+            resolve({ success: false, error: 'Button not found after ' + maxAttempts + ' attempts' });
+          }
+        }, retryInterval);
+      });
     }
 
     try {
       // Inject the script into the tab
-      await chrome.scripting.executeScript({
+      const results = await chrome.scripting.executeScript({
         target: { tabId: tabId },
         func: clickButtonInAppleTab,
-        args: [buttonValue, searchType, maxRetries]
+        args: [buttonValue, searchType, maxRetries, 2000] // Pass retry interval as arg
       });
 
-      // Wait for click to happen
-      setTimeout(() => {
+      // Get result from injected function
+      const result = results && results[0] && results[0].result;
+
+      if (result && result.success) {
+        logger('info', 'AppleHandler', `✅ Button "${buttonValue}" clicked successfully`);
         sendResponse({ success: true });
-      }, 1000);
+      } else {
+        const error = result?.error || 'Unknown error during button click';
+        logger('error', 'AppleHandler', `❌ Failed to click button "${buttonValue}": ${error}`);
+        sendResponse({ success: false, error: error });
+      }
     } catch (error) {
+      logger('error', 'AppleHandler', `❌ Script injection failed: ${error.message}`);
       sendResponse({ success: false, error: error.message });
     }
   }
