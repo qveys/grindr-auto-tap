@@ -93,10 +93,13 @@ The extension uses Chrome Extension messaging API for inter-component communicat
 Modules are loaded via manifest.json and share global scope via `window.*`:
 
 **Utils** (`utils/`):
-- `constants.js`: All constants (DELAYS, TIMEOUTS, LIMITS, SELECTORS, etc.) → `window.Constants`
+- `shared-constants.js`: All constants (DELAYS, TIMEOUTS, LIMITS, SELECTORS, etc.) → `window.Constants`
+- `state-manager.js`: State management → `window.StateManager`
+- `messaging.js`: Chrome runtime messaging wrapper → `window.sendToBackground`
 - `logger.js`: Centralized logging → `window.Logger`, `window.logger`
 - `formatters.js`: Date and duration formatting → `window.Formatters`
 - `dom-helpers.js`: DOM utilities (delay, getTextNodes) → `window.DOMHelpers`
+- `async-helpers.js`: Async utilities → `window.AsyncHelpers`
 
 **Modules** (`modules/`):
 - `auth.js`: Authentication logic → `window.Auth`
@@ -164,7 +167,7 @@ All modules are loaded via `manifest.json` in dependency order. Modules share sc
 
 ### Constants and Configuration
 
-Constants are defined in `utils/constants.js`:
+Constants are defined in `shared-constants.js`:
 - `DELAYS`: Timing delays (50ms - 3000ms)
 - `TIMEOUTS`: Operation timeouts (10s - 15s)
 - `LIMITS`: Safety limits (max iterations, duration)
@@ -173,7 +176,7 @@ Constants are defined in `utils/constants.js`:
 - `DEFAULTS`: Default config values
 - `APPLE`: Apple login specific constants
 
-Constants are exported via `window.Constants` and also individually on `window.*` for convenience.
+Constants are exported via `window.Constants` and also individually on `window.*` for convenience. The file supports both service workers (background.js) and content scripts through conditional exports.
 
 ## Storage Schema
 

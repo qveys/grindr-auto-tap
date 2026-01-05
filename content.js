@@ -4,10 +4,13 @@
  */
 
 // Dependencies loaded via manifest.json in order:
-// - utils/constants.js (window.Constants)
+// - shared-constants.js (window.Constants)
+// - utils/state-manager.js (window.StateManager)
+// - utils/messaging.js (window.sendToBackground)
 // - utils/logger.js (window.Logger, window.logger)
 // - utils/formatters.js (window.Formatters)
 // - utils/dom-helpers.js (window.DOMHelpers)
+// - utils/async-helpers.js (window.AsyncHelpers)
 // - modules/auth.js (window.Auth)
 // - modules/profile-opener.js (window.ProfileOpener)
 // - modules/stats.js (window.Stats)
