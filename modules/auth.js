@@ -432,14 +432,27 @@
     logger('info', 'Auth', '🖱️ Clic sur le bouton Apple...');
 
     let popupWindow = null;
-    const originalOpen = window.open;
+    let originalOpen = null;
 
-    if (originalOpen) {
-      window.open = function (...args) {
-        popupWindow = originalOpen.apply(this, args);
-        logger('info', 'Auth', '🔍 Nouvelle fenêtre détectée via window.open');
-        return popupWindow;
-      };
+    // Try to override window.open to capture popup reference
+    // If it fails (read-only), we'll rely on background script detection
+    try {
+      originalOpen = window.open;
+      if (originalOpen) {
+        Object.defineProperty(window, 'open', {
+          value: function (...args) {
+            popupWindow = originalOpen.apply(this, args);
+            logger('info', 'Auth', '🔍 Nouvelle fenêtre détectée via window.open');
+            return popupWindow;
+          },
+          writable: true,
+          configurable: true
+        });
+      }
+    } catch (e) {
+      // window.open is read-only, background script will handle detection
+      logger('debug', 'Auth', '⚠️ window.open est en lecture seule, utilisation de la détection par background script');
+      originalOpen = null;
     }
 
     appleButton.click();
@@ -524,16 +537,34 @@
 
       await handleApplePopup(popupWindow);
 
+      // Restore original window.open if we overrode it
       if (originalOpen) {
-        window.open = originalOpen;
+        try {
+          Object.defineProperty(window, 'open', {
+            value: originalOpen,
+            writable: true,
+            configurable: true
+          });
+        } catch (e) {
+          // Ignore if we can't restore (was read-only anyway)
+        }
       }
 
       await completeAppleLogin();
       return { success: true };
 
     } catch (error) {
+      // Restore original window.open if we overrode it
       if (originalOpen) {
-        window.open = originalOpen;
+        try {
+          Object.defineProperty(window, 'open', {
+            value: originalOpen,
+            writable: true,
+            configurable: true
+          });
+        } catch (e) {
+          // Ignore if we can't restore (was read-only anyway)
+        }
       }
       logger('error', 'Auth', '❌ Erreur lors de la connexion Apple: ' + error.message);
       return { success: false, error: error.message };
