@@ -1,0 +1,19 @@
+{
+  "addons": {
+    "grindr-auto-tap@local": {
+      "updates": [
+        {
+          "version": "1.0.0",
+          "update_link": "https://github.com/qveys/grindr-auto-tap/releases/download/v1.0.0/grindr-auto-tap-1.0.0.xpi",
+          "update_hash": "sha256:c9648db794c20b17c53d56a7adeb4951169c3b04886b1531e866c78924497619"
+        },
+        {
+          "version": "1.0.1",
+          "update_link": "https://github.com/qveys/grindr-auto-tap/releases/download/v1.0.1/grindr-auto-tap-1.0.1.xpi",
+          "update_hash": "sha256:7864409971662c14eb5d594e6660ebcbbfa6dd5c8e5b4ddd82ae5b0851a37748"
+        }
+      ]
+    }
+  }
+}
+

@@ -18,6 +18,7 @@
   "background": {
     "scripts": [
       "shared-constants.js",
+      "utils/logger.js",
       "background.js"
     ]
   },
@@ -27,7 +28,8 @@
         "*://web.grindr.com/*"
       ],
       "js": [
-        "utils/constants.js",
+        "shared-constants.js",
+        "utils/state-manager.js",
         "utils/messaging.js",
         "utils/logger.js",
         "utils/formatters.js",
@@ -63,6 +65,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "grindr-auto-tap@local",
+      "update_url": "https://raw.githubusercontent.com/qveys/grindr-auto-tap/main/updates.json",
       "data_collection_permissions": {
         "required": [
           "personallyIdentifyingInfo",
