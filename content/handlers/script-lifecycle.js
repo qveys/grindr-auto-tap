@@ -14,6 +14,22 @@
   const { checkLoginStatus, performLogin } = window.Auth;
   const { openProfile } = window.ProfileOpener;
   const { autoTapAndNext } = window.AutoTap;
+  const { StateManager } = window;
+
+  /**
+   * Stop script with error state
+   * @param {string} reason - Reason for stopping
+   * @private
+   */
+  function stopWithError(reason) {
+    if (StateManager) {
+      StateManager.setState(StateManager.State.ERROR);
+    } else {
+      window.__grindrRunning = false;
+    }
+    notifyPopupScriptStatus(false);
+    logger('error', 'ContentScriptLifecycle', reason);
+  }
 
   /**
    * Get credentials from background script
@@ -47,23 +63,18 @@
 
   /**
    * Notify popup about script status change
+   * Broadcasts message to all extension pages (popup, options, etc.)
    * @param {boolean} isRunning - Whether script is running
    */
   function notifyPopupScriptStatus(isRunning) {
-    // Use centralized messaging utility if available
-    if (typeof window !== 'undefined' && window.sendToBackground) {
-      window.sendToBackground({
-        action: 'scriptStatusChanged',
-        isRunning: isRunning
-      });
-    } else {
-      chrome.runtime.sendMessage({
-        action: 'scriptStatusChanged',
-        isRunning: isRunning
-      }).catch(err => {
-        // Ignore errors if popup is not open
-      });
-    }
+    // Send directly to runtime (broadcasts to all extension pages)
+    // DO NOT use sendToBackground() - this is a broadcast message, not a background-specific request
+    chrome.runtime.sendMessage({
+      action: 'scriptStatusChanged',
+      isRunning: isRunning
+    }).catch(err => {
+      // Ignore errors if no extension pages are listening (e.g., popup closed)
+    });
   }
 
   /**
@@ -72,14 +83,26 @@
    * @returns {Promise<{success: boolean, error?: string}>}
    */
   async function initAndRun() {
-    if (window.__grindrRunning) {
+    // Check if already running using StateManager
+    if (StateManager && StateManager.isRunning()) {
       logger('warn', 'ContentScriptLifecycle', '⚠️ Le script est déjà en cours d\'exécution. Attendez la fin ou rechargez la page.');
       return { success: false, error: 'Script déjà en cours d\'exécution' };
     }
 
-    // Reset flags to allow restart even after manual stop
-    window.__grindrRunning = true;
-    window.__grindrStopped = false;
+    // Reset from ERROR or STOPPED state to IDLE first
+    if (StateManager) {
+      const currentState = StateManager.getState();
+      if (currentState === StateManager.State.ERROR || currentState === StateManager.State.STOPPED) {
+        logger('info', 'ContentScriptLifecycle', `🔄 Réinitialisation depuis ${currentState} vers IDLE`);
+        StateManager.setState(StateManager.State.IDLE);
+      }
+      // Now transition to STARTING
+      StateManager.setState(StateManager.State.STARTING);
+    } else {
+      // Fallback
+      window.__grindrRunning = true;
+      window.__grindrStopped = false;
+    }
 
     // Notify popup that script is starting
     notifyPopupScriptStatus(true);
@@ -99,10 +122,9 @@
           logger('info', 'ContentScriptLifecycle', `🔑 Méthode de connexion: ${loginMethod}`);
 
           if (loginMethod === 'email' && (!credentials.email || !credentials.password)) {
-            logger('warn', 'ContentScriptLifecycle', '⚠️ Email et mot de passe requis pour la connexion par email');
-            window.__grindrRunning = false;
-            notifyPopupScriptStatus(false);
-            return { success: false, error: 'Email et mot de passe requis pour la connexion par email' };
+            const error = 'Email et mot de passe requis pour la connexion par email';
+            stopWithError(`⚠️ ${error}`);
+            return { success: false, error };
           }
 
           logger('info', 'ContentScriptLifecycle', '🔐 Connexion en cours...');
@@ -112,19 +134,18 @@
           });
 
           if (!loginResult.success) {
-            logger('error', 'ContentScriptLifecycle', '❌ Échec de la connexion: ' + loginResult.error);
-            window.__grindrRunning = false;
-            notifyPopupScriptStatus(false);
-            return { success: false, error: 'Échec de la connexion: ' + loginResult.error };
+            const error = 'Échec de la connexion: ' + loginResult.error;
+            stopWithError(`❌ ${error}`);
+            return { success: false, error };
           }
 
           await delay(DELAYS.TWO_SECONDS);
         } else {
-          logger('warn', 'ContentScriptLifecycle', '⚠️ Aucune configuration trouvée ou connexion automatique désactivée');
+          const error = 'Aucune configuration trouvée ou connexion automatique désactivée';
+          logger('warn', 'ContentScriptLifecycle', `⚠️ ${error}`);
           logger('warn', 'ContentScriptLifecycle', '💡 Configurez votre méthode de connexion dans le popup de l\'extension');
-          window.__grindrRunning = false;
-          notifyPopupScriptStatus(false);
-          return { success: false, error: 'Aucune configuration trouvée ou connexion automatique désactivée' };
+          stopWithError(error);
+          return { success: false, error };
         }
       } else {
         logger('info', 'ContentScriptLifecycle', '✅ Déjà connecté');
@@ -132,19 +153,17 @@
 
       const stillLoggedIn = checkLoginStatus();
       if (!stillLoggedIn) {
-        logger('error', 'ContentScriptLifecycle', '❌ Échec de la connexion ou déconnexion détectée');
-        window.__grindrRunning = false;
-        notifyPopupScriptStatus(false);
-        return { success: false, error: 'Échec de la connexion ou déconnexion détectée' };
+        const error = 'Échec de la connexion ou déconnexion détectée';
+        stopWithError(`❌ ${error}`);
+        return { success: false, error };
       }
 
       const profileOpened = await openProfile();
 
       if (!profileOpened) {
-        logger('error', 'ContentScriptLifecycle', '❌ Le profil n\'a pas pu être ouvert. Le script ne sera pas exécuté.');
-        window.__grindrRunning = false;
-        notifyPopupScriptStatus(false);
-        return { success: false, error: 'Le profil n\'a pas pu être ouvert' };
+        const error = 'Le profil n\'a pas pu être ouvert';
+        stopWithError(`❌ ${error}. Le script ne sera pas exécuté.`);
+        return { success: false, error };
       }
 
       // Script will continue with autoTapAndNext in background
@@ -159,9 +178,7 @@
       return { success: true };
 
     } catch (error) {
-      logger('error', 'ContentScriptLifecycle', '❌ Erreur fatale: ' + error.message, error);
-      window.__grindrRunning = false;
-      notifyPopupScriptStatus(false);
+      stopWithError('❌ Erreur fatale: ' + error.message);
       return { success: false, error: error.message };
     }
   }
@@ -170,9 +187,14 @@
    * Stop the script
    */
   function stopScript() {
-    window.__grindrRunning = false;
-    window.__grindrStopped = true;
-    window.__grindrStats = null;
+    if (StateManager) {
+      StateManager.setState(StateManager.State.STOPPED);
+      StateManager.clearStats();
+    } else {
+      window.__grindrRunning = false;
+      window.__grindrStopped = true;
+      window.__grindrStats = null;
+    }
     logger('info', 'ContentScriptLifecycle', '⏹️ Script arrêté manuellement');
     notifyPopupScriptStatus(false);
   }

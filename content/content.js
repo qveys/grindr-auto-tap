@@ -58,10 +58,17 @@
    */
   function setupConsoleAPI() {
     const { initAndRun, stopScript } = window.ContentScriptLifecycle || {};
+    const { StateManager } = window;
 
     window.grindrAutoTap = {
       start: () => {
-        window.__grindrStopped = false;
+        // Reset stopped flag using StateManager
+        if (StateManager && StateManager.getState() === StateManager.State.STOPPED) {
+          StateManager.setState(StateManager.State.IDLE);
+        } else if (!StateManager) {
+          window.__grindrStopped = false;
+        }
+
         if (initAndRun) {
           initAndRun();
         } else {
@@ -71,6 +78,10 @@
       stop: () => {
         if (stopScript) {
           stopScript();
+        } else if (StateManager) {
+          StateManager.setState(StateManager.State.STOPPED);
+          StateManager.clearStats();
+          logger('info', 'Content', '⏹️ Script arrêté manuellement');
         } else {
           window.__grindrRunning = false;
           window.__grindrStopped = true;

@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Message Handler for Content Script
  * Handles Chrome runtime message listeners.
@@ -38,9 +39,16 @@
         if (stopScript) {
           stopScript();
         } else {
-          window.__grindrRunning = false;
-          window.__grindrStopped = true;
-          window.__grindrStats = null;
+          // Fallback using StateManager
+          const { StateManager } = window;
+          if (StateManager) {
+            StateManager.setState(StateManager.State.STOPPED);
+            StateManager.clearStats();
+          } else {
+            window.__grindrRunning = false;
+            window.__grindrStopped = true;
+            window.__grindrStats = null;
+          }
           logger('info', 'ContentMessageHandler', '⏹️ Script arrêté manuellement (fallback)');
         }
         sendResponse({ success: true });

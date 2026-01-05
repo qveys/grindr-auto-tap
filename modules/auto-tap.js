@@ -161,11 +161,22 @@
     };
     let stats = null;
 
-    window.__grindrStats = {
-      startTime: startTime,
-      alreadyTappedCount: 0,
-      tappedCount: 0
-    };
+    // Initialize stats using StateManager
+    const { StateManager } = window;
+    if (StateManager) {
+      StateManager.initializeStats({
+        startTime: startTime,
+        alreadyTappedCount: 0,
+        tappedCount: 0
+      });
+    } else {
+      // Fallback if StateManager not available
+      window.__grindrStats = {
+        startTime: startTime,
+        alreadyTappedCount: 0,
+        tappedCount: 0
+      };
+    }
 
     logger('info', 'Content', `🚀 Démarrage du script à ${formatDate(startTime)}`);
 
@@ -223,11 +234,18 @@
       await sendFinalStats(stats, true);
       throw error;
     } finally {
-      window.__grindrRunning = false;
-      if (window.__grindrStats) {
-        delete window.__grindrStats;
+      // Use StateManager for proper cleanup
+      const { StateManager } = window;
+      if (StateManager) {
+        StateManager.setState(StateManager.State.STOPPED);
+        StateManager.clearStats();
+        StateManager.setLastRunTime(Date.now());
+      } else {
+        // Fallback if StateManager not available
+        window.__grindrRunning = false;
+        window.__grindrStats = null; // Set to null instead of delete (non-configurable)
+        window.__grindrLastRun = Date.now();
       }
-      window.__grindrLastRun = Date.now();
 
       // Notifier le popup que le script s'est arrêté
       if (window.notifyPopupScriptStatus) {
@@ -241,4 +259,3 @@
     autoTapAndNext
   };
 })();
-
