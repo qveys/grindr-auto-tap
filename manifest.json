@@ -19,6 +19,11 @@
     "scripts": [
       "shared-constants.js",
       "utils/logger.js",
+      "background/handlers/log-handler.js",
+      "background/handlers/storage-handler.js",
+      "background/handlers/webhook-handler.js",
+      "background/handlers/apple-handler.js",
+      "background/handlers/tab-handler.js",
       "background.js"
     ]
   },
