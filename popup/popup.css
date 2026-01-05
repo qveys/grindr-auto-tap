@@ -640,3 +640,133 @@ body {
   color: var(--color-accent);
   flex-shrink: 0;
 }
+
+/* Logs */
+.log-entry {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  border-left: 3px solid transparent;
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+  transition: background-color var(--transition);
+}
+
+.log-entry:hover {
+  background-color: var(--color-bg);
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+/* Colorisation par niveau */
+.log-entry.log-info {
+  border-left-color: #3b82f6;
+}
+
+.log-entry.log-warn {
+  border-left-color: var(--color-warning);
+  background-color: rgba(245, 158, 11, 0.05);
+}
+
+.log-entry.log-error {
+  border-left-color: var(--color-error);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.log-entry.log-debug {
+  border-left-color: var(--color-text-muted);
+}
+
+.log-timestamp {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+  max-width: 70px;
+}
+
+.log-level {
+  flex-shrink: 0;
+  min-width: 50px;
+  font-weight: var(--font-weight-semibold);
+  font-size: 10px;
+}
+
+.log-level.info {
+  color: #3b82f6;
+}
+
+.log-level.warn {
+  color: var(--color-warning);
+}
+
+.log-level.error {
+  color: var(--color-error);
+}
+
+.log-level.debug {
+  color: var(--color-text-muted);
+}
+
+.log-location {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  flex-shrink: 0;
+  min-width: 80px;
+  font-size: 10px;
+}
+
+.log-message {
+  flex: 1;
+  word-break: break-word;
+  white-space: normal;
+  min-width: 100px;
+  font-size: 11px;
+}
+
+/* Colorisation du message selon le niveau */
+.log-entry.log-info .log-message {
+  color: #1e40af;
+}
+
+.log-entry.log-warn .log-message {
+  color: #92400e;
+}
+
+.log-entry.log-error .log-message {
+  color: #991b1b;
+}
+
+.log-entry.log-debug .log-message {
+  color: var(--color-text-primary);
+}
+
+.log-data {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+#logsContainer {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+#logsContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+#logsContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#logsContainer::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+#logsContainer::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
