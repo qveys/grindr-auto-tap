@@ -184,8 +184,8 @@ chrome.runtime.sendMessage(message)
 #### Solution
 
 ✅ **FAIT:** Retourner objets d'erreur structurés :
-```javascript
-{success: boolean, data?: any, error?: string, errorType?: string}
+```text
+{success: true, data: responseData, error: null, errorType: null}
 ```
 
 **Vérification:** `utils/messaging.js` retourne bien `{success, data, error, errorType}` pour tous les cas d'erreur.
