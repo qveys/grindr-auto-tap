@@ -7,17 +7,30 @@
   'use strict';
 
   /**
-   * Send message to background script with centralized error handling
+   * Send message to background script with structured error handling
    * @param {Object} message - Message object to send to background script
    * @param {string} message.action - Action type for the background script
-   * @returns {Promise<any>} Promise that resolves with the response from background
+   * @returns {Promise<{success: boolean, data?: any, error?: string, errorType?: string}>}
+   *   Structured response with success flag and error details
+   *
+   * @example
+   * const result = await sendToBackground({ action: 'getCredentials' });
+   * if (!result.success) {
+   *   console.error(`Failed: ${result.error} (${result.errorType})`);
+   *   return;
+   * }
+   * const credentials = result.data;
    */
   function sendToBackground(message) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       // Check if Chrome runtime is available
       if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
         console.warn('[Messaging] Chrome runtime not available');
-        resolve(null);
+        resolve({
+          success: false,
+          error: 'Chrome runtime not available',
+          errorType: 'NO_RUNTIME'
+        });
         return;
       }
 
@@ -27,15 +40,27 @@
           // Check for runtime errors
           if (chrome.runtime.lastError) {
             console.error(`[Messaging] Failed to send message (${message.action}):`, chrome.runtime.lastError.message);
-            resolve(null); // Fail silently
+            resolve({
+              success: false,
+              error: chrome.runtime.lastError.message,
+              errorType: 'RUNTIME_ERROR'
+            });
             return;
           }
 
-          resolve(response);
+          // Success - response may be null/undefined for some actions
+          resolve({
+            success: true,
+            data: response
+          });
         })
         .catch(err => {
           console.error(`[Messaging] Error sending message (${message.action}):`, err);
-          resolve(null); // Fail silently
+          resolve({
+            success: false,
+            error: err.message || String(err),
+            errorType: 'SEND_ERROR'
+          });
         });
     });
   }
@@ -63,20 +88,36 @@
    * Convenience wrapper for sendToN8N action
    * @param {Object} stats - Statistics object
    * @param {number} [retries=2] - Number of retries
-   * @returns {Promise<{success: boolean, error?: string}>} Promise with success status
+   * @returns {Promise<{success: boolean, data?: any, error?: string, errorType?: string}>}
+   *   Structured response with success status and error details
    */
   async function sendStatsToWebhook(stats, retries = 2) {
-    const response = await sendToBackground({
+    const result = await sendToBackground({
       action: 'sendToN8N',
       stats: stats,
       retries: retries
     });
 
-    if (!response) {
-      return { success: false, error: 'No response from background' };
+    // Result is already in structured format from sendToBackground
+    // If sendToBackground failed, return that error
+    if (!result.success) {
+      return result;
     }
 
-    return response;
+    // If background response indicates failure, return that
+    if (result.data && typeof result.data === 'object' && result.data.success === false) {
+      return {
+        success: false,
+        error: result.data.error || 'Webhook request failed',
+        errorType: 'WEBHOOK_ERROR'
+      };
+    }
+
+    // Success
+    return {
+      success: true,
+      data: result.data
+    };
   }
 
   // Export to global scope for content scripts

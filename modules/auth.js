@@ -289,20 +289,16 @@
         if (resolved) return;
 
         // Use centralized messaging utility if available
-        const sendMessage = (typeof window !== 'undefined' && window.sendToBackground)
-          ? window.sendToBackground
-          : (msg) => new Promise((res) => chrome.runtime.sendMessage(msg, res));
+        if (typeof window !== 'undefined' && window.sendToBackground) {
+          const result = await window.sendToBackground({ action: 'findAppleTab' });
 
-        const response = await sendMessage({
-          action: 'findAppleTab'
-        });
-
-        if (response && response.tabId && !resolved) {
-          logger('info', 'Auth', '✅ Onglet Apple trouvé via recherche: ' + response.tabId);
-          resolved = true;
-          clearInterval(checkInterval);
-          chrome.runtime.onMessage.removeListener(messageListener);
-          resolve(response.tabId);
+          if (result.success && result.data?.tabId && !resolved) {
+            logger('info', 'Auth', '✅ Onglet Apple trouvé via recherche: ' + result.data.tabId);
+            resolved = true;
+            clearInterval(checkInterval);
+            chrome.runtime.onMessage.removeListener(messageListener);
+            resolve(result.data.tabId);
+          }
         }
 
         if (popupWindowRef && !popupWindowRef.closed && !resolved) {
@@ -348,32 +344,47 @@
    */
   async function clickAppleButtonInTab(tabId, buttonValue, searchType = 'id', maxRetries = LIMITS.MAX_APPLE_BUTTON_RETRIES) {
     // Use centralized messaging utility if available
-    const sendMessage = (typeof window !== 'undefined' && window.sendToBackground)
-      ? window.sendToBackground
-      : (msg) => new Promise((res, rej) => {
-          chrome.runtime.sendMessage(msg, (response) => {
-            if (chrome.runtime.lastError) {
-              rej(new Error(chrome.runtime.lastError.message));
-            } else {
-              res(response);
-            }
-          });
-        });
+    if (typeof window !== 'undefined' && window.sendToBackground) {
+      const result = await window.sendToBackground({
+        action: 'clickButtonInAppleTab',
+        tabId: tabId,
+        buttonValue: buttonValue,
+        searchType: searchType,
+        maxRetries: maxRetries
+      });
 
-    const response = await sendMessage({
-      action: 'clickButtonInAppleTab',
-      tabId: tabId,
-      buttonValue: buttonValue,
-      searchType: searchType,
-      maxRetries: maxRetries
-    });
+      if (!result.success) {
+        throw new Error(result.error || 'Échec du clic sur le bouton');
+      }
 
-    if (response && response.success) {
-      logger('info', 'Auth', `✅ Bouton "${buttonValue}" cliqué dans l'onglet Apple`);
-      return true;
-    } else {
-      throw new Error(response?.error || 'Échec du clic sur le bouton');
+      // Check background response
+      if (result.data?.success) {
+        logger('info', 'Auth', `✅ Bouton "${buttonValue}" cliqué dans l'onglet Apple`);
+        return true;
+      } else {
+        throw new Error(result.data?.error || 'Échec du clic sur le bouton');
+      }
     }
+
+    // Fallback for direct chrome.runtime.sendMessage
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        action: 'clickButtonInAppleTab',
+        tabId: tabId,
+        buttonValue: buttonValue,
+        searchType: searchType,
+        maxRetries: maxRetries
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (response && response.success) {
+          logger('info', 'Auth', `✅ Bouton "${buttonValue}" cliqué dans l'onglet Apple`);
+          resolve(true);
+        } else {
+          reject(new Error(response?.error || 'Échec du clic sur le bouton'));
+        }
+      });
+    });
   }
 
   /**

@@ -30,24 +30,32 @@
 
   /**
    * Get credentials from background script
-   * @returns {Promise<Object|null>} Credentials object or null
+   * @returns {Promise<Object|null>} Credentials object or null on error
    */
   async function getCredentialsFromBackground() {
-    // Use centralized messaging utility if available
-    const sendMessage = (typeof window !== 'undefined' && window.sendToBackground)
-      ? window.sendToBackground
-      : (msg) => new Promise((res) => {
-          chrome.runtime.sendMessage(msg, (response) => {
-            if (chrome.runtime.lastError) {
-              logger('error', 'Content', 'Erreur récupération identifiants: ' + chrome.runtime.lastError.message);
-              res(null);
-            } else {
-              res(response);
-            }
-          });
-        });
+    // Use centralized messaging utility
+    if (typeof window !== 'undefined' && window.sendToBackground) {
+      const result = await window.sendToBackground({ action: 'getCredentials' });
 
-    return await sendMessage({ action: 'getCredentials' });
+      if (!result.success) {
+        logger('error', 'Content', `Failed to get credentials: ${result.error} (${result.errorType})`);
+        return null;
+      }
+
+      return result.data;
+    }
+
+    // Fallback for direct chrome.runtime.sendMessage
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'getCredentials' }, (response) => {
+        if (chrome.runtime.lastError) {
+          logger('error', 'Content', 'Erreur récupération identifiants: ' + chrome.runtime.lastError.message);
+          resolve(null);
+        } else {
+          resolve(response);
+        }
+      });
+    });
   }
 
   /**

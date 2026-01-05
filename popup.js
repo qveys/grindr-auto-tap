@@ -325,7 +325,7 @@ function saveCredentials() {
     password: password,
     autoLogin: autoLogin
   }).then((response) => {
-    if (response && response.success) {
+    if (response.success) {
       showStatus('✅ Configuration sauvegardée', 'success');
       logger('info', 'Popup', `✅ Configuration d'authentification sauvegardée (méthode: ${loginMethod}, auto-login: ${autoLogin})`);
       // Sortir du mode édition
@@ -335,7 +335,7 @@ function saveCredentials() {
       loadAuthDisplay();
     } else {
       showStatus('❌ Erreur lors de la sauvegarde', 'error');
-      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde des identifiants');
+      logger('error', 'Popup', `❌ Erreur lors de la sauvegarde: ${response.error}`);
     }
   });
 }
@@ -373,7 +373,7 @@ function showConfirm(message, onConfirm) {
 function deleteCredentials() {
   showConfirm('Êtes-vous sûr de vouloir supprimer la configuration ?', () => {
     sendToBackground({ action: 'deleteCredentials' }).then((response) => {
-      if (response && response.success) {
+      if (response.success) {
         showStatus('✅ Configuration supprimée', 'success');
         logger('info', 'Popup', '✅ Configuration d\'authentification supprimée');
         loginMethodSelect.value = 'email';
@@ -384,7 +384,7 @@ function deleteCredentials() {
         loadAuthDisplay();
       } else {
         showStatus('❌ Erreur lors de la suppression', 'error');
-        logger('error', 'Popup', '❌ Erreur lors de la suppression des identifiants');
+        logger('error', 'Popup', `❌ Erreur: ${response.error}`);
       }
     });
   });
@@ -410,7 +410,7 @@ function saveWebhook() {
     action: 'saveWebhookURL',
     url: url
   }).then((response) => {
-    if (response && response.success) {
+    if (response.success) {
       showStatus('✅ URL sauvegardée', 'success');
       logger('info', 'Popup', `✅ URL webhook n8n mise à jour: ${url}`);
       // Sortir du mode édition
@@ -420,7 +420,7 @@ function saveWebhook() {
       loadWebhookDisplay();
     } else {
       showStatus('❌ Erreur lors de la sauvegarde', 'error');
-      logger('error', 'Popup', '❌ Erreur lors de la sauvegarde de l\'URL webhook');
+      logger('error', 'Popup', `❌ Erreur: ${response.error}`);
     }
   });
 }
@@ -656,12 +656,13 @@ function formatTimestamp(timestamp) {
 // Charger et afficher les logs
 function loadLogs() {
   sendToBackground({ action: 'getLogs' }).then((response) => {
-    if (!response) {
+    if (!response.success) {
       logsContainer.innerHTML = '<div style="color: var(--color-error); padding: var(--spacing-md); text-align: center;">Erreur lors du chargement des logs</div>';
+      logger('error', 'Popup', `Failed to load logs: ${response.error}`);
       return;
     }
 
-    const logs = response.logs || [];
+    const logs = response.data?.logs || [];
 
     if (logs.length === 0) {
       logsContainer.innerHTML = '<div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">Aucun log disponible</div>';
@@ -761,7 +762,7 @@ function clearLogs() {
     logsContainer.innerHTML = '<div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">Suppression en cours...</div>';
 
     sendToBackground({ action: 'clearLogs' }).then((response) => {
-      if (response && response.success) {
+      if (response.success) {
         showStatus('✅ Logs effacés', 'success');
         // Afficher immédiatement le message "Aucun log disponible"
         logsContainer.innerHTML = '<div style="color: var(--color-text-muted); text-align: center; padding: var(--spacing-md);">Aucun log disponible</div>';
@@ -771,7 +772,7 @@ function clearLogs() {
         }, 50);
       } else {
         showStatus('❌ Erreur lors de l\'effacement', 'error');
-        logger('error', 'Popup', '❌ Erreur lors de l\'effacement des logs');
+        logger('error', 'Popup', `❌ Erreur: ${response.error}`);
         // Recharger les logs en cas d'erreur
         loadLogs();
       }
