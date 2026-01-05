@@ -36,11 +36,7 @@
       return true;
     }
 
-    if (window.location.pathname.includes('/login') || window.location.pathname.includes('/signin')) {
-      return false;
-    }
-
-    return true;
+    return !(window.location.pathname.includes('/login') || window.location.pathname.includes('/signin'));
   }
 
   /**
@@ -162,7 +158,7 @@
       const title = btn.getAttribute('title')?.toLowerCase() || '';
       const text = btn.textContent.toLowerCase();
       const providerLower = provider.toLowerCase();
-      
+
       return title.includes(providerLower) ||
         text.includes(providerLower) ||
         text.includes(`log in with ${providerLower}`);
@@ -191,7 +187,9 @@
       logger('info', 'Auth', '📧 Connexion par email...');
 
       if (!email || !password) {
-        throw new Error('Email et mot de passe requis pour la connexion par email');
+        const error = 'Email and password are required'
+        logger('error', 'Auth', error);
+        return { success: false, error: error };
       }
 
       await fillLoginForm(email, password);
@@ -221,7 +219,9 @@
 
       const facebookButton = findSocialLoginButton('facebook', SELECTORS.AUTH.FACEBOOK_BUTTON);
       if (!facebookButton) {
-        throw new Error('Bouton "Log In With Facebook" introuvable');
+        const errorMessage = 'Bouton "Log In With Facebook" introuvable';
+        logger('error', 'Auth', '❌ ' + errorMessage);
+        return { success: false, error: errorMessage };
       }
 
       logger('info', 'Auth', '🖱️ Clic sur le bouton Facebook...');
@@ -232,8 +232,9 @@
       return { success: false, error: 'Gestion du popup Facebook non encore implémentée' };
 
     } catch (error) {
-      logger('error', 'Auth', '❌ Erreur lors de la connexion Facebook: ' + error.message);
-      return { success: false, error: error.message };
+      const errorMessage = 'Erreur lors de la connexion Facebook: ' + error.message;
+      logger('error', 'Auth', '❌ ' + errorMessage);
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -247,7 +248,9 @@
 
       const googleButton = findSocialLoginButton('google', SELECTORS.AUTH.GOOGLE_BUTTON);
       if (!googleButton) {
-        throw new Error('Bouton "Log In With Google" introuvable');
+        const errorMsg = 'Bouton "Log In With Google" introuvable';
+        logger('error', 'Auth', errorMsg);
+        return { success: false, error: errorMsg };
       }
 
       logger('info', 'Auth', '🖱️ Clic sur le bouton Google...');
@@ -258,8 +261,9 @@
       return { success: false, error: 'Gestion du popup Google non encore implémentée' };
 
     } catch (error) {
-      logger('error', 'Auth', '❌ Erreur lors de la connexion Google: ' + error.message);
-      return { success: false, error: error.message };
+      const errorMsg = `Erreur lors de la connexion Google: ${error.message}`;
+      logger('error', 'Auth', errorMsg);
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -273,7 +277,7 @@
     return new Promise((resolve, reject) => {
       let resolved = false;
 
-      const messageListener = (request, sender, sendResponse) => {
+      const messageListener = (request) => {
         if (request.action === 'applePopupDetected' && !resolved) {
           logger('info', 'Auth', '✅ Onglet Apple détecté par le background script: ' + request.appleTabId);
           resolved = true;
@@ -554,18 +558,7 @@
       return { success: true };
 
     } catch (error) {
-      // Restore original window.open if we overrode it
-      if (originalOpen) {
-        try {
-          Object.defineProperty(window, 'open', {
-            value: originalOpen,
-            writable: true,
-            configurable: true
-          });
-        } catch (e) {
-          // Ignore if we can't restore (was read-only anyway)
-        }
-      }
+      // Restore original window.open if we overrode i
       logger('error', 'Auth', '❌ Erreur lors de la connexion Apple: ' + error.message);
       return { success: false, error: error.message };
     }
@@ -614,7 +607,9 @@
         case 'apple':
           return await performAppleLogin();
         default:
-          throw new Error(`Méthode de connexion inconnue: ${loginMethod}`);
+          const errorMessage = `Méthode de connexion inconnue: ${loginMethod}`;
+          logger('error', 'Auth', `❌ ${errorMessage}`);
+          return { success: false, error: errorMessage };
       }
     } catch (error) {
       logger('error', 'Auth', '❌ Erreur lors de la connexion: ' + error.message);
