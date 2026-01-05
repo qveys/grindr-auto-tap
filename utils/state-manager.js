@@ -94,10 +94,11 @@
 
   /**
    * Check if script is running
-   * @returns {boolean} True if script is running
+   * Returns true for both STARTING and RUNNING states (script is active)
+   * @returns {boolean} True if script is running or starting
    */
   function isRunning() {
-    return currentState === State.RUNNING;
+    return currentState === State.STARTING || currentState === State.RUNNING;
   }
 
   /**
@@ -372,6 +373,7 @@
     set: (value) => {
       console.warn('DEPRECATED: Use StateManager.setState() instead of window.__grindrRunning');
       if (value && canStart()) {
+        // Properly transition through STARTING first, then to RUNNING
         setState(State.STARTING);
         setState(State.RUNNING);
       } else if (!value && isRunning()) {
