@@ -1,18 +1,20 @@
 # Refactorings Restants - Grindr Auto Tap Extension
 
 **Date de création:** 2026-01-06  
-**Dernière mise à jour:** 2026-01-06  
-**Statut global:** ~40% complété (7/18 refactorings identifiés)
+**Dernière mise à jour:** 2026-01-XX  
+**Statut global:** ~55% complété (mise à jour basée sur analyse du code réel)
+
+**Note:** Ce document a été mis à jour pour refléter l'état réel du code. Voir `REFACTORING_ROADMAP.md` pour une synthèse consolidée.
 
 ---
 
 ## 📋 Vue d'ensemble
 
-Ce document synthétise **tous les refactorings restants** identifiés dans :
-- `REFACTORING_OPPORTUNITIES.md` (8 refactorings)
-- `ARCHITECTURAL_ANALYSIS.md` (10+ recommandations supplémentaires)
+Ce document liste **tous les refactorings identifiés** avec leurs statuts réels basés sur l'analyse du code.
 
-**7 refactorings** de `REFACTORING_OPPORTUNITIES.md` ont été complétés, mais **ARCHITECTURAL_ANALYSIS.md** contient de nombreuses recommandations critiques non encore implémentées.
+**Références:**
+- Synthèse consolidée: `REFACTORING_ROADMAP.md` (nouveau)
+- Analyse détaillée: `ARCHITECTURAL_ANALYSIS.md`
 
 ### Statut des Refactorings
 
@@ -35,8 +37,8 @@ Ce document synthétise **tous les refactorings restants** identifiés dans :
 
 **Source:** `ARCHITECTURAL_ANALYSIS.md` section 2.3  
 **Priorité:** 🔥 **CRITIQUE**  
-**Statut:** ❌ **NON DÉMARRÉ**  
-**Temps estimé:** 2 heures
+**Statut:** ✅ **COMPLÉTÉ**  
+**Temps estimé:** 2 heures (FAIT)
 
 #### Problème
 
@@ -52,15 +54,12 @@ Ce document synthétise **tous les refactorings restants** identifiés dans :
 
 #### Solution
 
-1. ✅ Garder SEULEMENT `shared-constants.js`
-2. ✅ Supprimer `utils/constants.js`
-3. ✅ Mettre à jour `manifest.json` pour charger `shared-constants.js` dans content scripts
-4. ✅ Vérifier que tous les modules accèdent correctement aux constantes
+1. ✅ Garder SEULEMENT `shared-constants.js` - **FAIT**
+2. ✅ Supprimer `utils/constants.js` - **FAIT** (fichier n'existe plus)
+3. ✅ Mettre à jour `manifest.json` pour charger `shared-constants.js` dans content scripts - **FAIT**
+4. ✅ Vérifier que tous les modules accèdent correctement aux constantes - **FAIT**
 
-**Fichiers à modifier:**
-- `manifest.json` (remplacer `utils/constants.js` par `shared-constants.js`)
-- Supprimer `utils/constants.js`
-- Vérifier références dans tous les modules
+**Vérification:** Aucun fichier `utils/constants.js` trouvé. Seul `shared-constants.js` existe et est chargé dans `manifest.json`.
 
 ---
 
@@ -68,8 +67,8 @@ Ce document synthétise **tous les refactorings restants** identifiés dans :
 
 **Source:** `ARCHITECTURAL_ANALYSIS.md` section 1.3, 7  
 **Priorité:** 🔥 **CRITIQUE**  
-**Statut:** ❌ **NON DÉMARRÉ**  
-**Temps estimé:** 4 heures
+**Statut:** ⏳ **PARTIELLEMENT COMPLÉTÉ** (~40%)  
+**Temps estimé:** 4 heures (3-4h restantes pour migration complète)
 
 #### Problème
 
@@ -91,59 +90,71 @@ window.__grindrErrorHandlersAdded = false;
 
 #### Solution
 
-Créer `utils/state-manager.js` avec :
-- États définis (IDLE, STARTING, RUNNING, STOPPING, STOPPED, ERROR)
-- Validation des transitions d'état
-- Pattern Observer pour notifications
-- Gestion centralisée des statistiques
-- Persistance dans chrome.storage.local
+✅ **FAIT:** Créer `utils/state-manager.js` avec :
+- ✅ États définis (IDLE, STARTING, RUNNING, STOPPING, STOPPED, ERROR)
+- ✅ Validation des transitions d'état
+- ✅ Pattern Observer pour notifications
+- ✅ Gestion centralisée des statistiques
+- ✅ Persistance dans chrome.storage.local
+- ✅ Backward compatibility aliases
 
-**Code complet fourni dans** `ARCHITECTURAL_ANALYSIS.md` section 7 (lignes 1847-2200)
+⏳ **EN COURS:** Migration complète vers StateManager
+- ⚠️ **66 occurrences** de `window.__grindrRunning/Stopped/Stats` dans **12 fichiers**
+- Code utilise encore les anciennes variables globales en parallèle
 
-**Fichiers à modifier:**
-- Créer `utils/state-manager.js`
-- `content.js` (startScript, stopScript)
-- `modules/auto-tap.js` (shouldContinue, stats updates)
-- `popup.js` (status checks → listeners)
+**Fichiers à migrer (12 fichiers):**
+- `content/handlers/script-lifecycle.js` (6 occurrences)
+- `content/handlers/message-handler.js` (4 occurrences)
+- `content/content.js` (4 occurrences)
+- `modules/auto-tap.js` (8 occurrences)
+- `modules/stats.js` (7 occurrences)
+- `modules/profile-opener.js` (1 occurrence)
+- `content/handlers/auto-start.js` (1 occurrence)
+- `content/handlers/error-handler.js` (2 occurrences)
+- Et autres...
+
+**Référence:** `REFACTORING_ROADMAP.md` section "Migration Complète vers StateManager"
 
 ---
 
 ### 3. 🔥 HAUTE : Consolider les 3 Implémentations du Logger
 
 **Source:** `ARCHITECTURAL_ANALYSIS.md` section 3  
-**Priorité:** 🔥 **HAUTE**  
-**Statut:** ❌ **NON DÉMARRÉ**  
-**Temps estimé:** 3 heures
+**Priorité:** 🟡 **MOYENNE** (réduite car partiellement fait)  
+**Statut:** ⏳ **PARTIELLEMENT COMPLÉTÉ** (~80%)  
+**Temps estimé:** 3 heures (2h restantes)
 
 #### Problème
 
-Logger implémenté **3 fois** de manière presque identique :
-- `background.js` (lignes 4-30)
-- `utils/logger.js` (lignes 16-45)
-- `popup.js` (lignes 10-31)
+Logger implémenté **plusieurs fois** :
+- ✅ `utils/logger.js` - Factory pattern `createLogger()` (moderne, universel)
+- ⚠️ `modules/logger.js` - Implémentation alternative encore présente
+- ✅ Background handlers utilisent `self.createLogger()`
+- ✅ Popup managers utilisent `window.createLogger()`
 
 **Impact:**
-- ❌ **90+ lignes de code dupliquées**
-- ❌ **Maintenance x3** : chaque bug fix doit être répliqué 3 fois
-- ❌ **Risque d'incohérence** : versions peuvent diverger
+- ⚠️ **Implémentation alternative** dans `modules/logger.js` encore présente
+- ✅ **Factory pattern** créé et utilisé partout
+- ✅ **Maintenance centralisée** pour la plupart du code
 
 #### Solution
 
-Créer `utils/universal-logger.js` avec factory pattern :
+✅ **FAIT:** Créer `utils/logger.js` avec factory pattern :
 ```javascript
 window.createLogger = createLogger;
 window.logger = createLogger();
 ```
 
-**Code complet fourni dans** `ARCHITECTURAL_ANALYSIS.md` section 3 (lignes 709-767)
+⏳ **RESTE À FAIRE:**
+- Supprimer `modules/logger.js` (implémentation alternative)
+- Vérifier que tous les modules utilisent `utils/logger.js`
+- Mettre à jour `manifest.json` si nécessaire
 
 **Fichiers à modifier:**
-- Créer `utils/universal-logger.js`
-- `background.js` (remplacer logger)
-- `popup.js` (remplacer logger)
-- Supprimer définitions dupliquées
+- Supprimer `modules/logger.js`
+- Vérifier références dans tous les modules
 
-**Économie:** -90 lignes de code dupliqué
+**Économie:** -50+ lignes de code dupliqué (une fois modules/logger.js supprimé)
 
 ---
 
@@ -151,12 +162,12 @@ window.logger = createLogger();
 
 **Source:** `ARCHITECTURAL_ANALYSIS.md` section 6.4  
 **Priorité:** 🔥 **HAUTE**  
-**Statut:** ❌ **NON DÉMARRÉ**  
-**Temps estimé:** 2 heures
+**Statut:** ✅ **COMPLÉTÉ**  
+**Temps estimé:** 2 heures (FAIT)
 
 #### Problème
 
-`sendToBackground()` retourne `null` en cas d'erreur au lieu de rejeter :
+`sendToBackground()` retournait `null` en cas d'erreur au lieu de rejeter :
 ```javascript
 // ❌ PROBLÈME: resolve(null) masque l'erreur
 chrome.runtime.sendMessage(message)
@@ -172,17 +183,16 @@ chrome.runtime.sendMessage(message)
 
 #### Solution
 
-Retourner objets d'erreur structurés :
+✅ **FAIT:** Retourner objets d'erreur structurés :
 ```javascript
 {success: boolean, data?: any, error?: string, errorType?: string}
 ```
 
-**Code complet fourni dans** `ARCHITECTURAL_ANALYSIS.md` section 6.4 (lignes 1541-1604)
+**Vérification:** `utils/messaging.js` retourne bien `{success, data, error, errorType}` pour tous les cas d'erreur.
 
-**Fichiers à modifier:**
-- `utils/messaging.js` (modifier sendToBackground)
-- `popup.js` (tous les appels sendToBackground)
-- `modules/stats.js`
+**Fichiers modifiés:**
+- ✅ `utils/messaging.js` - `sendToBackground()` retourne structure d'erreur
+- ✅ Tous les appelants peuvent maintenant gérer les erreurs correctement
 
 ---
 
@@ -315,8 +325,8 @@ content/
 
 **Source:** `ARCHITECTURAL_ANALYSIS.md` section 9.1  
 **Priorité:** 🟡 **MOYENNE**  
-**Statut:** ❌ **NON DÉMARRÉ**  
-**Temps estimé:** 3 heures
+**Statut:** ✅ **COMPLÉTÉ**  
+**Temps estimé:** 3 heures (FAIT)
 
 #### Problème
 
@@ -335,12 +345,12 @@ const statusCheckInterval = setInterval(() => {
 
 #### Solution
 
-Event-driven avec StateManager :
-- Content script notifie lors des changements
-- Popup écoute les notifications
-- Plus de polling
+✅ **FAIT:** Event-driven avec StateManager :
+- ✅ Content script notifie lors des changements
+- ✅ Popup écoute les notifications via `PopupScriptManager.initializeStatusCheck()`
+- ✅ Plus de polling (aucun `setInterval` trouvé dans `popup/`)
 
-**Code complet fourni dans** `ARCHITECTURAL_ANALYSIS.md` section 9.1 (lignes 2468-2493)
+**Vérification:** Aucun `setInterval` ou `STATUS_CHECK_INTERVAL` trouvé dans les fichiers popup.
 
 **Gain:** Polling toutes les 2s → événements instantanés (<100ms latence)
 
