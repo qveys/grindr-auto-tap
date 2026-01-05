@@ -17,11 +17,8 @@ if (typeof createEditModeManagers === 'function') {
   editModeManagers = createEditModeManagers();
 }
 
-// Use centralized logger from utils/logger.js
-const logger = window.logger || function(level, location, message, data = null) {
-  // Fallback logger if centralized logger not loaded
-  console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : level === 'debug' ? 'debug' : 'log'](`[${location}] ${message}`, data || '');
-};
+// Use universal logger from utils/logger.js
+const logger = window.createLogger ? window.createLogger('Popup') : window.logger;
 
 // Éléments DOM
 const loginMethodSelect = document.getElementById('loginMethod');

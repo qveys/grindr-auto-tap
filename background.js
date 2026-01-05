@@ -1,42 +1,7 @@
 // Background script pour gérer les onglets, les requêtes n8n et le storage
 
-/**
- * Logger function for the background script
- * Logs to console and stores directly in chrome.storage.local.
- * Unlike content script logger, this stores directly instead of sending a message.
- *
- * @param {string} level - Log level: 'info', 'warn', 'error', 'debug'
- * @param {string} location - Location/module name (defaults to 'Background')
- * @param {string} message - Log message
- * @param {*} [data=null] - Optional data to log
- */
-function logger(level, location, message, data = null) {
-  const logEntry = {
-    timestamp: Date.now(),
-    level: level,
-    location: location || 'Background',
-    message: message,
-    data: data
-  };
-
-  // Log to console as well
-  const consoleMethod = level === 'error' ? console.error :
-    level === 'warn' ? console.warn :
-      level === 'debug' ? console.debug :
-        console.log;
-  consoleMethod(`[${location}] ${message}`, data || '');
-
-  // Store directly in chrome.storage.local
-  chrome.storage.local.get(['extensionLogs'], (result) => {
-    const logs = result.extensionLogs || [];
-    logs.push(logEntry);
-    // Garder seulement les derniers logs (limite définie dans shared-constants.js)
-    if (logs.length > LOGGING.MAX_LOGS) {
-      logs.shift();
-    }
-    chrome.storage.local.set({ extensionLogs: logs });
-  });
-}
+// Use universal logger from utils/logger.js (loaded via manifest.json)
+const logger = self.createLogger('Background');
 
 // Détecter les onglets web.grindr.com et injecter automatiquement
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
