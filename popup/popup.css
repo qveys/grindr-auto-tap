@@ -683,7 +683,7 @@ body {
   color: var(--color-text-muted);
   font-size: 10px;
   flex-shrink: 0;
-  max-width: 70px;
+  max-width: 50px;
 }
 
 .log-level {
@@ -713,7 +713,7 @@ body {
   color: var(--color-text-secondary);
   font-weight: var(--font-weight-medium);
   flex-shrink: 0;
-  min-width: 80px;
+  min-width: 111px;
   font-size: 10px;
 }
 
