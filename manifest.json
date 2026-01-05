@@ -44,6 +44,10 @@
         "modules/profile-opener.js",
         "modules/stats.js",
         "modules/auto-tap.js",
+        "content/handlers/script-lifecycle.js",
+        "content/handlers/message-handler.js",
+        "content/handlers/error-handler.js",
+        "content/handlers/auto-start.js",
         "content.js"
       ],
       "run_at": "document_idle"
