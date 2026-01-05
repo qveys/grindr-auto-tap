@@ -24,7 +24,7 @@
       "background/handlers/webhook-handler.js",
       "background/handlers/apple-handler.js",
       "background/handlers/tab-handler.js",
-      "background.js"
+      "background/background.js"
     ]
   },
   "content_scripts": [

@@ -31,7 +31,7 @@ Since this is a Firefox extension with no build process, development is done dir
 
 ### Extension Components (Manifest V3)
 
-**Background Script** (`background.js`):
+**Background Script** (`background/background.js`):
 - Service worker that orchestrates background handlers
 - Handlers loaded via manifest.json in dependency order:
     - **Handlers**: log-handler, storage-handler, webhook-handler, apple-handler, tab-handler
@@ -201,7 +201,7 @@ Constants are defined in `shared-constants.js`:
 - `DEFAULTS`: Default config values
 - `APPLE`: Apple login specific constants
 
-Constants are exported via `window.Constants` and also individually on `window.*` for convenience. The file supports both service workers (background.js) and content scripts through conditional exports.
+Constants are exported via `window.Constants` and also individually on `window.*` for convenience. The file supports both service workers (background/background.js) and content scripts through conditional exports.
 
 ## Storage Schema
 
