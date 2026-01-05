@@ -116,7 +116,10 @@
    * Clear all logs
    */
   async function clearLogs() {
-    if (!showConfirm || !sendToBackground) return;
+    if (!showConfirm || !sendToBackground) {
+      logger && logger('error', 'PopupLogManager', 'showConfirm or sendToBackground not available');
+      return;
+    }
 
     showConfirm('Êtes-vous sûr de vouloir effacer tous les logs ?', async () => {
       const logsContainer = document.getElementById('logsContainer');
@@ -143,10 +146,59 @@
     });
   }
 
+  /**
+   * Download logs as NDJSON file
+   */
+  async function downloadLogs() {
+    if (!sendToBackground) {
+      logger && logger('error', 'PopupLogManager', 'sendToBackground not available');
+      return;
+    }
+
+    const response = await sendToBackground({ action: 'getLogs' });
+
+    if (!response.success) {
+      showStatus && showStatus('❌ Erreur lors du chargement des logs', 'error');
+      logger && logger('error', 'PopupLogManager', `Failed to load logs: ${response.error}`);
+      return;
+    }
+
+    const logs = response.data?.logs || [];
+
+    if (logs.length === 0) {
+      showStatus && showStatus('ℹ️ Aucun log à télécharger', 'info');
+      return;
+    }
+
+    try {
+      // Convert to NDJSON format
+      const ndjson = logs.map(log => JSON.stringify(log)).join('\n');
+
+      // Create blob and download
+      const blob = new Blob([ndjson], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      a.download = `grindr-auto-tap-logs-${timestamp}.ndjson`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showStatus && showStatus(`✅ ${logs.length} logs téléchargés`, 'success');
+      logger && logger('info', 'PopupLogManager', `Downloaded ${logs.length} logs`);
+    } catch (error) {
+      showStatus && showStatus('❌ Erreur lors du téléchargement', 'error');
+      logger && logger('error', 'PopupLogManager', `Download error: ${error.message}`);
+    }
+  }
+
   // Export to global scope
   window.PopupLogManager = {
     loadLogs,
     clearLogs,
+    downloadLogs,
     scrollLogsToBottom
   };
 })();

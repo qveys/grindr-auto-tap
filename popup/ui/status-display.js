@@ -33,31 +33,31 @@
    * @param {Function} onConfirm - Callback when confirmed
    */
   function showConfirm(message, onConfirm) {
-    const overlay = document.getElementById('confirmOverlay');
+    const overlay = document.getElementById('confirmModal');
     const messageEl = document.getElementById('confirmMessage');
-    const yesBtn = document.getElementById('confirmYes');
-    const noBtn = document.getElementById('confirmNo');
+    const okBtn = document.getElementById('confirmOk');
+    const cancelBtn = document.getElementById('confirmCancel');
 
-    if (!overlay || !messageEl) return;
+    if (!overlay || !messageEl || !okBtn || !cancelBtn) return;
 
     messageEl.textContent = message;
-    overlay.style.display = 'flex';
+    overlay.classList.add('show');
 
-    const handleYes = () => {
-      overlay.style.display = 'none';
-      yesBtn.removeEventListener('click', handleYes);
-      noBtn.removeEventListener('click', handleNo);
+    const handleOk = () => {
+      overlay.classList.remove('show');
+      okBtn.removeEventListener('click', handleOk);
+      cancelBtn.removeEventListener('click', handleCancel);
       onConfirm();
     };
 
-    const handleNo = () => {
-      overlay.style.display = 'none';
-      yesBtn.removeEventListener('click', handleYes);
-      noBtn.removeEventListener('click', handleNo);
+    const handleCancel = () => {
+      overlay.classList.remove('show');
+      okBtn.removeEventListener('click', handleOk);
+      cancelBtn.removeEventListener('click', handleCancel);
     };
 
-    yesBtn.addEventListener('click', handleYes);
-    noBtn.addEventListener('click', handleNo);
+    okBtn.addEventListener('click', handleOk);
+    cancelBtn.addEventListener('click', handleCancel);
   }
 
   /**

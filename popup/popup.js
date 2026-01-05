@@ -112,10 +112,15 @@
       deleteCredentialsBtn.addEventListener('click', () => PopupStorageManager.deleteCredentials());
     }
 
-    // Clear logs button
+    // Logs buttons
     const clearLogsBtn = document.getElementById('clearLogs');
     if (clearLogsBtn) {
       clearLogsBtn.addEventListener('click', () => PopupLogManager.clearLogs());
+    }
+
+    const downloadLogsBtn = document.getElementById('downloadLogs');
+    if (downloadLogsBtn) {
+      downloadLogsBtn.addEventListener('click', () => PopupLogManager.downloadLogs());
     }
 
     // Login method change
