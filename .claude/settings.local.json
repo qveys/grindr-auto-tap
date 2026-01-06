@@ -10,7 +10,9 @@
       "Bash(GIT_SEQUENCE_EDITOR=\"sed -i ''s/^pick/reword/''\" git rebase -i HEAD~9)",
       "Bash(git rebase:*)",
       "Bash(git filter-branch:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(dir:*)",
+      "Bash(mkdir:*)"
     ]
   }
 }
