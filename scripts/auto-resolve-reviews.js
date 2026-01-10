@@ -159,14 +159,10 @@ async function getCommitsWithDiffs() {
 }
 
 // Get diff for a specific file in a commit
+// Get diff for a specific file in a commit
 async function getFileDiff(commit, filename) {
-  const response = await octokit.rest.repos.getCommit({
-    owner,
-    repo,
-    ref: commit.sha,
-  });
-
-  const file = response.files?.find(f => f.filename === filename);
+  // Use the diff information already attached to the commit object by getCommitsWithDiffs
+  const file = commit.files?.find(f => f.filename === filename);
   return file?.patch || '';
 }
 
