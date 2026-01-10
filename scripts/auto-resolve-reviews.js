@@ -304,6 +304,9 @@ async function main() {
   console.log(`🔍 Analyzing PR #${prNumber}...\n`);
 
   const cache = loadCache();
+  const cachedCount = Object.keys(cache.batchResolutions || {}).length;
+  console.log(`📦 Cache loaded with ${cachedCount} entries`);
+
   const commits = await getCommitsWithDiffs();
 
   // Fetch all threads once
@@ -423,7 +426,7 @@ async function main() {
       cacheHits++;
     } else {
       apiCalls++;
-      console.log(`\n⏳ OpenAI Batch Call ${apiCalls} / ${commentsToAnalyze.length} (Comment #${comment.id})`);
+      console.log(`\n⏳ Cache Miss -> OpenAI Batch Call ${apiCalls} / ${commentsToAnalyze.length} (Comment #${comment.id})`);
 
       analysis = await analyzeBatchWithOpenAI(comment, validCandidates);
 
