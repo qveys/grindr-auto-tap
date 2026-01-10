@@ -53,26 +53,69 @@ async function getOutdatedComments() {
     pull_number: prNumber,
   });
 
-  // Filter only outdated comments
+  // REST does not provide an `outdated` flag.
+  // Heuristic fallback: outdated review comments typically have null `position`.
+  // This is only used for counting/logging if GraphQL is unavailable.
   return response.data.filter(comment => {
-    return comment.outdated === true;
+    return comment.position == null;
   });
 }
 
-// Resolve a review comment thread
-async function resolveCommentThread(commentId) {
+// GraphQL: Fetch review threads to get accurate `isOutdated`/`isResolved`
+async function getOutdatedThreads() {
+  const query = `
+    query($owner: String!, $repo: String!, $prNumber: Int!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $prNumber) {
+          reviewThreads(first: 100) {
+            nodes {
+              id
+              isResolved
+              isOutdated
+              comments(first: 1) {
+                nodes { id body path line }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const res = await octokit.request('POST /graphql', {
+    query,
+    variables: { owner, repo, prNumber },
+  });
+
+  const nodes = res.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
+  return nodes.filter(t => t.isOutdated === true && t.isResolved === false);
+}
+
+// GraphQL: Resolve a review thread by ID
+async function resolveReviewThread(threadId) {
+  const mutation = `
+    mutation($threadId: ID!) {
+      resolveReviewThread(input: { threadId: $threadId }) {
+        thread { id isResolved }
+      }
+    }
+  `;
+
   try {
-    console.log(`    📡 Sending resolve request for comment #${commentId}...`);
-    await octokit.rest.pulls.updateReviewComment({
-      owner,
-      repo,
-      comment_id: commentId,
-      pull_number: prNumber,
+    console.log(`    📡 Resolving thread ${threadId} via GraphQL...`);
+    const res = await octokit.request('POST /graphql', {
+      query: mutation,
+      variables: { threadId },
     });
-    console.log(`    ✨ Comment #${commentId} resolved successfully`);
-    return true;
+    const resolved = !!res.data?.resolveReviewThread?.thread?.isResolved;
+    if (resolved) {
+      console.log(`    ✨ Thread ${threadId} resolved successfully`);
+      return true;
+    }
+    console.warn(`    ⚠️ Thread ${threadId} did not report resolved state`);
+    return false;
   } catch (error) {
-    console.error(`    ❌ Failed to resolve comment ${commentId}: ${error.message}`);
+    console.error(`    ❌ Failed to resolve thread ${threadId}: ${error.message}`);
     return false;
   }
 }
@@ -298,20 +341,30 @@ async function main() {
   const cache = loadCache();
   const commits = await getCommitsWithDiffs();
 
-  // Resolve outdated comments first
-  console.log(`🔎 Checking for outdated comments...\n`);
-  const outdatedComments = await getOutdatedComments();
-  console.log(`📊 Found ${outdatedComments.length} outdated comment(s)\n`);
+  // Resolve outdated review threads first (GraphQL authoritative)
+  console.log(`🔎 Checking for outdated review threads...\n`);
+  let outdatedThreads = [];
+  try {
+    outdatedThreads = await getOutdatedThreads();
+    console.log(`📊 Found ${outdatedThreads.length} outdated thread(s)\n`);
+  } catch (e) {
+    console.error('⚠️ Failed to fetch threads via GraphQL:', e?.message ?? e);
+    // Fallback: use REST heuristic to count only (no resolving possible via REST)
+    const outdatedCommentsFallback = await getOutdatedComments();
+    console.log(`📊 GraphQL unavailable. Heuristic found ${outdatedCommentsFallback.length} outdated comment(s)\n`);
+  }
   let resolvedOutdatedCount = 0;
 
-  for (const comment of outdatedComments) {
-    console.log(`  🔄 Resolving outdated comment #${comment.id} (line ${comment.line}) in ${comment.path}...`);
-    const resolved = await resolveCommentThread(comment.id);
-    if (resolved) {
+  for (const thread of outdatedThreads) {
+    const head = thread?.comments?.nodes?.[0];
+    const ref = head ? `comment #${head.id} in ${head.path}` : `thread ${thread.id}`;
+    console.log(`  🔄 Resolving outdated ${ref}...`);
+    const ok = await resolveReviewThread(thread.id);
+    if (ok) {
       resolvedOutdatedCount++;
-      console.log(`  ✅ Resolved outdated comment #${comment.id}`);
+      console.log(`  ✅ Resolved outdated ${ref}`);
     } else {
-      console.log(`  ❌ Failed to resolve outdated comment #${comment.id}`);
+      console.log(`  ❌ Failed to resolve outdated ${ref}`);
     }
   }
 
