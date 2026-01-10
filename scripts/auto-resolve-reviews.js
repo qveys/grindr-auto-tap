@@ -82,18 +82,7 @@ async function getOutdatedThreads() {
 
   // Log full structure to debug nulls
 
-  console.log('    🔍 Full GraphQL Response:', JSON.stringify(res.data, null, 2));
-
   const nodes = res.data?.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
-
-  console.log(`    🔍 GraphQL Raw Stats: Fetched ${nodes.length} threads`);
-  nodes.forEach((t, i) => {
-    console.log(`      [${i}] id=${t.id} isOutdated=${t.isOutdated} isResolved=${t.isResolved}`);
-    if (t.comments?.nodes?.length > 0) {
-      console.log(`          Sample comment: ${t.comments.nodes[0].body.substring(0, 50)}...`);
-    }
-  });
-
   return nodes.filter(t => t.isOutdated === true && t.isResolved === false);
 }
 
@@ -114,7 +103,7 @@ async function resolveReviewThread(threadId) {
       query: mutation,
       variables: { threadId },
     });
-    const resolved = !!res.data?.resolveReviewThread?.thread?.isResolved;
+    const resolved = !!res.data?.data?.resolveReviewThread?.thread?.isResolved;
     if (resolved) {
       console.log(`    ✨ Thread ${threadId} resolved successfully`);
       return true;
@@ -386,7 +375,7 @@ async function main() {
   };
 
   // Pre-execution estimate of OpenAI calls (upper bound)
-  const totalPairs = filtered.reduce((sum, {candidates }) => sum + candidates.length, 0);
+  const totalPairs = filtered.reduce((sum, { candidates }) => sum + candidates.length, 0);
   const cachedPairs = filtered.reduce((sum, { comment, candidates }) => {
     return sum + candidates.filter(c => {
       const pairId = `${comment.id}-${c.sha}`;
