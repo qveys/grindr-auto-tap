@@ -203,6 +203,13 @@ Respond in JSON format:
       return null;
     }
 
+    if (data?.usage) {
+      console.log(`   • usage: prompt=${data.usage.prompt_tokens} completion=${data.usage.completion_tokens} total=${data.usage.total_tokens}`);
+    }
+    if (data?.id) {
+      console.log(`   • response id: ${data.id}`);
+    }
+
     const choicesCount = Array.isArray(data.choices) ? data.choices.length : 0;
     console.log(`   ✅ OpenAI OK. choices=${choicesCount}`);
     const content = data.choices[0]?.message?.content ?? '';
@@ -213,7 +220,10 @@ Respond in JSON format:
       return null;
     }
 
-    return JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonMatch[0]);
+    const probHead = String(parsed.problemExtracted ?? '').slice(0, 100).replace(/\n/g, ' ');
+    console.log(`   ✅ Parsed: resolves=${parsed.resolves} confidence=${parsed.confidence} problem="${probHead}"`);
+    return parsed;
   } catch (error) {
     console.error('   ❌ Error calling OpenAI:', error?.message ?? error);
     throw error; // Re-throw to make it blocking
@@ -256,6 +266,10 @@ function preFilterCommits(comments, commits) {
 
 // Check if commit touches the region around the comment line
 function isInRegion(diff, commentLine) {
+  if (commentLine == null || Number.isNaN(Number(commentLine))) {
+    console.log('   ℹ️ Skipping region check: missing comment line');
+    return true;
+  }
   const lines = diff.split('\n');
   let currentLine = 0;
 
@@ -356,6 +370,7 @@ async function main() {
           confidence: 0,
           reason: 'Not in region',
         };
+        console.log(`   🧩 Cache[${pairId}] set: resolves=false, reason=Not in region`);
         continue;
       }
 
@@ -374,6 +389,7 @@ async function main() {
           confidence: 0,
           reason: 'OpenAI analysis failed',
         };
+        console.log(`   🧩 Cache[${pairId}] set: resolves=false, reason=OpenAI analysis failed`);
         continue;
       }
 
@@ -384,6 +400,7 @@ async function main() {
         confidence: analysis.confidence,
         reasoning: analysis.reasoning,
       };
+      console.log(`   🧩 Cache[${pairId}] set: resolves=${analysis.resolves}, confidence=${analysis.confidence}`);
 
       if (analysis.resolves && confidence >= CONFIDENCE_THRESHOLD) {
         resolvingCommits.push({
@@ -408,6 +425,7 @@ async function main() {
       });
       if (!cache.resolutions) cache.resolutions = {};
       cache.resolutions[pairKey] = resolvingCommits.map(c => c.sha);
+      console.log(`   🗂️ Resolutions[${pairKey}] = ${cache.resolutions[pairKey].join(', ')}`);
     } else if (highestConfidence > 0) {
       results.lowConfidence.push({
         commentId: comment.id,
