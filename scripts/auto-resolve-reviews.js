@@ -355,6 +355,7 @@ async function main() {
       if (!first) return null;
       return {
         id: first.databaseId, // Use databaseId for REST API compatibility
+        threadId: t.id,       // Capture GraphQL thread ID for resolution
         body: first.body,
         path: first.path,
         line: first.line
@@ -485,6 +486,13 @@ async function main() {
         body: `🎉 Fixed by commits: ${commitShas}`,
       });
       console.log(`    📬 Posted resolution comment for #${resolution.commentId}`);
+
+      // Also mark the thread as resolved using GraphQL
+      if (resolution.threadId) {
+        await resolveReviewThread(resolution.threadId);
+      } else {
+        console.warn(`    ⚠️ Missing threadId for comment #${resolution.commentId}, skipping thread resolution.`);
+      }
     } catch (error) {
       console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
     }
