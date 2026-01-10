@@ -46,7 +46,35 @@ async function getUnresolvedComments() {
     return !comment.body.includes('Fixed by commit');
   });
 }
+// Get all outdated comments in PR
+async function getOutdatedComments() {
+  const response = await octokit.rest.pulls.listReviewComments({
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
 
+  // Filter only outdated comments
+  return response.data.filter(comment => {
+    return comment.outdated === true;
+  });
+}
+
+// Resolve a review comment thread
+async function resolveCommentThread(commentId) {
+  try {
+    await octokit.rest.pulls.updateReviewComment({
+      owner,
+      repo,
+      comment_id: commentId,
+      pull_number: prNumber,
+    });
+    return true;
+  } catch (error) {
+    console.error(`Failed to resolve comment ${commentId}:`, error.message);
+    return false;
+  }
+}
 // Get all commits in PR with diffs
 async function getCommitsWithDiffs() {
   const response = await octokit.rest.pulls.listCommits({
@@ -215,9 +243,27 @@ async function main() {
   console.log(`🔍 Analyzing PR #${prNumber}...\n`);
 
   const cache = loadCache();
-  const comments = await getUnresolvedComments();
   const commits = await getCommitsWithDiffs();
 
+  // Resolve outdated comments first
+  console.log(`🔎 Checking for outdated comments...\n`);
+  const outdatedComments = await getOutdatedComments();
+  let resolvedOutdatedCount = 0;
+
+  for (const comment of outdatedComments) {
+    const resolved = await resolveCommentThread(comment.id);
+    if (resolved) {
+      resolvedOutdatedCount++;
+      console.log(`✅ Resolved outdated comment #${comment.id}`);
+    }
+  }
+
+  if (resolvedOutdatedCount > 0) {
+    console.log(`\n🎯 Resolved ${resolvedOutdatedCount} outdated comment(s)\n`);
+  }
+
+  // Then get remaining unresolved comments
+  const comments = await getUnresolvedComments();
   console.log(`📊 Found ${comments.length} unresolved comments and ${commits.length} commits\n`);
 
   const filtered = preFilterCommits(comments, commits);
