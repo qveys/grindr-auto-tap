@@ -173,45 +173,42 @@ async function getFileDiff(commit, filename) {
   return file?.patch || '';
 }
 
-// Call OpenAI to analyze if commit resolves comment
-async function analyzeWithOpenAI(comment, commitMessage, diff) {
-  const prompt = `You are a code review assistant. Analyze if the given commit resolves the review comment.
+// Call OpenAI to analyze if ANY of the candidate commits resolve the comment
+async function analyzeBatchWithOpenAI(comment, commits) {
+  const commitsContext = commits.map((c, i) => `
+COMMIT #${i + 1}:
+SHA: ${c.sha}
+MESSAGE: ${c.message}
+DIFF:
+${c.diff.substring(0, 2000)}
+`).join('\n---\n');
 
-REVIEW COMMENT:
-${comment.body}
+  const prompt = `You are a code review assistant. 
+Review Comment: "${comment.body}"
+File: ${comment.path}
 
-COMMIT MESSAGE:
-${commitMessage}
+I have a list of commits that modified this file. Determine if ANY of them resolve the issue described in the review comment.
 
-CHANGED CODE (diff):
-${diff.substring(0, 3000)}  # Limited to first 3000 chars to save tokens
+${commitsContext}
 
 Task:
-1. Extract the core problem/request from the review comment
-2. Determine if the commit + diff addresses this problem
-3. Provide a confidence score (0-100) of resolution
+1. Understand the issue from the review comment.
+2. Check each commit to see if it fixes the issue.
+3. If multiple commits address it, pick the one that fully resolves it.
+4. If NO commit resolves it, return false.
 
-IMPORTANT:
-- The commit must change the same file where the comment was made
-- The changes must logically address the problem described in the comment
-- Be strict about what constitutes a valid resolution
-
-Respond in JSON format:
+Respond in JSON:
 {
-  "problemExtracted": "Brief description of what the comment asks for",
   "resolves": true/false,
+  "resolvingConfirmIndices": [1, 3], // List of indices (1-based) of commits that contribute to the fix. Empty if none.
   "confidence": 0-100,
-  "reasoning": "Brief explanation"
+  "reasoning": "Explanation..."
 }`;
 
   try {
-    const diffLen = typeof diff === 'string' ? diff.length : 0;
     const promptLen = prompt.length;
-    const commitMsgLen = typeof commitMessage === 'string' ? commitMessage.length : 0;
-    console.log(`\n🧠 OpenAI analyze start -> comment #${comment?.id ?? 'n/a'} @ ${comment?.path ?? 'n/a'}:${comment?.line ?? 'n/a'}`);
-    console.log(`   • model=gpt-4o-mini • temperature=0.3 • max_tokens=500`);
-    console.log(`   • lengths: diff=${diffLen} chars, commitMsg=${commitMsgLen} chars, prompt=${promptLen} chars`);
-    console.time(`openai_request_${comment?.id ?? 'n/a'}`);
+    console.log(`\n🧠 OpenAI Batch Analyze -> comment #${comment.id} with ${commits.length} candidates`);
+    console.log(`   • prompt length=${promptLen} chars`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -221,56 +218,28 @@ Respond in JSON format:
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.3,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
         max_tokens: 500,
       }),
     });
 
     const data = await response.json();
-    console.timeEnd(`openai_request_${comment?.id ?? 'n/a'}`);
-    console.log(`   ← OpenAI status: ${response.status}`);
     if (!response.ok) {
-      // Check if it's a blocking authentication error
-      if (data.error && (data.error.code === 'invalid_api_key' || data.error.code === 'authentication_error')) {
-        console.error('\n❌ FATAL ERROR: OpenAI Authentication Failed');
-        console.error(`   Error: ${data.error.message}`);
-        console.error('   Please verify your OPENAI_API_KEY environment variable is set correctly.');
-        throw new Error(`OpenAI API Authentication Error: ${data.error.message}`);
-      }
       console.error('   ❌ OpenAI API error:', data);
       return null;
     }
 
-    if (data?.usage) {
-      console.log(`   • usage: prompt=${data.usage.prompt_tokens} completion=${data.usage.completion_tokens} total=${data.usage.total_tokens}`);
-    }
-    if (data?.id) {
-      console.log(`   • response id: ${data.id}`);
-    }
-
-    const choicesCount = Array.isArray(data.choices) ? data.choices.length : 0;
-    console.log(`   ✅ OpenAI OK. choices=${choicesCount}`);
     const content = data.choices[0]?.message?.content ?? '';
-    console.log(`   🧾 Content head: ${content.slice(0, 140).replace(/\n/g, ' ')}`);
-    const jsonMatch = content.match(/\{[\s\S]*}/);
-    if (!jsonMatch) {
-      console.error('   ⚠️ Failed to parse OpenAI response. Raw head:', content.slice(0, 200).replace(/\n/g, ' '));
-      return null;
-    }
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const probHead = String(parsed.problemExtracted ?? '').slice(0, 100).replace(/\n/g, ' ');
-    console.log(`   ✅ Parsed: resolves=${parsed.resolves} confidence=${parsed.confidence} problem="${probHead}"`);
+    console.log(`   ✅ Result: resolves=${parsed.resolves} confidence=${parsed.confidence}`);
     return parsed;
   } catch (error) {
-    console.error('   ❌ Error calling OpenAI:', error?.message ?? error);
-    throw error; // Re-throw to make it blocking
+    console.error('   ❌ Error calling OpenAI:', error);
+    return null;
   }
 }
 
@@ -379,124 +348,65 @@ async function main() {
 
   // Pre-execution estimate of OpenAI calls (upper bound)
   const totalPairs = filtered.reduce((sum, { candidates }) => sum + candidates.length, 0);
-  const cachedPairs = filtered.reduce((sum, { comment, candidates }) => {
-    return sum + candidates.filter(c => {
-      const pairId = `${comment.id}-${c.sha}`;
-      return cache.processedPairs && cache.processedPairs[pairId];
-    }).length;
-  }, 0);
-  const plannedCallsUpperBound = totalPairs - cachedPairs;
-  console.log(`🧮 Planned OpenAI calls (upper bound): ${plannedCallsUpperBound} (total pairs=${totalPairs}, cache hits=${cachedPairs})`);
+  // Optimize: Batch analysis
+  // Group 1: Filter potential candidates strictly FIRST (isInRegion)
+  const commentsToAnalyze = [];
 
-  let apiCalls = 0;
-  const cacheHits = [];
-
-  // Analyze each comment against candidate commits
   for (const { comment, candidates } of filtered) {
-    const pairKey = `${comment.id}`;
-    const resolvingCommits = [];
-    let highestConfidence = 0;
-
+    const validCandidates = [];
     for (const commit of candidates) {
-      const pairId = `${comment.id}-${commit.sha}`;
-
-      // Check cache
-      if (cache.processedPairs && cache.processedPairs[pairId]) {
-        const cached = cache.processedPairs[pairId];
-        if (cached.resolves && cached.confidence >= CONFIDENCE_THRESHOLD) {
-          resolvingCommits.push({
-            sha: commit.sha.substring(0, 8),
-            confidence: cached.confidence,
-          });
-          cacheHits.push(pairId);
-        } else if (cached.confidence > highestConfidence) {
-          highestConfidence = cached.confidence;
-        }
-        continue;
-      }
-
-      // Get file diff
       const diff = await getFileDiff(commit, comment.path);
-
-      // Check if commit touches the region
-      if (!isInRegion(diff, comment.line)) {
-        if (!cache.processedPairs) cache.processedPairs = {};
-        cache.processedPairs[pairId] = {
-          resolves: false,
-          confidence: 0,
-          reason: 'Not in region',
-        };
-        console.log(`   🧩 Cache[${pairId}] set: resolves=false, reason=Not in region`);
-        continue;
+      if (isInRegion(diff, comment.line)) {
+        validCandidates.push({ ...commit, diff });
       }
-
-      // Call OpenAI
-      console.log(`\n⏳ OpenAI Call ${apiCalls + 1} / ~${plannedCallsUpperBound}`);
-      const analysis = await analyzeWithOpenAI(
-        comment,
-        commit.message,
-        diff
-      );
-      apiCalls++;
-
-      if (!analysis) {
-        if (!cache.processedPairs) cache.processedPairs = {};
-        cache.processedPairs[pairId] = {
-          resolves: false,
-          confidence: 0,
-          reason: 'OpenAI analysis failed',
-        };
-        console.log(`   🧩 Cache[${pairId}] set: resolves=false, reason=OpenAI analysis failed`);
-        continue;
-      }
-
-      const confidence = analysis.confidence / 100;
-      if (!cache.processedPairs) cache.processedPairs = {};
-      cache.processedPairs[pairId] = {
-        resolves: analysis.resolves,
-        confidence: analysis.confidence,
-        reasoning: analysis.reasoning,
-      };
-      console.log(`   🧩 Cache[${pairId}] set: resolves=${analysis.resolves}, confidence=${analysis.confidence}`);
-
-      if (analysis.resolves && confidence >= CONFIDENCE_THRESHOLD) {
-        resolvingCommits.push({
-          sha: commit.sha.substring(0, 8),
-          confidence: analysis.confidence,
-        });
-      } else if (confidence > highestConfidence) {
-        highestConfidence = confidence;
-      }
-
-      // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // Store results
-    if (resolvingCommits.length > 0) {
-      results.resolved.push({
-        commentId: comment.id,
-        line: comment.line,
-        commits: resolvingCommits,
-        body: comment.body.substring(0, 100),
-      });
-      if (!cache.resolutions) cache.resolutions = {};
-      cache.resolutions[pairKey] = resolvingCommits.map(c => c.sha);
-      console.log(`   🗂️ Resolutions[${pairKey}] = ${cache.resolutions[pairKey].join(', ')}`);
-    } else if (highestConfidence > 0) {
+    if (validCandidates.length > 0) {
+      commentsToAnalyze.push({ comment, validCandidates });
+    }
+  }
+
+  console.log(`\n📉 Optimized Plan: ${commentsToAnalyze.length} OpenAI calls for ${filtered.length} total comments.`);
+
+  // Analyze each comment with its batch of valid candidates
+  for (const { comment, validCandidates } of commentsToAnalyze) {
+    apiCalls++;
+    console.log(`\n⏳ OpenAI Batch Call ${apiCalls} / ${commentsToAnalyze.length} (Comment #${comment.id})`);
+
+    const analysis = await analyzeBatchWithOpenAI(comment, validCandidates);
+
+    if (analysis && analysis.resolves && analysis.confidence >= 85) {
+      const resolvingCommits = (analysis.resolvingConfirmIndices || [])
+        .map(idx => validCandidates[idx - 1]) // 1-based index to 0-based
+        .filter(c => c)
+        .map(c => ({ sha: c.sha.substring(0, 8), confidence: analysis.confidence }));
+
+      if (resolvingCommits.length > 0) {
+        results.resolved.push({
+          commentId: comment.id,
+          line: comment.line,
+          commits: resolvingCommits,
+          body: comment.body.substring(0, 100)
+        });
+        console.log(`   ✅ Resolved by: ${resolvingCommits.map(c => c.sha).join(', ')}`);
+      }
+    } else if (analysis && analysis.confidence > 0) {
       results.lowConfidence.push({
         commentId: comment.id,
         line: comment.line,
-        highestConfidence,
-        body: comment.body.substring(0, 100),
+        highestConfidence: analysis.confidence,
+        body: comment.body.substring(0, 100)
       });
     } else {
       results.notResolved.push({
         commentId: comment.id,
         line: comment.line,
-        body: comment.body.substring(0, 100),
+        body: comment.body.substring(0, 100)
       });
     }
+
+    // Rate limit
+    await new Promise(r => setTimeout(r, 500));
   }
 
   // Save updated cache
