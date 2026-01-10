@@ -332,6 +332,17 @@ async function main() {
     notResolved: [],
   };
 
+  // Pre-execution estimate of OpenAI calls (upper bound)
+  const totalPairs = filtered.reduce((sum, { comment, candidates }) => sum + candidates.length, 0);
+  const cachedPairs = filtered.reduce((sum, { comment, candidates }) => {
+    return sum + candidates.filter(c => {
+      const pairId = `${comment.id}-${c.sha}`;
+      return cache.processedPairs && cache.processedPairs[pairId];
+    }).length;
+  }, 0);
+  const plannedCallsUpperBound = totalPairs - cachedPairs;
+  console.log(`🧮 Planned OpenAI calls (upper bound): ${plannedCallsUpperBound} (total pairs=${totalPairs}, cache hits=${cachedPairs})`);
+
   let apiCalls = 0;
   const cacheHits = [];
 
