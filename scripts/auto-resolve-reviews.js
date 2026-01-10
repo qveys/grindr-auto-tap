@@ -410,22 +410,18 @@ async function main() {
       .map(c => `${c.sha}`)
       .join(', ');
 
-    await octokit.rest.pulls.createReplyForReviewComment({
-      owner,
-      repo,
-      pull_number: prNumber,
-      comment_id: resolution.commentId,
-      body: `Fixed by commits: ${commitShas}`,
-    });
-
-    // Resolve the thread
-    await octokit.rest.pulls.updateReviewComment({
-      owner,
-      repo,
-      comment_id: resolution.commentId,
-      pull_number: prNumber,
-      body: `Fixed by commits: ${commitShas}`,
-    });
+    try {
+      await octokit.rest.pulls.createReplyForReviewComment({
+        owner,
+        repo,
+        pull_number: prNumber,
+        comment_id: resolution.commentId,
+        body: `🎉 Fixed by commits: ${commitShas}`,
+      });
+      console.log(`    📬 Posted resolution comment for #${resolution.commentId}`);
+    } catch (error) {
+      console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
+    }
   }
 
   // Post low-confidence notifications
