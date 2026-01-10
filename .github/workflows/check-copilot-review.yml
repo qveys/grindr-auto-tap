@@ -15,13 +15,26 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            // Get all commits in the PR
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            
+            // Get the latest commit date
+            const latestCommit = commits[commits.length - 1];
+            const latestCommitDate = new Date(latestCommit.commit.committer.date);
+            core.info(`⏱️ Latest commit: ${latestCommit.sha.substring(0, 7)} at ${latestCommitDate.toISOString()}`);
+            
+            // Get all reviews
             const { data: reviews } = await github.rest.pulls.listReviews({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number,
             });
             
-            // Check if Copilot has reviewed
+            // Find Copilot review
             const copilotReview = reviews.find(review => 
               review.user.login === 'copilot-pull-request-reviewer[bot]' ||
               review.user.type === 'Bot'
@@ -30,7 +43,15 @@ jobs:
             if (!copilotReview) {
               core.setFailed('❌ Copilot review is required but not found. Please wait for Copilot to review this PR.');
             } else {
-              core.info('✅ Copilot review found!');
-              core.info(`Review state: ${copilotReview.state}`);
-              core.info(`Review submitted at: ${copilotReview.submitted_at}`);
+              const reviewDate = new Date(copilotReview.submitted_at);
+              core.info(`✅ Copilot review found!`);
+              core.info(`📄 Review state: ${copilotReview.state}`);
+              core.info(`📅 Review submitted at: ${reviewDate.toISOString()}`);
+              
+              // Check if review is older than the latest commit
+              if (reviewDate < latestCommitDate) {
+                core.setFailed(`⚠️ Copilot review (${reviewDate.toISOString()}) is older than the latest commit (${latestCommitDate.toISOString()}). A new review is required after code changes.`);
+              } else {
+                core.info('✅ Copilot review is up-to-date with the latest commit!');
+              }
             }
