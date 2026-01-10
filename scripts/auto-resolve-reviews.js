@@ -424,10 +424,6 @@ async function main() {
 
   // Post low-confidence notifications
   for (const lowConf of results.lowConfidence) {
-    const commitSha = Object.keys(cache.processedPairs).find(
-      key => key.startsWith(lowConf.commentId.toString())
-    );
-
     await octokit.rest.pulls.createReplyForReviewComment({
       owner,
       repo,
