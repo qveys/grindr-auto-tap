@@ -103,6 +103,12 @@ async function resolveReviewThread(threadId) {
       query: mutation,
       variables: { threadId },
     });
+
+    if (res.errors) {
+      console.error(`    ❌ GraphQL Errors for ${threadId}:`, JSON.stringify(res.errors, null, 2));
+    }
+    console.log(`    🔍 Resolution response for ${threadId}:`, JSON.stringify(res.data, null, 2));
+
     const resolved = !!res.data?.data?.resolveReviewThread?.thread?.isResolved;
     if (resolved) {
       console.log(`    ✨ Thread ${threadId} resolved successfully`);
