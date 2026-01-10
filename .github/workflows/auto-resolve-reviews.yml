@@ -4,7 +4,6 @@ on:
   pull_request:
     types: [opened, synchronize]
     paths-ignore:
-      - '**.md'
       - '.github/pr-resolution-cache.json'
 
 jobs:
