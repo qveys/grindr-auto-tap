@@ -98,16 +98,6 @@ async function getOutdatedThreads() {
 }
 
 // REST: Fetch review threads and filter outdated/unresolved
-async function getOutdatedThreadsRest() {
-  const res = await octokit.rest.pulls.listReviewThreads({
-    owner,
-    repo,
-    pull_number: prNumber,
-  });
-  const threads = Array.isArray(res.data) ? res.data : [];
-  return threads.filter(t => t.is_outdated === true && t.is_resolved === false);
-}
-
 // GraphQL: Resolve a review thread by ID
 async function resolveReviewThread(threadId) {
   const mutation = `
@@ -276,7 +266,7 @@ Respond in JSON format:
     console.log(`   ✅ OpenAI OK. choices=${choicesCount}`);
     const content = data.choices[0]?.message?.content ?? '';
     console.log(`   🧾 Content head: ${content.slice(0, 140).replace(/\n/g, ' ')}`);
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = content.match(/\{[\s\S]*}/);
     if (!jsonMatch) {
       console.error('   ⚠️ Failed to parse OpenAI response. Raw head:', content.slice(0, 200).replace(/\n/g, ' '));
       return null;
@@ -396,7 +386,7 @@ async function main() {
   };
 
   // Pre-execution estimate of OpenAI calls (upper bound)
-  const totalPairs = filtered.reduce((sum, { comment, candidates }) => sum + candidates.length, 0);
+  const totalPairs = filtered.reduce((sum, {candidates }) => sum + candidates.length, 0);
   const cachedPairs = filtered.reduce((sum, { comment, candidates }) => {
     return sum + candidates.filter(c => {
       const pairId = `${comment.id}-${c.sha}`;
