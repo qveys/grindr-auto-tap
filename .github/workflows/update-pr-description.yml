@@ -1,0 +1,153 @@
+name: Update PR Description
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to update'
+        required: true
+        type: number
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  update-pr-description:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: Get PR information
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request?.number || context.payload.inputs?.pr_number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            
+            // Calculate statistics
+            const stats = {
+              filesChanged: files.length,
+              additions: files.reduce((sum, f) => sum + f.additions, 0),
+              deletions: files.reduce((sum, f) => sum + f.deletions, 0),
+              commits: commits.length
+            };
+            
+            // Build file tree
+            const fileTree = files.map(f => f.filename).sort();
+            const tree = buildFileTree(fileTree);
+            
+            function buildFileTree(files) {
+              const root = {};
+              files.forEach(file => {
+                const parts = file.split('/');
+                let current = root;
+                parts.forEach((part, i) => {
+                  if (!current[part]) {
+                    current[part] = i === parts.length - 1 ? null : {};
+                  }
+                  current = current[part];
+                });
+              });
+              return formatTree(root);
+            }
+            
+            function formatTree(node, prefix = '', isLast = true) {
+              let result = '';
+              const entries = Object.entries(node);
+              entries.forEach(([key, value], index) => {
+                const isLastEntry = index === entries.length - 1;
+                const connector = isLastEntry ? '└── ' : '├── ';
+                const extension = isLastEntry ? '    ' : '│   ';
+                
+                result += prefix + connector + key + '\n';
+                
+                if (value !== null) {
+                  result += formatTree(value, prefix + extension, isLastEntry);
+                }
+              });
+              return result;
+            }
+            
+            // Format commits list
+            const commitsList = commits.map(c => 
+              `- \`${c.sha.substring(0, 7)}\` – ${c.commit.message.split('\n')[0]}`
+            ).join('\n');
+            
+            // Get original description (everything before the stats section)
+            let originalDescription = pr.body || '';
+            const statsMarker = '## 📁 Fichiers ajoutés / modifiés';
+            if (originalDescription.includes(statsMarker)) {
+              originalDescription = originalDescription.substring(0, originalDescription.indexOf(statsMarker)).trim();
+            }
+            
+            // Build updated description
+            const updatedDescription = `${originalDescription}
+
+## 📁 Fichiers ajoutés / modifiés
+
+\`\`\`
+${tree.trim()}
+\`\`\`
+
+## 📊 Statistiques
+
+| Métrique               | Valeur |
+|------------------------|--------|
+| Fichiers modifiés      | ${stats.filesChanged}     |
+| Lignes ajoutées        | +${stats.additions}  |
+| Lignes supprimées      | -${stats.deletions}   |
+| Commits                | ${stats.commits}      |
+
+## 📝 Commits
+
+${commitsList}
+`;
+            
+            // Update PR description
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              body: updatedDescription
+            });
+            
+            core.info('✅ PR description updated successfully');
+            return { prNumber, stats };
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request?.number || context.payload.inputs?.pr_number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: '🤖 La description de la PR a été mise à jour automatiquement avec les statistiques détaillées.'
+            });
