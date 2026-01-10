@@ -85,13 +85,24 @@ async function getCommitsWithDiffs() {
 
   const commits = [];
   for (const commit of response.data) {
-    // Files are already in the commit object from listCommits
-    const filesData = commit.files || [];
+    // Use repos.getCommit to get the full commit details including files
+    let filesData = [];
+    try {
+      const commitDetail = await octokit.rest.repos.getCommit({
+        owner,
+        repo,
+        ref: commit.sha,
+      });
+      filesData = commitDetail.data.files || [];
+    } catch (error) {
+      console.error(`  Error fetching details for commit ${commit.sha.substring(0, 8)}:`, error.message);
+    }
+    
     console.log(`  Commit ${commit.sha.substring(0, 8)}: ${filesData.length} files modified`);
-    if (filesData.length === 0) {
-      console.warn(`    ⚠️ No files found for commit ${commit.sha.substring(0, 8)}`);
-    } else {
+    if (filesData.length > 0) {
       console.log(`    Files: ${filesData.map(f => f.filename).join(', ')}`);
+    } else {
+      console.warn(`    ⚠️ No files found for commit ${commit.sha.substring(0, 8)}`);
     }
     
     commits.push({
