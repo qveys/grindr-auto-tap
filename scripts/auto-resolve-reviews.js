@@ -312,7 +312,7 @@ async function main() {
       const pairId = `${comment.id}-${commit.sha}`;
 
       // Check cache
-      if (cache.processedPairs[pairId]) {
+      if (cache.processedPairs && cache.processedPairs[pairId]) {
         const cached = cache.processedPairs[pairId];
         if (cached.resolves && cached.confidence >= CONFIDENCE_THRESHOLD) {
           resolvingCommits.push({
@@ -331,6 +331,7 @@ async function main() {
 
       // Check if commit touches the region
       if (!isInRegion(diff, comment.line)) {
+        if (!cache.processedPairs) cache.processedPairs = {};
         cache.processedPairs[pairId] = {
           resolves: false,
           confidence: 0,
@@ -348,6 +349,7 @@ async function main() {
       apiCalls++;
 
       if (!analysis) {
+        if (!cache.processedPairs) cache.processedPairs = {};
         cache.processedPairs[pairId] = {
           resolves: false,
           confidence: 0,
@@ -357,6 +359,7 @@ async function main() {
       }
 
       const confidence = analysis.confidence / 100;
+      if (!cache.processedPairs) cache.processedPairs = {};
       cache.processedPairs[pairId] = {
         resolves: analysis.resolves,
         confidence: analysis.confidence,
@@ -384,6 +387,7 @@ async function main() {
         commits: resolvingCommits,
         body: comment.body.substring(0, 100),
       });
+      if (!cache.resolutions) cache.resolutions = {};
       cache.resolutions[pairKey] = resolvingCommits.map(c => c.sha);
     } else if (highestConfidence > 0) {
       results.lowConfidence.push({
