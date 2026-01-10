@@ -45,21 +45,7 @@ async function getUnresolvedComments() {
     return !comment.body.includes('Fixed by commit');
   });
 }
-// Get all outdated comments in PR
-async function getOutdatedComments() {
-  const response = await octokit.rest.pulls.listReviewComments({
-    owner,
-    repo,
-    pull_number: prNumber,
-  });
 
-  // REST does not provide an `outdated` flag.
-  // Heuristic fallback: outdated review comments typically have null `position`.
-  // This is only used for counting/logging if GraphQL is unavailable.
-  return response.data.filter(comment => {
-    return comment.position == null;
-  });
-}
 
 // GraphQL: Fetch review threads to get accurate `isOutdated`/`isResolved`
 async function getOutdatedThreads() {
@@ -131,37 +117,7 @@ async function resolveReviewThread(threadId) {
   }
 }
 
-// GraphQL: Given a REST comment `node_id`, fetch its thread
-async function getThreadForCommentNode(nodeId) {
-  const query = `
-    query($id: ID!) {
-      node(id: $id) {
-        ... on PullRequestReviewComment {
-          databaseId
-          pullRequestReviewThread {
-            id
-            isResolved
-            isOutdated
-          }
-        }
-      }
-    }
-  `;
 
-  try {
-    const res = await octokit.request('POST /graphql', {
-      query,
-      variables: { id: nodeId },
-    });
-    const node = res.data?.node;
-    const thread = node?.pullRequestReviewThread ?? null;
-    if (!thread) return null;
-    return thread;
-  } catch (error) {
-    console.error(`    ❌ Failed to map comment node to thread: ${error.message}`);
-    return null;
-  }
-}
 // Get all commits in PR with diffs
 async function getCommitsWithDiffs() {
   const response = await octokit.rest.pulls.listCommits({
@@ -184,14 +140,14 @@ async function getCommitsWithDiffs() {
     } catch (error) {
       console.error(`  Error fetching details for commit ${commit.sha.substring(0, 8)}:`, error.message);
     }
-    
+
     console.log(`  Commit ${commit.sha.substring(0, 8)}: ${filesData.length} files modified`);
     if (filesData.length > 0) {
       console.log(`    Files: ${filesData.map(f => f.filename).join(', ')}`);
     } else {
       console.warn(`    ⚠️ No files found for commit ${commit.sha.substring(0, 8)}`);
     }
-    
+
     commits.push({
       sha: commit.sha,
       message: commit.commit.message,
@@ -326,7 +282,7 @@ function preFilterCommits(comments, commits) {
   for (const comment of comments) {
     const commentFile = comment.path;
     console.log(`\n  📄 Comment file: "${commentFile}"`);
-    
+
     const matchingCommits = commits.filter(commit => {
       const hasFile = commit.files.some(
         file => file.filename === commentFile
@@ -338,7 +294,7 @@ function preFilterCommits(comments, commits) {
     });
 
     console.log(`    ✓ Found ${matchingCommits.length} matching commits`);
-    
+
     if (matchingCommits.length > 0) {
       filtered.push({
         comment,
@@ -384,21 +340,14 @@ async function main() {
   const cache = loadCache();
   const commits = await getCommitsWithDiffs();
 
-  // Resolve outdated review threads: detect via REST comments heuristic, map to GraphQL threads
-  console.log(`🔎 Checking for outdated review threads...\n`);
-  const outdatedComments = await getOutdatedComments();
-  console.log(`📊 Found ${outdatedComments.length} outdated comment(s) (REST heuristic)\n`);
+  // Resolve outdated review threads: detect via GraphQL
+  console.log(`🔎 Checking for outdated review threads (GraphQL)...\n`);
+  const outdatedThreads = await getOutdatedThreads();
+  console.log(`📊 Found ${outdatedThreads.length} outdated thread(s)\n`);
 
-  const uniqueThreadIds = new Set();
-  for (const c of outdatedComments) {
-    if (!c.node_id) continue;
-    const thread = await getThreadForCommentNode(c.node_id);
-    if (thread?.id) uniqueThreadIds.add(thread.id);
-  }
-
-  console.log(`📊 Mapped to ${uniqueThreadIds.size} unique thread(s)\n`);
   let resolvedOutdatedCount = 0;
-  for (const threadId of uniqueThreadIds) {
+  for (const thread of outdatedThreads) {
+    const threadId = thread.id;
     console.log(`  🔄 Resolving outdated thread ${threadId}...`);
     const ok = await resolveReviewThread(threadId);
     if (ok) {
@@ -581,7 +530,7 @@ async function main() {
     });
   }
 
-  
+
   // Only post summary comment if there are comments to analyze
   if (comments.length > 0) {
     // Post summary comment
@@ -593,7 +542,7 @@ async function main() {
       body: summaryComment,
     });
   }
-  
+
   // Write to job summary
   const jobSummary = formatJobSummary(results, apiCalls, cacheHits.length);
   fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
