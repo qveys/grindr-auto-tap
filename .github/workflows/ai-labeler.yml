@@ -29,22 +29,15 @@ jobs:
             const body = issue.body || '';
             
             // List of defined labels
-            const labels = [
-              "area: auth", "area: background", "area: build", "area: content", "area: core",
-              "area: engine", "area: legacy", "area: logger", "area: popup", "area: storage", "area: tests",
-              "area: ui", "area: api",
-              "breaking-change",
-              "browser: chrome", "browser: cross-browser", "browser: firefox",
-              "effort: small", "effort: medium", "effort: large", "effort: xlarge",
-              "meta: good-first-issue", "meta: help-wanted", "meta: needs-discussion",
-              "priority: critical", "priority: high", "priority: low", "priority: medium",
-              "roadmap: phase-1", "roadmap: phase-2", "roadmap: phase-3",
-              "status: blocked", "status: duplicate", "status: in-progress", "status: invalid",
-              "status: migration-wip", "status: needs-info", "status: on-hold", "status: review-needed", "status: wontfix",
-              "type: breaking-change", "type: bug", "type: build", "type: chore", "type: dependency",
-              "type: documentation", "type: enhancement", "type: feature", "type: migration",
-              "type: performance", "type: question", "type: refactor", "type: security", "type: test", "type: release"
-            ];
+            // Fetch all labels from the repository using pagination
+            const allLabels = await github.paginate(github.rest.issues.listLabelsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            const labels = allLabels.map(label => label.name);
+            core.notice(`Fetched ${labels.length} labels from repository`);
 
             const prompt = `
             You are a GitHub repository maintainer.
