@@ -23,6 +23,11 @@ jobs:
             });
             
             // Get the latest commit date
+            if (!commits || commits.length === 0) {
+              core.info('ℹ️ no commits found in the pull request. Skipping Copilot review freshness check.");
+              return;
+            } 
+
             const latestCommit = commits[commits.length - 1];
             const latestCommitDate = new Date(latestCommit.commit.committer.date);
             core.info(`⏱️ Latest commit: ${latestCommit.sha.substring(0, 7)} at ${latestCommitDate.toISOString()}`);
