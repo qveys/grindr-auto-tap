@@ -1,0 +1,52 @@
+name: Auto-Resolve Review Comments
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths-ignore:
+      - '**.md'
+      - '.github/pr-resolution-cache.json'
+
+jobs:
+  auto-resolve:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all commits for proper diff analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-save octokit dotenv
+
+      - name: Download previous cache
+        continue-on-error: true
+        run: |
+          if git show HEAD:.github/pr-resolution-cache.json 2>/dev/null; then
+            mkdir -p .github
+            git show HEAD:.github/pr-resolution-cache.json > .github/pr-resolution-cache.json
+          fi
+
+      - name: Run auto-resolution
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: node scripts/auto-resolve-reviews.js
+
+      - name: Upload cache as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-resolution-cache
+          path: .github/pr-resolution-cache.json
+          retention-days: 30
