@@ -245,7 +245,6 @@ function preFilterCommits(comments, commits) {
   const filtered = [];
 
   console.log(`\n🔍 Pre-filtering: ${comments.length} comments vs ${commits.length} commits`);
-  console.log(`📝 Commits files structure sample:`, commits[0]?.files?.slice(0, 2));
 
   for (const comment of comments) {
     const commentFile = comment.path;
