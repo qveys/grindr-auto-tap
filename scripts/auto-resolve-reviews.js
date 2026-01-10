@@ -63,15 +63,17 @@ async function getOutdatedComments() {
 // Resolve a review comment thread
 async function resolveCommentThread(commentId) {
   try {
+    console.log(`    📡 Sending resolve request for comment #${commentId}...`);
     await octokit.rest.pulls.updateReviewComment({
       owner,
       repo,
       comment_id: commentId,
       pull_number: prNumber,
     });
+    console.log(`    ✨ Comment #${commentId} resolved successfully`);
     return true;
   } catch (error) {
-    console.error(`Failed to resolve comment ${commentId}:`, error.message);
+    console.error(`    ❌ Failed to resolve comment ${commentId}: ${error.message}`);
     return false;
   }
 }
@@ -266,13 +268,17 @@ async function main() {
   // Resolve outdated comments first
   console.log(`🔎 Checking for outdated comments...\n`);
   const outdatedComments = await getOutdatedComments();
+  console.log(`📊 Found ${outdatedComments.length} outdated comment(s)\n`);
   let resolvedOutdatedCount = 0;
 
   for (const comment of outdatedComments) {
+    console.log(`  🔄 Resolving outdated comment #${comment.id} (line ${comment.line}) in ${comment.path}...`);
     const resolved = await resolveCommentThread(comment.id);
     if (resolved) {
       resolvedOutdatedCount++;
-      console.log(`✅ Resolved outdated comment #${comment.id}`);
+      console.log(`  ✅ Resolved outdated comment #${comment.id}`);
+    } else {
+      console.log(`  ❌ Failed to resolve outdated comment #${comment.id}`);
     }
   }
 
