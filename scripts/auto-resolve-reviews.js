@@ -373,15 +373,19 @@ async function main() {
     });
   }
 
-  // Post summary comment
-  const summaryComment = formatSummary(results, apiCalls, cacheHits.length);
-  await octokit.rest.issues.createComment({
-    owner,
-    repo,
-    issue_number: prNumber,
-    body: summaryComment,
-  });
-
+  
+  // Only post summary comment if there are comments to analyze
+  if (comments.length > 0) {
+    // Post summary comment
+    const summaryComment = formatSummary(results, apiCalls, cacheHits.length);
+    await octokit.rest.issues.createComment({
+      owner,
+      repo,
+      issue_number: prNumber,
+      body: summaryComment,
+    });
+  }
+  
   // Write to job summary
   const jobSummary = formatJobSummary(results, apiCalls, cacheHits.length);
   fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
