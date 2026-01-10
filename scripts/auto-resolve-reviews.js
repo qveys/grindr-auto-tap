@@ -22,7 +22,12 @@ function loadCache() {
   if (fs.existsSync(CACHE_FILE)) {
     return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
   }
-  return { processedPairs: {}, resolutions: {} };
+  return { processedPairs: {}, resolutions: {}, batchResolutions: {} };
+}
+
+function generateBatchCacheKey(comment, candidates) {
+  const commitShas = candidates.map(c => c.sha).sort().join(',');
+  return `${comment.id}-${commitShas}`;
 }
 
 // Save cache
@@ -376,6 +381,7 @@ async function main() {
   // Group 1: Filter potential candidates strictly FIRST (isInRegion)
   const commentsToAnalyze = [];
   let apiCalls = 0;
+  let cacheHits = 0;
 
 
   for (const { comment, candidates } of filtered) {
@@ -408,10 +414,29 @@ async function main() {
 
   // Analyze each comment with its batch of valid candidates
   for (const { comment, validCandidates } of commentsToAnalyze) {
-    apiCalls++;
-    console.log(`\n⏳ OpenAI Batch Call ${apiCalls} / ${commentsToAnalyze.length} (Comment #${comment.id})`);
+    const cacheKey = generateBatchCacheKey(comment, validCandidates);
+    let analysis;
 
-    const analysis = await analyzeBatchWithOpenAI(comment, validCandidates);
+    // Check cache
+    if (cache.batchResolutions && cache.batchResolutions[cacheKey]) {
+      console.log(`\n⏭️  Skipping OpenAI (Cache Hit) for Comment #${comment.id}`);
+      analysis = cache.batchResolutions[cacheKey];
+      cacheHits++;
+    } else {
+      apiCalls++;
+      console.log(`\n⏳ OpenAI Batch Call ${apiCalls} / ${commentsToAnalyze.length} (Comment #${comment.id})`);
+
+      analysis = await analyzeBatchWithOpenAI(comment, validCandidates);
+
+      // Cache result if valid
+      if (analysis) {
+        if (!cache.batchResolutions) cache.batchResolutions = {};
+        cache.batchResolutions[cacheKey] = analysis;
+      }
+
+      // Rate limit only on API call
+      await new Promise(r => setTimeout(r, 500));
+    }
 
     if (analysis && analysis.resolves && analysis.confidence >= 85) {
       const resolvingCommits = (analysis.resolvingConfirmIndices || [])
@@ -442,9 +467,6 @@ async function main() {
         body: comment.body.substring(0, 100)
       });
     }
-
-    // Rate limit
-    await new Promise(r => setTimeout(r, 500));
   }
 
   // Save updated cache
@@ -482,10 +504,12 @@ async function main() {
   }
 
 
-  // Only post summary comment if there are comments to analyze
-  if (comments.length > 0) {
+  // Only post summary comment if there are comments to analyze and work was done
+  const totalAnalyzed = results.resolved.length + results.lowConfidence.length + results.notResolved.length;
+
+  if (comments.length > 0 && totalAnalyzed > 0) {
     // Post summary comment
-    const summaryComment = formatSummary(results, apiCalls, 0);
+    const summaryComment = formatSummary(results, apiCalls, cacheHits);
     await octokit.rest.issues.createComment({
       owner,
       repo,
@@ -495,10 +519,13 @@ async function main() {
   }
 
   // Write to job summary
-  const jobSummary = formatJobSummary(results, apiCalls, 0);
-  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
-
-  console.log(jobSummary);
+  if (totalAnalyzed > 0) {
+    const jobSummary = formatJobSummary(results, apiCalls, cacheHits);
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
+    console.log(jobSummary);
+  } else {
+    console.log("\n✨ No new analysis performed. Everything looks up to date.");
+  }
 }
 
 function formatSummary(results, apiCalls, cacheHits) {
