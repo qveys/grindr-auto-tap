@@ -91,6 +91,17 @@ async function getOutdatedThreads() {
   return nodes.filter(t => t.isOutdated === true && t.isResolved === false);
 }
 
+// REST: Fetch review threads and filter outdated/unresolved
+async function getOutdatedThreadsRest() {
+  const res = await octokit.rest.pulls.listReviewThreads({
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
+  const threads = Array.isArray(res.data) ? res.data : [];
+  return threads.filter(t => t.is_outdated === true && t.is_resolved === false);
+}
+
 // GraphQL: Resolve a review thread by ID
 async function resolveReviewThread(threadId) {
   const mutation = `
@@ -341,25 +352,34 @@ async function main() {
   const cache = loadCache();
   const commits = await getCommitsWithDiffs();
 
-  // Resolve outdated review threads first (GraphQL authoritative)
+  // Resolve outdated review threads first (prefer REST for detection)
   console.log(`🔎 Checking for outdated review threads...\n`);
   let outdatedThreads = [];
   try {
-    outdatedThreads = await getOutdatedThreads();
-    console.log(`📊 Found ${outdatedThreads.length} outdated thread(s)\n`);
+    outdatedThreads = await getOutdatedThreadsRest();
+    console.log(`📊 Found ${outdatedThreads.length} outdated thread(s) (REST)\n`);
   } catch (e) {
-    console.error('⚠️ Failed to fetch threads via GraphQL:', e?.message ?? e);
-    // Fallback: use REST heuristic to count only (no resolving possible via REST)
-    const outdatedCommentsFallback = await getOutdatedComments();
-    console.log(`📊 GraphQL unavailable. Heuristic found ${outdatedCommentsFallback.length} outdated comment(s)\n`);
+    console.error('⚠️ Failed to fetch threads via REST:', e?.message ?? e);
+    try {
+      outdatedThreads = await getOutdatedThreads();
+      console.log(`📊 Found ${outdatedThreads.length} outdated thread(s) (GraphQL)\n`);
+    } catch (e2) {
+      console.error('⚠️ Failed to fetch threads via GraphQL:', e2?.message ?? e2);
+      const outdatedCommentsFallback = await getOutdatedComments();
+      console.log(`📊 Fallback heuristic found ${outdatedCommentsFallback.length} outdated comment(s)\n`);
+    }
   }
   let resolvedOutdatedCount = 0;
 
   for (const thread of outdatedThreads) {
-    const head = thread?.comments?.nodes?.[0];
-    const ref = head ? `comment #${head.id} in ${head.path}` : `thread ${thread.id}`;
+    // Normalize reference for log across REST/GraphQL shapes
+    const restHead = thread?.comments?.[0];
+    const gqlHead = thread?.comments?.nodes?.[0];
+    const head = restHead || gqlHead;
+    const threadId = thread.id;
+    const ref = head ? `comment #${head.id} in ${head.path || 'unknown'}` : `thread ${threadId}`;
     console.log(`  🔄 Resolving outdated ${ref}...`);
-    const ok = await resolveReviewThread(thread.id);
+    const ok = await resolveReviewThread(threadId);
     if (ok) {
       resolvedOutdatedCount++;
       console.log(`  ✅ Resolved outdated ${ref}`);
