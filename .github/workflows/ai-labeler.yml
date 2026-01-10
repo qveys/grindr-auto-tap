@@ -1,0 +1,113 @@
+name: AI Labeler
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited]
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: AI Labeling
+        uses: actions/github-script@v7
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          script: |
+            if (!process.env.OPENAI_API_KEY) {
+              console.log('No OPENAI_API_KEY provided. Skipping AI labeling.');
+              return;
+            }
+            
+            const issue = context.payload.issue || context.payload.pull_request;
+            const title = issue.title;
+            const body = issue.body || '';
+            
+            // List of defined labels
+            const labels = [
+              "area: auth", "area: background", "area: build", "area: content", "area: core",
+              "area: engine", "area: legacy", "area: logger", "area: popup", "area: storage", "area: tests",
+              "area: ui", "area: api",
+              "breaking-change",
+              "browser: chrome", "browser: cross-browser", "browser: firefox",
+              "effort: small", "effort: medium", "effort: large", "effort: xlarge",
+              "meta: good-first-issue", "meta: help-wanted", "meta: needs-discussion",
+              "priority: critical", "priority: high", "priority: low", "priority: medium",
+              "roadmap: phase-1", "roadmap: phase-2", "roadmap: phase-3",
+              "status: blocked", "status: duplicate", "status: in-progress", "status: invalid",
+              "status: migration-wip", "status: needs-info", "status: on-hold", "status: review-needed", "status: wontfix",
+              "type: breaking-change", "type: bug", "type: build", "type: chore", "type: dependency",
+              "type: documentation", "type: enhancement", "type: feature", "type: migration",
+              "type: performance", "type: question", "type: refactor", "type: security", "type: test", "type: release"
+            ];
+
+            const prompt = `
+            You are a GitHub repository maintainer.
+            Analyze the following Issue or Pull Request and assign the most appropriate labels from the list below.
+            
+            Title: ${title}
+            Body: ${body}
+            
+            Available Labels:
+            ${labels.join(', ')}
+            
+            Rules:
+            - Select 1 to 5 labels.
+            - Always select at least one 'type:' label.
+            - If it's a bug, select 'type: bug'.
+            - If it's a feature, select 'type: feature'.
+            - Select an 'area:' label if possible.
+            - Return ONLY a JSON array of strings. Example: ["type: bug", "area: auth"]
+            `;
+
+            try {
+              const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o-mini',
+                  messages: [{ role: 'user', content: prompt }],
+                  temperature: 0
+                })
+              });
+
+              const data = await response.json();
+              if (data.error) {
+                console.error('OpenAI Error:', data.error);
+                return;
+              }
+
+              let suggestedLabels = [];
+              const content = data.choices[0].message.content.trim();
+              
+              // Try to find JSON array in the text
+              const jsonMatch = content.match(/\[.*\]/s);
+              if (jsonMatch) {
+                suggestedLabels = JSON.parse(jsonMatch[0]);
+              } else {
+                suggestedLabels = JSON.parse(content);
+              }
+
+              // Filter valid labels
+              const validLabels = suggestedLabels.filter(l => labels.includes(l));
+              
+              if (validLabels.length > 0) {
+                console.log('Adding labels:', validLabels);
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: validLabels
+                });
+              }
+            } catch (error) {
+              console.error('Error during AI labeling:', error);
+            }
