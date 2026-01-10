@@ -30,12 +30,10 @@ jobs:
 
       - name: Download previous cache
         continue-on-error: true
-        run: |
-          if git show HEAD:.github/pr-resolution-cache.json 2>/dev/null; then
-            mkdir -p .github
-            git show HEAD:.github/pr-resolution-cache.json > .github/pr-resolution-cache.json
-          fi
-
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-resolution-cache
+          path: .github
       - name: Run auto-resolution
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
