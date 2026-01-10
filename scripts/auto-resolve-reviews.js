@@ -534,7 +534,7 @@ function formatSummary(results, apiCalls, cacheHits) {
   return `🤖 **Auto-Resolution Summary**
 
 ✅ **Resolved:** ${results.resolved.length} review comment(s)
-⚠️ **Low Confidence:** ${results.lowConfidence.length} review comment(s)  
+⚠️ **Low Confidence:** ${results.lowConfidence.length} review comment(s)
 ❌ **Not Resolved:** ${results.notResolved.length} review comment(s)
 
 📊 **Stats:** ${apiCalls} API calls | ${cacheHits} cache hits | ${results.resolved.length + results.lowConfidence.length + results.notResolved.length} total analyzed`;
