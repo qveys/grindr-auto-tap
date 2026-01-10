@@ -28,9 +28,25 @@ jobs:
               return;
             } 
 
-            const latestCommit = commits[commits.length - 1];
+            // Find the latest content-changing commit that requires review
+            let latestCommit = commits[commits.length - 1];
+            for (let i = commits.length - 1; i >= 0; i--) {
+              const c = commits[i];
+              const message = c.commit.message; 
+              
+              // Skip commits that shouldn't invalidate a review
+              const isMerge = message.startsWith('Merge branch') || message.startsWith('Merge pull request');
+              const isRevert = message.startsWith('Revert "');
+              const isSkip = message.includes('[skip review]');
+
+              if (!isMerge && !isRevert && !isSkip) {
+                latestCommit = c;
+                break;
+              }
+            }
+
             const latestCommitDate = new Date(latestCommit.commit.committer.date);
-            core.info(`⏱️ Latest commit: ${latestCommit.sha.substring(0, 7)} at ${latestCommitDate.toISOString()}`);
+            core.info(`⏱️ Latest content commit: ${latestCommit.sha.substring(0, 7)} at ${latestCommitDate.toISOString()}`);
             
             // Get all reviews
             const { data: reviews } = await github.rest.pulls.listReviews({
