@@ -74,6 +74,15 @@ async function getOutdatedThreads() {
   });
 
   const nodes = res.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
+
+  console.log(`    🔍 GraphQL Raw Stats: Fetched ${nodes.length} threads`);
+  nodes.forEach((t, i) => {
+    console.log(`      [${i}] id=${t.id} isOutdated=${t.isOutdated} isResolved=${t.isResolved}`);
+    if (t.comments?.nodes?.length > 0) {
+      console.log(`          Sample comment: ${t.comments.nodes[0].body.substring(0, 50)}...`);
+    }
+  });
+
   return nodes.filter(t => t.isOutdated === true && t.isResolved === false);
 }
 
