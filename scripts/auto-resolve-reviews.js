@@ -1,4 +1,3 @@
-
 const fs = require('fs');
 const path = require('path');
 const { Octokit } = require('octokit');
@@ -183,6 +182,13 @@ Respond in JSON format:
 
     const data = await response.json();
     if (!response.ok) {
+      // Check if it's a blocking authentication error
+      if (data.error && (data.error.code === 'invalid_api_key' || data.error.code === 'authentication_error')) {
+        console.error('\n❌ FATAL ERROR: OpenAI Authentication Failed');
+        console.error(`   Error: ${data.error.message}`);
+        console.error('   Please verify your OPENAI_API_KEY environment variable is set correctly.');
+        throw new Error(`OpenAI API Authentication Error: ${data.error.message}`);
+      }
       console.error('OpenAI API error:', data);
       return null;
     }
@@ -196,8 +202,8 @@ Respond in JSON format:
 
     return JSON.parse(jsonMatch[0]);
   } catch (error) {
-    console.error('Error calling OpenAI:', error);
-    return null;
+    console.error('Error calling OpenAI:', error.message);
+    throw error; // Re-throw to make it blocking
   }
 }
 
@@ -505,6 +511,6 @@ function formatJobSummary(results, apiCalls, cacheHits) {
 }
 
 main().catch(error => {
-  console.error('❌ Workflow failed:', error);
+  console.error('❌ Workflow failed:', error.message);
   process.exit(1);
 });
