@@ -277,9 +277,8 @@ function preFilterCommits(comments, commits) {
 }
 
 // Check if commit touches the region around the comment line
-function isInRegion(diff, commentLine, commentId) {
+function isInRegion(diff, commentLine) {
   if (commentLine == null || Number.isNaN(Number(commentLine))) {
-    console.log(`   ℹ️ Skipping region check: missing comment line (Comment #${commentId || 'unknown'})`);
     return true;
   }
   const lines = diff.split('\n');
@@ -355,9 +354,21 @@ async function main() {
 
   for (const { comment, candidates } of filtered) {
     const validCandidates = [];
+    const hasLine = comment.line != null && !Number.isNaN(Number(comment.line));
+
+    if (!hasLine) {
+      console.log(`   ℹ️ Comment #${comment.id} missing line check: checking all ${candidates.length} candidates.`);
+    }
+
     for (const commit of candidates) {
       const diff = await getFileDiff(commit, comment.path);
-      if (isInRegion(diff, comment.line, comment.id)) {
+
+      if (!hasLine) {
+        validCandidates.push({ ...commit, diff });
+        continue;
+      }
+
+      if (isInRegion(diff, comment.line)) {
         validCandidates.push({ ...commit, diff });
       }
     }
@@ -391,7 +402,7 @@ async function main() {
         });
         console.log(`   ✅ Resolved by: ${resolvingCommits.map(c => c.sha).join(', ')}`);
       }
-    } else if (analysis && analysis.confidence > 0) {
+    } else if (analysis && analysis.resolves && analysis.confidence > 0) {
       results.lowConfidence.push({
         commentId: comment.id,
         line: comment.line,
