@@ -28,23 +28,19 @@ jobs:
       - name: Install dependencies
         run: npm install octokit
 
-      - name: Download previous cache
-        continue-on-error: true
-        uses: actions/download-artifact@v4
+      - name: Restore/Save Cache
+        uses: actions/cache@v4
         with:
-          name: pr-resolution-cache
-          path: .github
+          path: .github/pr-resolution-cache.json
+          # Use run_id in the key to force a new cache entry save every run (if changed)
+          key: pr-resolution-cache-${{ github.run_id }}
+          # Restore from the latest available cache with this prefix
+          restore-keys: |
+            pr-resolution-cache-
+
       - name: Run auto-resolution
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: node scripts/auto-resolve-reviews.js
-
-      - name: Upload cache as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-resolution-cache
-          path: .github/pr-resolution-cache.json
-          retention-days: 7
