@@ -1,0 +1,2 @@
+This is a placeholder for icon128.png
+You should replace this with an actual 128x128 PNG icon

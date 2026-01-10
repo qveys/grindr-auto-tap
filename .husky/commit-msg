@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+
+/**
+ * Custom emoji-based commit message validation
+ * Enforces conventional commits with emojis
+ */
+
+const fs = require('fs');
+
+const COMMIT_MSG_FILE = process.argv[2];
+const commitMessage = fs.readFileSync(COMMIT_MSG_FILE, 'utf-8').trim();
+
+// Valid emoji prefixes
+const VALID_EMOJIS = {
+  '✨': 'New feature',
+  '🐛': 'Bug fix',
+  '📚': 'Documentation',
+  '♻️': 'Refactoring',
+  '⚡': 'Performance improvement',
+  '✅': 'Tests',
+  '🔧': 'Configuration',
+  '🔒': 'Security',
+  '⬆️': 'Dependencies upgrade',
+  '⬇️': 'Dependencies downgrade',
+  '🎨': 'Style/formatting',
+  '🚀': 'Deployment',
+  '🔥': 'Remove code/files',
+  '💥': 'Breaking changes',
+  '🚑': 'Critical hotfix',
+  '🔀': 'Merge',
+  '⏪': 'Revert',
+  '🏗️': 'Architecture',
+  '📦': 'Package/build',
+  '👷': 'CI/CD',
+};
+
+// Pattern: emoji + space + message (min 10 chars)
+const COMMIT_PATTERN = new RegExp(
+  `^(${Object.keys(VALID_EMOJIS).join('|')}) .{10,}$`
+);
+
+// Allow merge commits, revert commits, and automated commits
+const SPECIAL_PATTERNS = [
+  /^Merge /,
+  /^Revert /,
+  /^Initial commit$/,
+  /^Bump version/,
+];
+
+function validateCommit(message) {
+  // Check special patterns
+  for (const pattern of SPECIAL_PATTERNS) {
+    if (pattern.test(message)) {
+      return { valid: true };
+    }
+  }
+
+  // Check emoji pattern
+  if (!COMMIT_PATTERN.test(message)) {
+    const validEmojis = Object.entries(VALID_EMOJIS)
+      .map(([emoji, desc]) => `  ${emoji}  ${desc}`)
+      .join('\n');
+
+    return {
+      valid: false,
+      error: `
+❌ Invalid commit message format!
+
+Your commit message:
+"${message}"
+
+Expected format: <emoji> <message>
+
+Valid emojis:
+${validEmojis}
+
+Examples:
+  ✨ Add new feature for auto-tapping
+  🐛 Fix issue with storage API
+  📚 Update README with new instructions
+  ♻️ Refactor message handler
+
+Message must be at least 10 characters after the emoji.
+`,
+    };
+  }
+
+  return { valid: true };
+}
+
+const result = validateCommit(commitMessage);
+
+if (!result.valid) {
+  console.error(result.error);
+  process.exit(1);
+}
+
+console.log('✅ Commit message validated successfully!');
+process.exit(0);
