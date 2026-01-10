@@ -97,11 +97,17 @@ async function getCommitsWithDiffs() {
       ref: commit.sha,
     });
 
+    const filesData = diffResponse.files || [];
+    console.log(`  Commit ${commit.sha.substring(0, 8)}: ${filesData.length} files modified`);
+    if (filesData.length === 0) {
+      console.warn(`    ⚠️ No files found for commit ${commit.sha.substring(0, 8)} - check API response`);
+    }
+    
     commits.push({
       sha: commit.sha,
       message: commit.commit.message,
       author: commit.commit.author.name,
-      files: diffResponse.files || [],
+      files: filesData,
       tree: commitDetail.tree,
     });
   }
@@ -196,14 +202,25 @@ Respond in JSON format:
 function preFilterCommits(comments, commits) {
   const filtered = [];
 
+  console.log(`\n🔍 Pre-filtering: ${comments.length} comments vs ${commits.length} commits`);
+  console.log(`📝 Commits files structure sample:`, commits[0]?.files?.slice(0, 2));
+
   for (const comment of comments) {
     const commentFile = comment.path;
-    const matchingCommits = commits.filter(commit =>
-      commit.files.some(
+    console.log(`\n  📄 Comment file: "${commentFile}"`);
+    
+    const matchingCommits = commits.filter(commit => {
+      const hasFile = commit.files.some(
         file => file.filename === commentFile
-      )
-    );
+      );
+      if (!hasFile && commit.files.length > 0) {
+        console.log(`    Files in commit: ${commit.files.map(f => f.filename).join(', ')}`);
+      }
+      return hasFile;
+    });
 
+    console.log(`    ✓ Found ${matchingCommits.length} matching commits`);
+    
     if (matchingCommits.length > 0) {
       filtered.push({
         comment,
