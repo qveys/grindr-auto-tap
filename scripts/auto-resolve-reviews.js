@@ -81,9 +81,10 @@ async function getOutdatedThreads() {
   }
 
   // Log full structure to debug nulls
+
   console.log('    🔍 Full GraphQL Response:', JSON.stringify(res.data, null, 2));
 
-  const nodes = res.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
+  const nodes = res.data?.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
 
   console.log(`    🔍 GraphQL Raw Stats: Fetched ${nodes.length} threads`);
   nodes.forEach((t, i) => {
