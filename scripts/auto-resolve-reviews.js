@@ -68,10 +68,20 @@ async function getOutdatedThreads() {
     }
   `;
 
+  const variables = { owner, repo, prNumber };
+  console.log(`    🔍 GraphQL Variables:`, JSON.stringify(variables));
+
   const res = await octokit.request('POST /graphql', {
     query,
-    variables: { owner, repo, prNumber },
+    variables,
   });
+
+  if (res.errors) {
+    console.error('    ❌ GraphQL Errors:', JSON.stringify(res.errors, null, 2));
+  }
+
+  // Log full structure to debug nulls
+  console.log('    🔍 Full GraphQL Response:', JSON.stringify(res.data, null, 2));
 
   const nodes = res.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
 
