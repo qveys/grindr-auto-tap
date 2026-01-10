@@ -1,0 +1,440 @@
+
+const fs = require('fs');
+const path = require('path');
+const { Octokit } = require('octokit');
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GITHUB_EVENT = JSON.parse(
+  fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')
+);
+
+const octokit = new Octokit({ auth: GITHUB_TOKEN });
+const owner = GITHUB_EVENT.repository.owner.login;
+const repo = GITHUB_EVENT.repository.name;
+const prNumber = GITHUB_EVENT.pull_request.number;
+
+// Use __dirname for robust path resolution
+const CACHE_FILE = path.join(__dirname, '..', '.github', 'pr-resolution-cache.json');
+const CONFIDENCE_THRESHOLD = 0.85;
+const CONTEXT_LINES = 15;
+
+// Load cache
+function loadCache() {
+  if (fs.existsSync(CACHE_FILE)) {
+    return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+  }
+  return { processedPairs: {}, resolutions: {} };
+}
+
+// Save cache
+function saveCache(cache) {
+  fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
+  fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
+}
+
+// Get all unresolved comments in PR
+async function getUnresolvedComments() {
+  const response = await octokit.rest.pulls.listReviewComments({
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
+
+  // Filter only unresolved threads (comments without "Fixed by" resolution)
+  return response.data.filter(comment => {
+    return !comment.body.includes('Fixed by commit');
+  });
+}
+
+// Get all commits in PR with diffs
+async function getCommitsWithDiffs() {
+  const response = await octokit.rest.pulls.listCommits({
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
+
+  const commits = [];
+  for (const commit of response.data) {
+    const commitDetail = await octokit.rest.git.getCommit({
+      owner,
+      repo,
+      commit_sha: commit.sha,
+    });
+
+    const diffResponse = await octokit.rest.repos.getCommit({
+      owner,
+      repo,
+      ref: commit.sha,
+    });
+
+    commits.push({
+      sha: commit.sha,
+      message: commit.commit.message,
+      author: commit.commit.author.name,
+      files: diffResponse.files || [],
+      tree: commitDetail.tree,
+    });
+  }
+
+  return commits;
+}
+
+// Get diff for a specific file in a commit
+async function getFileDiff(commit, filename) {
+  const response = await octokit.rest.repos.getCommit({
+    owner,
+    repo,
+    ref: commit.sha,
+  });
+
+  const file = response.files?.find(f => f.filename === filename);
+  return file?.patch || '';
+}
+
+// Call OpenAI to analyze if commit resolves comment
+async function analyzeWithOpenAI(comment, commitMessage, diff) {
+  const prompt = `You are a code review assistant. Analyze if the given commit resolves the review comment.
+
+REVIEW COMMENT:
+${comment.body}
+
+COMMIT MESSAGE:
+${commitMessage}
+
+CHANGED CODE (diff):
+${diff.substring(0, 3000)}  # Limited to first 3000 chars to save tokens
+
+Task:
+1. Extract the core problem/request from the review comment
+2. Determine if the commit + diff addresses this problem
+3. Provide a confidence score (0-100) of resolution
+
+IMPORTANT:
+- The commit must change the same file where the comment was made
+- The changes must logically address the problem described in the comment
+- Be strict about what constitutes a valid resolution
+
+Respond in JSON format:
+{
+  "problemExtracted": "Brief description of what the comment asks for",
+  "resolves": true/false,
+  "confidence": 0-100,
+  "reasoning": "Brief explanation"
+}`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 500,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('OpenAI API error:', data);
+      return null;
+    }
+
+    const content = data.choices[0].message.content;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('Failed to parse OpenAI response:', content);
+      return null;
+    }
+
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('Error calling OpenAI:', error);
+    return null;
+  }
+}
+
+// Pre-filter: find commits that touch the same file as the comment
+function preFilterCommits(comments, commits) {
+  const filtered = [];
+
+  for (const comment of comments) {
+    const commentFile = comment.path;
+    const matchingCommits = commits.filter(commit =>
+      commit.files.some(
+        file => file.filename === commentFile
+      )
+    );
+
+    if (matchingCommits.length > 0) {
+      filtered.push({
+        comment,
+        candidates: matchingCommits,
+      });
+    }
+  }
+
+  return filtered;
+}
+
+// Check if commit touches the region around the comment line
+function isInRegion(diff, commentLine) {
+  const lines = diff.split('\n');
+  let currentLine = 0;
+
+  for (const line of lines) {
+    if (line.startsWith('@@')) {
+      const match = line.match(/@@ -\d+,?\d* \+(\d+),?\d* @@/);
+      if (match) {
+        currentLine = parseInt(match[1]);
+      }
+    } else if (!line.startsWith('-')) {
+      currentLine++;
+
+      if (Math.abs(currentLine - commentLine) <= CONTEXT_LINES) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Main workflow
+async function main() {
+  console.log(`🔍 Analyzing PR #${prNumber}...\n`);
+
+  const cache = loadCache();
+  const comments = await getUnresolvedComments();
+  const commits = await getCommitsWithDiffs();
+
+  console.log(`📊 Found ${comments.length} unresolved comments and ${commits.length} commits\n`);
+
+  const filtered = preFilterCommits(comments, commits);
+  console.log(`🎯 Pre-filtered to ${filtered.length} comment/commit pairs\n`);
+
+  const results = {
+    resolved: [],
+    lowConfidence: [],
+    notResolved: [],
+  };
+
+  let apiCalls = 0;
+  const cacheHits = [];
+
+  // Analyze each comment against candidate commits
+  for (const { comment, candidates } of filtered) {
+    const pairKey = `${comment.id}`;
+    const resolvingCommits = [];
+    let highestConfidence = 0;
+
+    for (const commit of candidates) {
+      const pairId = `${comment.id}-${commit.sha}`;
+
+      // Check cache
+      if (cache.processedPairs[pairId]) {
+        const cached = cache.processedPairs[pairId];
+        if (cached.resolves && cached.confidence >= CONFIDENCE_THRESHOLD) {
+          resolvingCommits.push({
+            sha: commit.sha.substring(0, 8),
+            confidence: cached.confidence,
+          });
+          cacheHits.push(pairId);
+        } else if (cached.confidence > highestConfidence) {
+          highestConfidence = cached.confidence;
+        }
+        continue;
+      }
+
+      // Get file diff
+      const diff = await getFileDiff(commit, comment.path);
+
+      // Check if commit touches the region
+      if (!isInRegion(diff, comment.line)) {
+        cache.processedPairs[pairId] = {
+          resolves: false,
+          confidence: 0,
+          reason: 'Not in region',
+        };
+        continue;
+      }
+
+      // Call OpenAI
+      const analysis = await analyzeWithOpenAI(
+        comment,
+        commit.message,
+        diff
+      );
+      apiCalls++;
+
+      if (!analysis) {
+        cache.processedPairs[pairId] = {
+          resolves: false,
+          confidence: 0,
+          reason: 'OpenAI analysis failed',
+        };
+        continue;
+      }
+
+      const confidence = analysis.confidence / 100;
+      cache.processedPairs[pairId] = {
+        resolves: analysis.resolves,
+        confidence: analysis.confidence,
+        reasoning: analysis.reasoning,
+      };
+
+      if (analysis.resolves && confidence >= CONFIDENCE_THRESHOLD) {
+        resolvingCommits.push({
+          sha: commit.sha.substring(0, 8),
+          confidence: analysis.confidence,
+        });
+      } else if (confidence > highestConfidence) {
+        highestConfidence = confidence;
+      }
+
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // Store results
+    if (resolvingCommits.length > 0) {
+      results.resolved.push({
+        commentId: comment.id,
+        line: comment.line,
+        commits: resolvingCommits,
+        body: comment.body.substring(0, 100),
+      });
+      cache.resolutions[pairKey] = resolvingCommits.map(c => c.sha);
+    } else if (highestConfidence > 0) {
+      results.lowConfidence.push({
+        commentId: comment.id,
+        line: comment.line,
+        highestConfidence,
+        body: comment.body.substring(0, 100),
+      });
+    } else {
+      results.notResolved.push({
+        commentId: comment.id,
+        line: comment.line,
+        body: comment.body.substring(0, 100),
+      });
+    }
+  }
+
+  // Save updated cache
+  saveCache(cache);
+
+  // Post resolutions to PR
+  for (const resolution of results.resolved) {
+    const commitShas = resolution.commits
+      .map(c => `${c.sha}`)
+      .join(', ');
+
+    await octokit.rest.pulls.createReplyForReviewComment({
+      owner,
+      repo,
+      pull_number: prNumber,
+      comment_id: resolution.commentId,
+      body: `Fixed by commits: ${commitShas}`,
+    });
+
+    // Resolve the thread
+    await octokit.rest.pulls.updateReviewComment({
+      owner,
+      repo,
+      comment_id: resolution.commentId,
+      pull_number: prNumber,
+      body: `Fixed by commits: ${commitShas}`,
+    });
+  }
+
+  // Post low-confidence notifications
+  for (const lowConf of results.lowConfidence) {
+    const commitSha = Object.keys(cache.processedPairs).find(
+      key => key.startsWith(lowConf.commentId.toString())
+    );
+
+    await octokit.rest.pulls.createReplyForReviewComment({
+      owner,
+      repo,
+      pull_number: prNumber,
+      comment_id: lowConf.commentId,
+      body: `⚠️ Potentially resolved (${lowConf.highestConfidence}% confidence). Please review manually.`,
+    });
+  }
+
+  // Post summary comment
+  const summaryComment = formatSummary(results, apiCalls, cacheHits.length);
+  await octokit.rest.issues.createComment({
+    owner,
+    repo,
+    issue_number: prNumber,
+    body: summaryComment,
+  });
+
+  // Write to job summary
+  const jobSummary = formatJobSummary(results, apiCalls, cacheHits.length);
+  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
+
+  console.log(jobSummary);
+}
+
+function formatSummary(results, apiCalls, cacheHits) {
+  return `🤖 **Auto-Resolution Summary**
+
+✅ **Resolved:** ${results.resolved.length} review comment(s)
+⚠️ **Low Confidence:** ${results.lowConfidence.length} review comment(s)  
+❌ **Not Resolved:** ${results.notResolved.length} review comment(s)
+
+📊 **Stats:** ${apiCalls} API calls | ${cacheHits} cache hits | ${results.resolved.length + results.lowConfidence.length + results.notResolved.length} total analyzed`;
+}
+
+function formatJobSummary(results, apiCalls, cacheHits) {
+  let summary = `# 🤖 Auto-Resolution Report\n\n`;
+
+  if (results.resolved.length > 0) {
+    summary += `## ✅ Resolved (${results.resolved.length})\n`;
+    results.resolved.forEach(r => {
+      summary += `- Comment #${r.commentId} (line ${r.line}) → ${r.commits.map(c => c.sha).join(', ')}\n`;
+    });
+    summary += '\n';
+  }
+
+  if (results.lowConfidence.length > 0) {
+    summary += `## ⚠️ Low Confidence (${results.lowConfidence.length})\n`;
+    results.lowConfidence.forEach(r => {
+      summary += `- Comment #${r.commentId} (line ${r.line}) - ${r.highestConfidence}% confidence\n`;
+    });
+    summary += '\n';
+  }
+
+  if (results.notResolved.length > 0) {
+    summary += `## ❌ Not Resolved (${results.notResolved.length})\n`;
+    results.notResolved.forEach(r => {
+      summary += `- Comment #${r.commentId} (line ${r.line})\n`;
+    });
+    summary += '\n';
+  }
+
+  summary += `## 📊 Stats\n`;
+  summary += `- API Calls: ${apiCalls}\n`;
+  summary += `- Cache Hits: ${cacheHits}\n`;
+  summary += `- Total Analyzed: ${results.resolved.length + results.lowConfidence.length + results.notResolved.length}\n`;
+
+  return summary;
+}
+
+main().catch(error => {
+  console.error('❌ Workflow failed:', error);
+  process.exit(1);
+});
