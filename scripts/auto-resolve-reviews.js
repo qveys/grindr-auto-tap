@@ -31,23 +31,12 @@ function saveCache(cache) {
   fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
 }
 
-// Get all unresolved comments in PR
-async function getUnresolvedComments() {
-  const response = await octokit.rest.pulls.listReviewComments({
-    owner,
-    repo,
-    pull_number: prNumber,
-  });
 
-  // Filter only unresolved threads (comments without "Fixed by" resolution)
-  return response.data.filter(comment => {
-    return !comment.body.includes('Fixed by commit');
-  });
-}
 
 
 // GraphQL: Fetch review threads to get accurate `isOutdated`/`isResolved`
-async function getOutdatedThreads() {
+// GraphQL: Fetch all review threads
+async function getAllReviewThreads() {
   const query = `
     query($owner: String!, $repo: String!, $prNumber: Int!) {
       repository(owner: $owner, name: $repo) {
@@ -57,8 +46,15 @@ async function getOutdatedThreads() {
               id
               isResolved
               isOutdated
-              comments(first: 1) {
-                nodes { id body path line }
+              comments(first: 50) {
+                nodes {
+                  id
+                  databaseId
+                  body
+                  path
+                  line
+                  author { login }
+                }
               }
             }
           }
@@ -79,10 +75,7 @@ async function getOutdatedThreads() {
     console.error('    ❌ GraphQL Errors:', JSON.stringify(res.errors, null, 2));
   }
 
-  // Log full structure to debug nulls
-
-  const nodes = res.data?.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
-  return nodes.filter(t => t.isOutdated === true && t.isResolved === false);
+  return res.data?.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
 }
 
 // REST: Fetch review threads and filter outdated/unresolved
@@ -309,9 +302,12 @@ async function main() {
   const cache = loadCache();
   const commits = await getCommitsWithDiffs();
 
-  // Resolve outdated review threads: detect via GraphQL
-  console.log(`🔎 Checking for outdated review threads (GraphQL)...\n`);
-  const outdatedThreads = await getOutdatedThreads();
+  // Fetch all threads once
+  console.log(`🔎 Fetching all review threads (GraphQL)...\n`);
+  const allThreads = await getAllReviewThreads();
+
+  // 1. Handle Outdated Threads
+  const outdatedThreads = allThreads.filter(t => t.isOutdated === true && t.isResolved === false);
   console.log(`📊 Found ${outdatedThreads.length} outdated thread(s)\n`);
 
   let resolvedOutdatedCount = 0;
@@ -331,8 +327,38 @@ async function main() {
     console.log(`\n🎯 Resolved ${resolvedOutdatedCount} outdated comment(s)\n`);
   }
 
-  // Then get remaining unresolved comments
-  const comments = await getUnresolvedComments();
+  // 2. Handle Unresolved Comments (Active Threads)
+  // Filter for:
+  // - Not valid outdated (handled above)
+  // - isResolved = false
+  // - No "Fixed by commits: ..." reply from bot
+
+  const unresolvedThreads = allThreads.filter(t => {
+    if (t.isResolved) return false;
+    if (t.isOutdated) return false; // Already tried to resolve if it was outdated
+
+    // Check for existing bot resolution reply
+    const hasBotResolution = t.comments.nodes.some(c =>
+      c.body.includes('Fixed by commits') || c.body.includes('Fixed by commit')
+    );
+
+    return !hasBotResolution;
+  });
+
+  // Map to comment objects for analysis (use the first comment in the thread)
+  const comments = unresolvedThreads
+    .map(t => {
+      const first = t.comments.nodes[0];
+      if (!first) return null;
+      return {
+        id: first.databaseId, // Use databaseId for REST API compatibility
+        body: first.body,
+        path: first.path,
+        line: first.line
+      };
+    })
+    .filter(c => c !== null);
+
   console.log(`📊 Found ${comments.length} unresolved comments and ${commits.length} commits\n`);
 
   const filtered = preFilterCommits(comments, commits);
