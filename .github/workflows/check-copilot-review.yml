@@ -24,7 +24,7 @@ jobs:
             
             // Get the latest commit date
             if (!commits || commits.length === 0) {
-              core.info('ℹ️ no commits found in the pull request. Skipping Copilot review freshness check.");
+              core.info('ℹ️ no commits found in the pull request. Skipping Copilot review freshness check.');
               return;
             } 
 
