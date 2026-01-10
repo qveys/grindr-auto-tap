@@ -15,7 +15,6 @@ const prNumber = GITHUB_EVENT.pull_request.number;
 
 // Use __dirname for robust path resolution
 const CACHE_FILE = path.join(__dirname, '..', '.github', 'pr-resolution-cache.json');
-const CONFIDENCE_THRESHOLD = 0.85;
 const CONTEXT_LINES = 15;
 
 // Load cache
@@ -231,7 +230,7 @@ Respond in JSON:
     }
 
     const content = data.choices[0]?.message?.content ?? '';
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = content.match(/\{[\s\S]*}/);
     if (!jsonMatch) return null;
 
     const parsed = JSON.parse(jsonMatch[0]);
@@ -278,9 +277,9 @@ function preFilterCommits(comments, commits) {
 }
 
 // Check if commit touches the region around the comment line
-function isInRegion(diff, commentLine) {
+function isInRegion(diff, commentLine, commentId) {
   if (commentLine == null || Number.isNaN(Number(commentLine))) {
-    console.log('   ℹ️ Skipping region check: missing comment line');
+    console.log(`   ℹ️ Skipping region check: missing comment line (Comment #${commentId || 'unknown'})`);
     return true;
   }
   const lines = diff.split('\n');
@@ -347,16 +346,18 @@ async function main() {
   };
 
   // Pre-execution estimate of OpenAI calls (upper bound)
-  const totalPairs = filtered.reduce((sum, { candidates }) => sum + candidates.length, 0);
+  filtered.reduce((sum, { candidates }) => sum + candidates.length, 0);
   // Optimize: Batch analysis
   // Group 1: Filter potential candidates strictly FIRST (isInRegion)
   const commentsToAnalyze = [];
+  let apiCalls = 0;
+
 
   for (const { comment, candidates } of filtered) {
     const validCandidates = [];
     for (const commit of candidates) {
       const diff = await getFileDiff(commit, comment.path);
-      if (isInRegion(diff, comment.line)) {
+      if (isInRegion(diff, comment.line, comment.id)) {
         validCandidates.push({ ...commit, diff });
       }
     }
@@ -447,7 +448,7 @@ async function main() {
   // Only post summary comment if there are comments to analyze
   if (comments.length > 0) {
     // Post summary comment
-    const summaryComment = formatSummary(results, apiCalls, cacheHits.length);
+    const summaryComment = formatSummary(results, apiCalls, 0);
     await octokit.rest.issues.createComment({
       owner,
       repo,
@@ -457,7 +458,7 @@ async function main() {
   }
 
   // Write to job summary
-  const jobSummary = formatJobSummary(results, apiCalls, cacheHits.length);
+  const jobSummary = formatJobSummary(results, apiCalls, 0);
   fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
 
   console.log(jobSummary);
