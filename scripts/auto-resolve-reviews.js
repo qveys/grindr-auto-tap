@@ -161,6 +161,14 @@ Respond in JSON format:
 }`;
 
   try {
+    const diffLen = typeof diff === 'string' ? diff.length : 0;
+    const promptLen = prompt.length;
+    const commitMsgLen = typeof commitMessage === 'string' ? commitMessage.length : 0;
+    console.log(`\n🧠 OpenAI analyze start -> comment #${comment?.id ?? 'n/a'} @ ${comment?.path ?? 'n/a'}:${comment?.line ?? 'n/a'}`);
+    console.log(`   • model=gpt-4o-mini • temperature=0.3 • max_tokens=500`);
+    console.log(`   • lengths: diff=${diffLen} chars, commitMsg=${commitMsgLen} chars, prompt=${promptLen} chars`);
+    console.time(`openai_request_${comment?.id ?? 'n/a'}`);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -181,6 +189,8 @@ Respond in JSON format:
     });
 
     const data = await response.json();
+    console.timeEnd(`openai_request_${comment?.id ?? 'n/a'}`);
+    console.log(`   ← OpenAI status: ${response.status}`);
     if (!response.ok) {
       // Check if it's a blocking authentication error
       if (data.error && (data.error.code === 'invalid_api_key' || data.error.code === 'authentication_error')) {
@@ -189,20 +199,23 @@ Respond in JSON format:
         console.error('   Please verify your OPENAI_API_KEY environment variable is set correctly.');
         throw new Error(`OpenAI API Authentication Error: ${data.error.message}`);
       }
-      console.error('OpenAI API error:', data);
+      console.error('   ❌ OpenAI API error:', data);
       return null;
     }
 
-    const content = data.choices[0].message.content;
+    const choicesCount = Array.isArray(data.choices) ? data.choices.length : 0;
+    console.log(`   ✅ OpenAI OK. choices=${choicesCount}`);
+    const content = data.choices[0]?.message?.content ?? '';
+    console.log(`   🧾 Content head: ${content.slice(0, 140).replace(/\n/g, ' ')}`);
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.error('Failed to parse OpenAI response:', content);
+      console.error('   ⚠️ Failed to parse OpenAI response. Raw head:', content.slice(0, 200).replace(/\n/g, ' '));
       return null;
     }
 
     return JSON.parse(jsonMatch[0]);
   } catch (error) {
-    console.error('Error calling OpenAI:', error.message);
+    console.error('   ❌ Error calling OpenAI:', error?.message ?? error);
     throw error; // Re-throw to make it blocking
   }
 }
