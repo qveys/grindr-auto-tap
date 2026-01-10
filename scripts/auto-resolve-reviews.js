@@ -431,6 +431,7 @@ async function main() {
       }
 
       // Call OpenAI
+      console.log(`\n⏳ OpenAI Call ${apiCalls + 1} / ~${plannedCallsUpperBound}`);
       const analysis = await analyzeWithOpenAI(
         comment,
         commit.message,
