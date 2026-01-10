@@ -26,7 +26,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install --no-save octokit dotenv
+        run: npm install octokit
 
       - name: Download previous cache
         continue-on-error: true
