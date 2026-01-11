@@ -222,9 +222,6 @@ jobs:
               core.warning(`status: review-needed is present → attempting to trigger bot review (${preferredBotLogin}) and failing check.`);
 
               // Only Copilot Code Review has a public endpoint; other bots are usually not triggerable.
-              const isCopilotLike =
-                preferredBotLogin.toLowerCase().includes("copilot");
-
                 try {
                   await github.rest.pulls.requestReviewers({
                     owner,
@@ -237,9 +234,6 @@ jobs:
                   core.error(`❌ Request code review: Failed to request review from ${preferredBotLogin}`);
                   core.setFailed(error.message);
                 }
-              } else {
-                core.info(`No known API trigger for bot '${preferredBotLogin}' - attempted standard review request.`);
-              }
 
               core.setFailed("❌ Bot review required (status: review-needed). Waiting for a fresh bot review.");
               return;
