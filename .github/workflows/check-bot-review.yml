@@ -227,14 +227,19 @@ jobs:
                     owner,
                     repo,
                     pull_number: pull_number,
-                    reviewers: [preferredBotLogin]
+                    reviewers: [preferredBotLogin],
+                    team_reviewers: ["github/copilot"]
                   });
                   
-                  const requested = result.data.requested_reviewers || [];
-                  if (requested.length > 0) {
-                    core.info(`✅ Request code review: Success (requested ${requested.map(r => r.login).join(', ')})`);
+                  const requestedUsers = result.data.requested_reviewers || [];
+                  const requestedTeams = result.data.requested_teams || [];
+                  
+                  if (requestedUsers.length > 0 || requestedTeams.length > 0) {
+                    core.info(`✅ Request code review: Success`);
+                    if (requestedUsers.length) core.info(`   Users: ${requestedUsers.map(r => r.login).join(', ')}`);
+                    if (requestedTeams.length) core.info(`   Teams: ${requestedTeams.map(t => t.slug).join(', ')}`);
                   } else {
-                    core.warning(`⚠️ Request Sent, but ignored: GitHub returned an empty list of reviewers. The bot '${preferredBotLogin}' might not be a collaborator or cannot be requested.`);
+                    core.warning(`⚠️ Request Sent, but ignored: GitHub returned empty lists for both users and teams.`);
                   }
                 } catch (error) {
                   core.error(`❌ Request code review: Failed to request review from ${preferredBotLogin}`);
