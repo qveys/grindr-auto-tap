@@ -40,6 +40,12 @@ yarn.lock
 # IDE et éditeurs
 .vscode/
 .idea/
+.agent/
+.claude/
+.codex/
+.cursor/
+.gemini/
+.qwen/
 *.sublime-project
 *.sublime-workspace
 *.code-workspace
@@ -47,9 +53,12 @@ yarn.lock
 # Fichiers de backup
 *.bak
 *.backup
-*~
 
 # Fichiers de test et coverage
 coverage/
 .nyc_output/
 *.test.js.snap
+
+# Déploiement
+build/
+dist/
