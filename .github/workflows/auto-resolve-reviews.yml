@@ -50,9 +50,23 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Wait a moment to ensure review thread updates are propagated in GitHub's backend
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            /**
+             * Wait for a short period using exponential backoff before
+             * triggering the check-bot-review workflow. This avoids relying
+             * on a single hardcoded delay and is more resilient to backend
+             * propagation variance.
+             */
+            async function waitForReviewPropagation(maxAttempts = 3, initialDelayMs = 1000) {
+              let delay = initialDelayMs;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                core.info(`⏱ Waiting ${delay} ms before triggering check-bot-review (attempt ${attempt}/${maxAttempts})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+              }
+            }
 
+            // Wait a moment to help ensure review thread updates are propagated
+            await waitForReviewPropagation();
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const pull_number = context.payload.pull_request.number;
