@@ -15,218 +15,220 @@ jobs:
   check-bot-review:
     name: Verify Bot Review Exists
     runs-on: ubuntu-latest
-    if: github.event.pull_request
+    if: github.event.pull_request != null
 
     steps:
-      - name: Check unresolved review threads via GraphQL
+      - name: Check unresolved review threads (GraphQL, paginated)
         id: threads
-        run: |
-          owner="${GITHUB_REPOSITORY_OWNER}"
-          name="${GITHUB_REPOSITORY#*/}"
-          number=${{ github.event.pull_request.number }}
-      
-          query='
-          query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
-            repository(owner: $owner, name: $name) {
-              pullRequest(number: $number) {
-                reviewThreads(first: 100, after: $cursor) {
-                  nodes {
-                    id
-                    isResolved
-                  }
-                  pageInfo {
-                    hasNextPage
-                    endCursor
-                  }
-                }
-              }
-            }
-          }'
-      
-          cursor=null
-          unresolved=0
-          unresolved_ids='[]'
-      
-          while : ; do
-            body=$(jq -n \
-              --arg q "$query" \
-              --arg owner "$owner" \
-              --arg name "$name" \
-              --argjson number "$number" \
-              --arg cursor "$cursor" \
-              '{
-                query: $q,
-                variables: {
-                  owner: $owner,
-                  name: $name,
-                  number: $number,
-                  cursor: ($cursor | select(. != "null"))
-                }
-              }')
-      
-            resp=$(curl -s \
-              -H "Authorization: bearer ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -X POST https://api.github.com/graphql \
-              -d "$body")
-      
-            echo "$resp" | jq '.' >/dev/null || {
-              echo "GraphQL error response:"
-              echo "$resp"
-              exit 1
-            }
-      
-            delta=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes // [] | map(select(.isResolved == false))] | length')
-            unresolved=$((unresolved + delta))
-      
-            page_ids=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes // [] | map(select(.isResolved == false) | .id)]')
-      
-            unresolved_ids=$(jq -n --argjson a "$unresolved_ids" --argjson b "$page_ids" '$a + $b')
-      
-            has_next=$(echo "$resp" | jq '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
-            if [ "$has_next" != "true" ]; then
-              break
-            fi
-      
-            cursor=$(echo "$resp" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
-            if [ -z "$cursor" ]; then
-              break
-            fi
-          done
-      
-          echo "unresolved=$unresolved" >> "$GITHUB_OUTPUT"
-          echo "Unresolved thread IDs: $unresolved_ids"
-      
-          if [ "$unresolved" != "0" ]; then
-            echo "❌ There are still $unresolved unresolved review threads. Bot review check cannot pass."
-            exit 1
-          fi
-
-
-      - name: Get last bot reviewer
-        id: last_bot
-        run: |
-          pr_number=${{ github.event.pull_request.number }}
-          reviews=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/$pr_number/reviews")
-
-          # filter reviews whose author is a bot
-          last_bot_login=$(echo "$reviews" | jq -r '
-            map(select(.user.type == "Bot"))
-            | sort_by(.submitted_at)
-            | last // empty
-            | .user.login // empty')
-
-          if [ -z "$last_bot_login" ] || [ "$last_bot_login" == "null" ]; then
-            # default fallback to Copilot PR reviewer
-            last_bot_login="copilot-pull-request-reviewer[bot]"
-          fi
-
-          echo "login=$last_bot_login" >> "$GITHUB_OUTPUT"
-
-      - name: Force bot review when statut review-needed
-        run: |
-          pr_number=${{ github.event.pull_request.number }}
-          last_bot_login='${{ steps.last_bot.outputs.login }}'
-
-          echo "Last bot reviewer: $last_bot_login"
-
-          # get current labels
-          labels_json=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$pr_number/labels")
-
-          has_review_needed=$(echo "$labels_json" | jq -r '
-            any(.[].name == "status: review-needed")')
-
-          if [ "$has_review_needed" != "true" ]; then
-            echo "No status: review-needed label, skipping forced bot review."
-            exit 0
-          fi
-
-          echo "status: review-needed present, triggering bot review from $last_bot_login and failing check."
-
-          if [ "$last_bot_login" == "copilot" ]; then
-            curl -s -X POST \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"pull_request_url\": \"https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/$pr_number\",
-                \"reviewer\": \"$last_bot_login\"
-              }" \
-              "https://api.github.com/copilot/code-review"
-          else
-            echo "Would trigger bot review via API for PR #$pr_number by $last_bot_login"
-          fi
-
-          # fail the job to block merge until bot review runs
-          exit 1
-
-
-      - name: Check for Bot review
         uses: actions/github-script@v7
         with:
           script: |
-            const botLogin = '${{ steps.last_bot.outputs.login }}';
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const number = context.payload.pull_request.number;
 
-            // Get all commits in the PR
-            const { data: commits } = await github.rest.pulls.listCommits({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
+            const query = /* GraphQL */ `
+              query($owner:String!, $repo:String!, $number:Int!, $after:String) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    reviewThreads(first: 100, after: $after) {
+                      nodes {
+                        id
+                        isResolved
+                        isOutdated
+                        comments(first: 1) {
+                          nodes { url }
+                        }
+                      }
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            let after = null;
+            const unresolved = [];
+
+            while (true) {
+              const data = await github.graphql(query, { owner, repo, number, after });
+              const threads = data.repository.pullRequest.reviewThreads;
+
+              for (const t of (threads.nodes ?? [])) {
+                if (t && t.isResolved === false) {
+                  unresolved.push({
+                    id: t.id,
+                    url: t.comments?.nodes?.[0]?.url ?? null,
+                    isOutdated: !!t.isOutdated,
+                  });
+                }
+              }
+
+              if (!threads.pageInfo?.hasNextPage) break;
+              after = threads.pageInfo.endCursor;
+              if (!after) break;
+            }
+
+            const unresolvedCount = unresolved.length;
+            const unresolvedIds = unresolved.map(t => t.id);
+            const unresolvedUrls = unresolved.map(t => t.url).filter(Boolean);
+
+            core.setOutput("unresolved_count", String(unresolvedCount));
+            core.setOutput("unresolved_ids", JSON.stringify(unresolvedIds));
+            core.setOutput("unresolved_urls", JSON.stringify(unresolvedUrls));
+
+            if (unresolvedCount > 0) {
+              core.setFailed(
+                `❌ ${unresolvedCount} unresolved review thread(s) remain.\n` +
+                `IDs: ${JSON.stringify(unresolvedIds)}\n` +
+                `URLs: ${unresolvedUrls.join("\n") || "(no urls found)"}`
+              );
+            } else {
+              core.info("✅ No unresolved review threads.");
+            }
+
+      - name: Determine bot login to enforce (latest bot reviewer or fallback)
+        id: bot
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            const { data: reviews } = await github.rest.pulls.listReviews({ owner, repo, pull_number });
+
+            const botReviews = (reviews ?? [])
+              .filter(r => r?.user?.type === "Bot" && r?.submitted_at)
+              .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+
+            const lastBot = botReviews[botReviews.length - 1]?.user?.login ?? "";
+            const fallback = "copilot-pull-request-reviewer[bot]";
+            const botLogin = lastBot || fallback;
+
+            core.setOutput("login", botLogin);
+            core.info(`Bot login selected: ${botLogin}`);
+
+      - name: Enforce bot review freshness + force Copilot review when status: review-needed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            const enforcedBotLogin = "${{ steps.bot.outputs.login }}";
+
+            // 1) Get labels
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo, issue_number: pull_number,
             });
 
-            // Get all commits and find the latest content-changing commit
-            if (!commits || commits.length === 0) {
-              core.info('ℹ️ No commits found in the pull request. Skipping bot review freshness check.');
+            const hasReviewNeeded = (labels ?? []).some(l => l?.name === "status: review-needed");
+
+            // 2) Find latest "content-changing" commit
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner, repo, pull_number,
+              per_page: 250,
+            });
+
+            if (!commits?.length) {
+              core.info("ℹ️ No commits found; skipping bot freshness check.");
               return;
             }
 
-            // Find the latest content-changing commit that requires review
+            function isSkippableCommitMessage(msg) {
+              if (!msg) return false;
+              const isMerge  = msg.startsWith("Merge branch") || msg.startsWith("Merge pull request");
+              const isRevert = msg.startsWith('Revert "');
+              const isSkip   = msg.includes("[skip review]");
+              return isMerge || isRevert || isSkip;
+            }
+
             let latestCommit = commits[commits.length - 1];
             for (let i = commits.length - 1; i >= 0; i--) {
               const c = commits[i];
-              const message = c.commit.message;
-
-              const isMerge = message.startsWith('Merge branch') || message.startsWith('Merge pull request');
-              const isRevert = message.startsWith('Revert "');
-              const isSkip = message.includes('[skip review]');
-
-              if (!isMerge && !isRevert && !isSkip) {
+              const msg = c?.commit?.message ?? "";
+              if (!isSkippableCommitMessage(msg)) {
                 latestCommit = c;
                 break;
               }
             }
 
             const latestCommitDate = new Date(latestCommit.commit.committer.date);
-            core.info(`⏱️ Latest content commit: ${latestCommit.sha.substring(0, 7)} at ${latestCommitDate.toISOString()}`);
+            core.info(`⏱️ Latest content commit: ${latestCommit.sha.substring(0,7)} at ${latestCommitDate.toISOString()}`);
 
-            // Get all reviews
+            // 3) Get reviews
             const { data: reviews } = await github.rest.pulls.listReviews({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
+              owner, repo, pull_number,
+              per_page: 250,
             });
 
-            const botReviews = reviews.filter(review =>
-              review.user.login === botLogin ||
-              review.user.type === 'Bot'
-            );
+            const botReviews = (reviews ?? [])
+              .filter(r =>
+                r?.submitted_at &&
+                (r?.user?.login === enforcedBotLogin || r?.user?.type === "Bot")
+              )
+              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
 
-            botReviews.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+            const latestBotReview = botReviews[0];
 
-            const botReview = botReviews[0];
+            // 4) If label is present, attempt to trigger Copilot review and fail
+            if (hasReviewNeeded) {
+              core.warning(`status: review-needed is present → attempting to trigger bot review (${enforcedBotLogin}) and failing check.`);
 
-            if (!botReview) {
-              core.setFailed(`❌ Bot review is required but not found. Please wait for ${botLogin} to review this PR.`);
-            } else {
-              const reviewDate = new Date(botReview.submitted_at);
-              core.info(`✅ Bot review found from ${botReview.user.login}!`);
-              core.info(`📄 Review state: ${botReview.state}`);
-              core.info(`📅 Review submitted at: ${reviewDate.toISOString()}`);
+              // Only Copilot Code Review has a public endpoint; other bots are usually not triggerable.
+              const isCopilotLike =
+                enforcedBotLogin.toLowerCase().includes("copilot");
 
-              if (reviewDate < latestCommitDate) {
-                core.setFailed(`⚠️ Bot review (${reviewDate.toISOString()}) is older than the latest commit (${latestCommitDate.toISOString()}). A new review is required after code changes.`);
+              if (isCopilotLike) {
+                const pull_request_url = `https://api.github.com/repos/${owner}/${repo}/pulls/${pull_number}`;
+
+                const resp = await fetch("https://api.github.com/copilot/code-review", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${process.env.GITHUB_TOKEN}`,
+                    "Content-Type": "application/json",
+                    "Accept": "application/vnd.github+json",
+                  },
+                  body: JSON.stringify({
+                    pull_request_url,
+                    // reviewer is optional/ignored depending on API behavior; keep for clarity.
+                    reviewer: enforcedBotLogin,
+                  }),
+                });
+
+                core.info(`Copilot trigger response: ${resp.status} ${resp.statusText}`);
+                const text = await resp.text();
+                if (text) core.info(`Copilot response body: ${text.slice(0, 1000)}`);
               } else {
-                core.info('✅ Bot review is up-to-date with the latest commit!');
+                core.info(`No known API trigger for bot '${enforcedBotLogin}'.`);
               }
+
+              core.setFailed("❌ Bot review required (status: review-needed). Waiting for a fresh bot review.");
+              return;
             }
+
+            // 5) Normal freshness enforcement
+            if (!latestBotReview) {
+              core.setFailed(`❌ Bot review is required but not found. Please wait for ${enforcedBotLogin} to review this PR.`);
+              return;
+            }
+
+            const reviewDate = new Date(latestBotReview.submitted_at);
+            core.info(`✅ Bot review found: ${latestBotReview.user.login} (${latestBotReview.state}) at ${reviewDate.toISOString()}`);
+
+            if (reviewDate < latestCommitDate) {
+              core.setFailed(
+                `⚠️ Bot review is older than the latest commit.\n` +
+                `Review: ${reviewDate.toISOString()}\n` +
+                `Latest commit: ${latestCommitDate.toISOString()}\n` +
+                `A new bot review is required after code changes.`
+              );
+              return;
+            }
+
+            core.info("✅ Bot review is up-to-date with the latest commit!");
