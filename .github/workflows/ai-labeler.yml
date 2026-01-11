@@ -267,12 +267,18 @@ jobs:
 
                             // Add the forced status
                             core.notice(`Adding ${forcedStatus}`);
-                            await github.rest.issues.addLabels({
-                                owner: context.repo.owner,
-                                repo: context.repo.repo,
-                                issue_number: pr.number,
-                                labels: [forcedStatus]
-                            });
+                            try {
+                                await github.rest.issues.addLabels({
+                                    owner: context.repo.owner,
+                                    repo: context.repo.repo,
+                                    issue_number: pr.number,
+                                    labels: [forcedStatus]
+                                });
+                                core.notice(`✓ Successfully added label: ${forcedStatus}`);
+                            } catch (labelError) {
+                                core.error(`Failed to add label ${forcedStatus}: ${labelError.message}`);
+                                throw labelError;
+                            }
                         } else {
                             core.notice(`${forcedStatus} already present`);
                         }
