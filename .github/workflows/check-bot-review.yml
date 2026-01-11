@@ -31,6 +31,7 @@ jobs:
               pullRequest(number: $number) {
                 reviewThreads(first: 100, after: $cursor) {
                   nodes {
+                    id
                     isResolved
                   }
                   pageInfo {
@@ -44,6 +45,7 @@ jobs:
 
           cursor=null
           unresolved=0
+          unresolved_ids="[]"
 
           while : ; do
             body=$(jq -n \
@@ -74,8 +76,15 @@ jobs:
               exit 1
             }
 
+            # nombre de threads non résolus dans cette page
             delta=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes // [] | map(select(.isResolved == false))] | length')
             unresolved=$((unresolved + delta))
+
+            # IDs des threads non résolus de cette page
+            page_ids=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes // [] | map(select(.isResolved == false) | .id)]')
+
+            # concaténer avec la liste globale
+            unresolved_ids=$(jq -n --argjson a "$unresolved_ids" --argjson b "$page_ids" '$a + $b')
 
             has_next=$(echo "$resp" | jq '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
             if [ "$has_next" != "true" ]; then
@@ -89,6 +98,7 @@ jobs:
           done
 
           echo "unresolved=$unresolved" >> "$GITHUB_OUTPUT"
+          echo "Unresolved thread IDs: $unresolved_ids"
 
           if [ "$unresolved" != "0" ]; then
             echo "❌ There are still $unresolved unresolved review threads. Bot review check cannot pass."
