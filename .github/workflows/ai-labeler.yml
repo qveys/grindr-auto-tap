@@ -154,29 +154,20 @@ jobs:
                         core.notice('No bot reviews found');
                     }
 
-                    // 4. Get commits information (optimized: fetch only last page)
-                    // We only need the latest commit, so fetch in reverse order
-                    const commitsResponse = await github.rest.pulls.listCommits({
+                    // 4. Get latest commit information
+                    // Use pr.head.sha directly instead of fetching all commits
+                    const latestCommitSha = pr.head.sha;
+
+                    // Get commit details to extract committer date
+                    const { data: commitData } = await github.rest.repos.getCommit({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
-                        pull_number: pr.number,
-                        per_page: 100
+                        ref: latestCommitSha
                     });
 
-                    const commits = commitsResponse.data;
-
-                    // Safety check: handle empty commits array or missing data gracefully
-                    let latestCommit = null;
-                    let latestCommitDate = null;
-
-                    if (commits.length > 0) {
-                        latestCommit = commits[commits.length - 1];
-                        latestCommitDate = latestCommit && latestCommit.commit && latestCommit.commit.committer
-                            ? new Date(latestCommit.commit.committer.date)
-                            : null;
-                    } else {
-                        core.notice('No commits found for this PR when determining latest commit.');
-                    }
+                    const latestCommitDate = commitData.commit.committer.date
+                        ? new Date(commitData.commit.committer.date)
+                        : null;
 
                     const hasNewCommitsAfterReview = latestBotReview && latestCommitDate &&
                         latestCommitDate > new Date(botReviewDate);
@@ -190,7 +181,6 @@ jobs:
                         latestBotReviewDate: botReviewDate,
                         botReviewCommentCount,
                         hasNewCommitsAfterReview,
-                        commitCount: commits.length,
                         prState: pr.state,
                         merged: pr.merged || false
                     };
@@ -316,7 +306,6 @@ jobs:
             - Latest bot review date: ${prContext.latestBotReviewDate || 'None'}
             - Bot review comment count: ${prContext.botReviewCommentCount}
             - Has new commits after review: ${prContext.hasNewCommitsAfterReview}
-            - Total commits: ${prContext.commitCount}
             - PR State: ${prContext.prState}
             - Merged: ${prContext.merged}
             `;
@@ -350,7 +339,7 @@ jobs:
 
             Status Label Selection Rules for Pull Requests:
             NOTE: Most status labels are automatically enforced by the system based on objective conditions.
-            You are only called for edge cases that don't match standard patterns.
+            If none of the following 5 priority conditions match, you will be asked to determine the appropriate status.
 
             Standard statuses (handled automatically, you should rarely need these):
             - "status: review-needed" - Auto-applied when all threads resolved + new commits
@@ -440,8 +429,8 @@ jobs:
 
               // Filter valid labels (only those from our whitelist)
               const validLabels = suggestedLabels
-                .filter(l => typeof l === 'string' && labels.includes(l))
-              
+                .filter(l => typeof l === 'string' && labels.includes(l));
+
               // Enforce business rules: at least one 'type:' label
               const hasTypeLabel = validLabels.some(l => l.startsWith('type:'));
               if (validLabels.length > 0 && !hasTypeLabel) {
