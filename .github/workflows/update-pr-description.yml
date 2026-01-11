@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to update'
+        description: "PR number to update"
         required: true
         type: number
 
@@ -18,7 +18,7 @@ jobs:
   update-pr-description:
     runs-on: ubuntu-latest
     if: (github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch') || (github.event.action == 'closed' && github.event.pull_request.merged == true)
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -33,93 +33,94 @@ jobs:
           script: |
             const prNumber = context.payload.pull_request?.number || context.payload.inputs?.pr_number;
             const isClosed = github.event.action === 'closed' && context.payload.pull_request?.merged === true;
+
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: prNumber
             });
-            
+
             const { data: files } = await github.rest.pulls.listFiles({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: prNumber
             });
-            
+
             const { data: commits } = await github.rest.pulls.listCommits({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: prNumber
             });
-            
-            // ============ PRÉSERVER LE CONTENU UTILISATEUR ============
+
+            // ============ PRESERVE USER CONTENT ============
             let userContent = '';
             const currentBody = pr.body || '';
-            
-            // Parser les marqueurs USER_CONTENT
+
+            // Parse USER_CONTENT markers
             const userContentMatch = currentBody.match(
               /<!-- USER_CONTENT_START -->([\s\S]*?)<!-- USER_CONTENT_END -->/
             );
-            
+
             if (userContentMatch) {
-              // Contenu existant trouvé
+              // Existing content found
               userContent = userContentMatch[1];
             } else {
-              // Première création : extraire tout ce qui n'est pas AUTO_GENERATED
+              // First creation: extract everything that is not AUTO_GENERATED
               const autoMatch = currentBody.match(
                 /<!-- AUTO_GENERATED_START -->([\s\S]*?)<!-- AUTO_GENERATED_END -->/
               );
               if (autoMatch) {
                 userContent = currentBody.substring(0, autoMatch.index).trim();
               } else {
-                // Aucun marqueur trouvé : c'est un nouveau contenu
+                // No markers found: treat as new content
                 userContent = currentBody.trim();
               }
             }
-            
-            // ============ GÉNÉRER LES SECTIONS AUTO ============
-            
-            // 1. Calculer les statistiques
+
+            // ============ GENERATE AUTO SECTIONS ============
+
+            // 1. Compute stats
             const stats = {
               filesChanged: files.length,
               additions: files.reduce((sum, f) => sum + f.additions, 0),
               deletions: files.reduce((sum, f) => sum + f.deletions, 0),
               commits: commits.length
             };
-            
-            // 2. Construire l'arbre des fichiers avec les stats
+
+            // 2. Build file tree with stats
             const fileMap = {};
             files.forEach(f => {
               fileMap[f.filename] = { additions: f.additions, deletions: f.deletions };
             });
-            
+
             const fileTree = Object.keys(fileMap).sort();
-            
+
             function buildFileTree(files, fileStats) {
               const root = {};
-              
+
               files.forEach(file => {
                 const parts = file.split('/');
                 let current = root;
-                
+
                 parts.forEach((part, i) => {
                   const isFile = i === parts.length - 1;
-                  
+
                   if (!current[part]) {
                     current[part] = isFile ? { _isFile: true, _stats: fileStats[file] } : {};
                   }
-                  
+
                   if (isFile) {
                     current[part]._isFile = true;
                     current[part]._stats = fileStats[file];
                   }
-                  
+
                   current = current[part];
                 });
               });
-              
+
               return formatTree(root);
             }
-            
+
             function formatTree(node, prefix = '', isLast = true) {
               let result = '';
               const entries = Object.entries(node)
@@ -128,14 +129,14 @@ jobs:
                   const aIsFile = node[a]._isFile;
                   const bIsFile = node[b]._isFile;
                   if (aIsFile === bIsFile) return a.localeCompare(b);
-                  return aIsFile ? 1 : -1; // Dossiers avant fichiers
+                  return aIsFile ? 1 : -1; // Folders before files
                 });
-              
+
               entries.forEach(([key, value], index) => {
                 const isLastEntry = index === entries.length - 1;
                 const connector = isLastEntry ? '└── ' : '├── ';
                 const extension = isLastEntry ? '    ' : '│   ';
-                
+
                 if (value._isFile) {
                   const { additions = 0, deletions = 0 } = value._stats || {};
                   const stats = additions === 0 && deletions === 0 ? '(binary)' : `(+${additions}/-${deletions})`;
@@ -145,25 +146,25 @@ jobs:
                   result += formatTree(value, prefix + extension, isLastEntry);
                 }
               });
-              
+
               return result;
             }
-            
+
             const tree = buildFileTree(fileTree, fileMap);
-            
-            // 3. Formater la liste des commits
+
+            // 3. Format commit list
             const commitsList = commits
               .map(c => `- \`${c.sha.substring(0, 7)}\` – ${c.commit.message.split('\n')[0]}`)
               .join('\n');
-            
-            // 4. Générer le schéma Mermaid si PR fermée
+
+            // 4. Generate Mermaid diagram if PR is merged
             let architectureDiagram = '';
             if (isClosed) {
               architectureDiagram = generateArchitectureDiagram(files);
             }
-            
+
             function generateArchitectureDiagram(changedFiles) {
-              // Analyser les fichiers modifiés pour générer un diagramme architectural
+              // Analyze changed files to generate a basic architecture diagram
               const categories = {
                 components: [],
                 services: [],
@@ -172,7 +173,7 @@ jobs:
                 api: [],
                 other: []
               };
-              
+
               changedFiles.forEach(f => {
                 const path = f.filename.toLowerCase();
                 if (path.includes('component') || path.includes('view') || path.includes('page')) {
@@ -189,16 +190,16 @@ jobs:
                   categories.other.push(f.filename.split('/').pop());
                 }
               });
-              
+
               let mermaid = 'graph TD\n';
               let connections = [];
-              
-              // Ajouter les nœuds
+
+              // Add nodes
               if (categories.components.length > 0) {
                 mermaid += '    UI["🎨 UI Components<br/>' + categories.components.slice(0, 3).join('<br/>') + '"]::ui\n';
                 connections.push('UI');
               }
-              
+
               if (categories.services.length > 0) {
                 mermaid += '    SERVICES["⚙️ Services<br/>' + categories.services.slice(0, 3).join('<br/>') + '"]::service\n';
                 if (connections.includes('UI')) {
@@ -206,7 +207,7 @@ jobs:
                 }
                 connections.push('SERVICES');
               }
-              
+
               if (categories.api.length > 0) {
                 mermaid += '    API["🔌 API/Routes<br/>' + categories.api.slice(0, 3).join('<br/>') + '"]::api\n';
                 if (connections.includes('SERVICES')) {
@@ -216,7 +217,7 @@ jobs:
                 }
                 connections.push('API');
               }
-              
+
               if (categories.database.length > 0) {
                 mermaid += '    DB[("🗄️ Database<br/>' + categories.database.slice(0, 3).join('<br/>') + '")]::db\n';
                 if (connections.includes('API')) {
@@ -225,76 +226,76 @@ jobs:
                   mermaid += '    SERVICES --> DB\n';
                 }
               }
-              
+
               if (categories.utils.length > 0) {
-                mermaid += '    UTILS["🛠️ Utils<br/>' + categories.utils.slice(0, 2).join('<br/>') + '"]::utils\n';
+                mermaid += '    UTILS["🛠️ Utilities<br/>' + categories.utils.slice(0, 2).join('<br/>') + '"]::utils\n';
                 if (categories.services.length > 0) {
                   mermaid += '    SERVICES -.->|used by| UTILS\n';
                 }
               }
-              
-              // Ajouter les styles
+
+              // Styles
               mermaid += '    classDef ui fill:#e1f5ff\n';
               mermaid += '    classDef service fill:#f3e5f5\n';
               mermaid += '    classDef api fill:#fce4ec\n';
               mermaid += '    classDef db fill:#e8f5e9\n';
               mermaid += '    classDef utils fill:#fff3e0\n';
-              
+
               return `\`\`\`mermaid\n${mermaid}\`\`\``;
             }
-            
-            // 5. Extraire la section Architecture du USER_CONTENT (si présente)
+
+            // 5. Extract Architecture section from USER_CONTENT (if present)
             let architectureSection = '';
             const archMatch = userContent.match(
               /## 🏗️ Architecture.*?\n\n([\s\S]*?)(?=## ✅|$)/
             );
-            
+
             if (archMatch) {
-              architectureSection = `\n## 🏗️ Architecture (Manuel)\n\n${archMatch[1].trim()}\n`;
+              architectureSection = `\n## 🏗️ Architecture (Manual)\n\n${archMatch[1].trim()}\n`;
             } else if (isClosed) {
-              // Si PR fermée et pas de schéma manuel, ajouter le schéma auto-généré
-              architectureSection = `\n## 🏗️ Architecture (Auto-généré)\n\n${architectureDiagram}\n`;
+              // If merged and no manual architecture section, add auto-generated diagram
+              architectureSection = `\n## 🏗️ Architecture (Auto-generated)\n\n${architectureDiagram}\n`;
             }
-            
-            // 6. Construire la section AUTO_GENERATED
+
+            // 6. Build AUTO_GENERATED section
             const autoGeneratedSection = `<!-- AUTO_GENERATED_START -->
 
-## 📁 Fichiers modifiés
+            ## 📁 Changed files
 
-\`\`\`
-${tree.trim()}
-\`\`\`
+            \`\`\`
+            ${tree.trim()}
+            \`\`\`
 
-## 📊 Statistiques
+            ## 📊 Stats
 
-| Métrique | Valeur |
-|----------|--------|
-| Fichiers modifiés | ${stats.filesChanged} |
-| Lignes ajoutées | +${stats.additions} |
-| Lignes supprimées | -${stats.deletions} |
-| Commits | ${stats.commits} |
+            | Metric | Value |
+            |--------|------:|
+            | Files changed | ${stats.filesChanged} |
+            | Lines added | +${stats.additions} |
+            | Lines deleted | -${stats.deletions} |
+            | Commits | ${stats.commits} |
 
-## 📝 Commits
+            ## 📝 Commits
 
-${commitsList}${architectureSection}
+            ${commitsList}${architectureSection}
 
-<!-- AUTO_GENERATED_END -->`;
-            
-            // ============ CONSTRUIRE LA DESCRIPTION FINALE ============
+            <!-- AUTO_GENERATED_END -->`;
+
+            // ============ BUILD FINAL DESCRIPTION ============
             const updatedDescription = `<!-- USER_CONTENT_START -->
-${userContent}
-<!-- USER_CONTENT_END -->
+            ${userContent}
+            <!-- USER_CONTENT_END -->
 
-${autoGeneratedSection}`;
-            
-            // 7. Mettre à jour la PR
+            ${autoGeneratedSection}`;
+
+            // 7. Update PR
             await github.rest.pulls.update({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: prNumber,
               body: updatedDescription
             });
-            
+
             const action = isClosed ? '✅ Merged' : '🔄 Updated';
             core.info(`${action} PR description successfully`);
             core.info(`📊 Stats: ${stats.filesChanged} files, +${stats.additions}/-${stats.deletions} lines, ${stats.commits} commits`);
@@ -310,6 +311,6 @@ ${autoGeneratedSection}`;
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: '🤖 The PR description has been automatically updated with detailed statistics. This section updates with each commit, and an architectural diagram will be automatically generated upon closure.'
+                body: '🤖 The PR description was updated with detailed stats. This section refreshes on each push, and an architecture diagram will be generated when the PR is merged.'
               });
             }
