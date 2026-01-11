@@ -165,15 +165,19 @@ jobs:
 
                     const commits = commitsResponse.data;
 
-                    // Safety check: ensure commits array is not empty
-                    if (commits.length === 0) {
-                        core.warning('PR has no commits, skipping status determination');
-                        prContext = null;
-                        throw new Error('No commits found in PR');
+                    // Safety check: handle empty commits array or missing data gracefully
+                    let latestCommit = null;
+                    let latestCommitDate = null;
+
+                    if (commits.length > 0) {
+                        latestCommit = commits[commits.length - 1];
+                        latestCommitDate = latestCommit && latestCommit.commit && latestCommit.commit.committer
+                            ? new Date(latestCommit.commit.committer.date)
+                            : null;
+                    } else {
+                        core.notice('No commits found for this PR when determining latest commit.');
                     }
 
-                    const latestCommit = commits[commits.length - 1];
-                    const latestCommitDate = latestCommit ? new Date(latestCommit.commit.committer.date) : null;
                     const hasNewCommitsAfterReview = latestBotReview && latestCommitDate &&
                         latestCommitDate > new Date(botReviewDate);
 
