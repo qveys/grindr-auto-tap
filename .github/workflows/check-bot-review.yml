@@ -112,7 +112,7 @@ jobs:
             core.setOutput("login", botLogin);
             core.info(`Bot login selected: ${botLogin}`);
 
-      - name: Enforce bot review freshness + force Copilot review when status: review-needed
+      - name: Enforce bot review freshness + force Copilot review when status review-needed
         uses: actions/github-script@v7
         with:
           script: |
