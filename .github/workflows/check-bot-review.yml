@@ -220,7 +220,7 @@ jobs:
             if (!latestCommit) {
               core.info("ℹ️ All commits are skippable (merge, revert, or [skip review]). Strict review check not required.");
               return;
-            }
+              core.info("ℹ️ All commits are skippable (merge, revert, or [skip review]). Strict review check not required.");
 
             const latestCommitDate = new Date(latestCommit.commit.committer.date);
             core.info(`⏱️ Latest content commit: ${latestCommit.sha.substring(0,7)} at ${latestCommitDate.toISOString()}`);
