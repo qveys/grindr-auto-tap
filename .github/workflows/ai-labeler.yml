@@ -43,35 +43,36 @@ jobs:
             const title = issue.title;
             const body = issue.body || '';
 
+            // Handle closed/merged issues and PRs - remove all status labels
+            if (issue.state === 'closed') {
+                core.notice('Issue/PR is closed or merged. Removing all status labels.');
+                const { data: currentIssue } = await github.rest.issues.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                });
+                const currentStatusLabels = currentIssue.labels
+                    .map(l => typeof l === 'string' ? l : l.name)
+                    .filter(l => l.startsWith('status:'));
+
+                for (const label of currentStatusLabels) {
+                    core.notice(`Removing status label: ${label}`);
+                    await github.rest.issues.removeLabel({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: issue.number,
+                        name: label
+                    });
+                }
+                return; // Skip AI labeling for closed issues/PRs
+            }
+
             // Collect PR context for AI decision making
             let prContext = null;
             const pr = context.payload.pull_request || context.payload.pull_request_review?.pull_request;
 
             if (pr) {
                 try {
-                    // Handle closed/merged PR - remove all status labels
-                    if (pr.state === 'closed') {
-                        core.notice('PR is closed or merged. Removing all status labels.');
-                        const { data: currentIssue } = await github.rest.issues.get({
-                            owner: context.repo.owner,
-                            repo: context.repo.repo,
-                            issue_number: pr.number,
-                        });
-                        const currentStatusLabels = currentIssue.labels
-                            .map(l => typeof l === 'string' ? l : l.name)
-                            .filter(l => l.startsWith('status:'));
-
-                        for (const label of currentStatusLabels) {
-                            core.notice(`Removing status label: ${label}`);
-                            await github.rest.issues.removeLabel({
-                                owner: context.repo.owner,
-                                repo: context.repo.repo,
-                                issue_number: pr.number,
-                                name: label
-                            });
-                        }
-                        return; // Skip AI labeling for closed PRs
-                    }
 
                     // 1. Count unresolved threads
                     let hasNextPage = true;
