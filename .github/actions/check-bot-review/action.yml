@@ -1,0 +1,91 @@
+name: 'Check Bot Review Status'
+description: 'Checks if a PR needs a bot review based on commits and existing reviews'
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+  pr-number:
+    description: 'Pull request number'
+    required: true
+outputs:
+  needs-review:
+    description: 'Whether the PR needs a bot review (true/false)'
+    value: ${{ steps.check.outputs.needs-review }}
+  latest-commit-sha:
+    description: 'SHA of the latest content-changing commit'
+    value: ${{ steps.check.outputs.latest-commit-sha }}
+  latest-bot-review-date:
+    description: 'Date of the latest bot review (if any)'
+    value: ${{ steps.check.outputs.latest-bot-review-date }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check bot review status
+      id: check
+      uses: actions/github-script@v7
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const prNumber = parseInt(process.env.PR_NUMBER);
+          
+          // Get all commits
+          const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100
+          });
+          
+          let needsReview = false;
+          let latestCommitSha = '';
+          let latestBotReviewDate = '';
+          
+          if (commits.length > 0) {
+              // Find latest content-changing commit
+              let latestCommit = commits[commits.length - 1];
+              for (let i = commits.length - 1; i >= 0; i--) {
+                  const c = commits[i];
+                  const message = c.commit.message;
+                  const isMerge = message.startsWith('Merge branch') || message.startsWith('Merge pull request');
+                  const isRevert = message.startsWith('Revert "');
+                  const isSkip = message.includes('[skip review]');
+                  if (!isMerge && !isRevert && !isSkip) {
+                      latestCommit = c;
+                      break;
+                  }
+              }
+              
+              latestCommitSha = latestCommit.sha;
+              const latestCommitDate = new Date(latestCommit.commit.committer.date);
+              
+              // Get reviews
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                  per_page: 100
+              });
+              
+              // Find bot reviews
+              const botReviews = reviews.filter(review => review.user.type === 'Bot');
+              botReviews.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+              const latestBotReview = botReviews[0];
+              
+              if (!latestBotReview) {
+                  needsReview = true;
+              } else {
+                  const reviewDate = new Date(latestBotReview.submitted_at);
+                  latestBotReviewDate = latestBotReview.submitted_at;
+                  if (reviewDate < latestCommitDate) {
+                      needsReview = true;
+                  }
+              }
+          }
+          
+          core.setOutput('needs-review', needsReview.toString());
+          core.setOutput('latest-commit-sha', latestCommitSha);
+          core.setOutput('latest-bot-review-date', latestBotReviewDate);
+          core.notice(`Bot review needed: ${needsReview}`);

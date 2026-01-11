@@ -1,0 +1,249 @@
+name: Update PR Description
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to update"
+        required: true
+        type: number
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  update-pr-description:
+    runs-on: ubuntu-latest
+    if: (github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch') || (github.event.action == 'closed' && github.event.pull_request.merged == true)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref || github.event.pull_request.base.ref || github.ref }}
+
+      - name: Get PR information and parse markers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const dedent = (str) =>
+              str
+                .replace(/^\n/, '')
+                .replace(/\n\s+/g, '\n')
+                .trim() + '\n';
+
+            const prNumber =
+              context.payload.pull_request?.number ??
+              (context.payload.inputs?.pr_number ? Number(context.payload.inputs.pr_number) : undefined);
+
+            if (!prNumber) {
+              core.setFailed('PR number not found.');
+              return;
+            }
+
+            const isMerged =
+              context.eventName === 'pull_request' &&
+              context.payload.action === 'closed' &&
+              context.payload.pull_request?.merged === true;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100
+            });
+            
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100
+            });
+
+            // ===== Preserve user content =====
+            const body = pr.body || '';
+            const userMatch = body.match(/<!-- USER_CONTENT_START -->([\s\S]*?)<!-- USER_CONTENT_END -->/);
+            const relatedMatch = body.match(/<!-- RELATED_ISSUES_START -->([\s\S]*?)<!-- RELATED_ISSUES_END -->/);
+
+            const userContent = userMatch
+              ? userMatch[1].trim()
+              : body.split('<!-- AUTO_GENERATED_START -->')[0].trim();
+            
+            // ===== Related Issues =====
+            // Detect if this is the first run (opened) to add the section initially
+            const isFirstRun = context.payload.action === 'opened';
+            let relatedContent = relatedMatch ? relatedMatch[1].trim() : '';
+
+            if (!relatedMatch && isFirstRun) {
+                relatedContent = [
+                  '## 🔗 Related issues',
+                  '',
+                  'Link any related issues or PRs that provide context for this change.',
+                  '',
+                  '- Closes: <!-- e.g. #123 -->',
+                  '- Relates to: <!-- e.g. #456 -->',
+                  ''
+                ].join('\n');
+            }
+            
+            // Formatting the related section if it exists
+            const relatedSection = relatedContent 
+                ? dedent(`
+                    <!-- RELATED_ISSUES_START -->
+                    ${relatedContent}
+                    <!-- RELATED_ISSUES_END -->
+                  `)
+                : '';
+
+            // ===== Stats =====
+            const stats = {
+              filesChanged: files.length,
+              additions: files.reduce((sum, f) => sum + (f.additions ?? 0), 0),
+              deletions: files.reduce((sum, f) => sum + (f.deletions ?? 0), 0),
+              commits: commits.length
+            };
+            
+            // ===== File tree (correct per-file stats) =====
+            const fileStats = {};
+            files.forEach(f => {
+              fileStats[f.filename] = { additions: f.additions ?? 0, deletions: f.deletions ?? 0 };
+            });
+            
+            function buildFileTree(paths, statsByPath) {
+              const root = {};
+              for (const fullPath of paths) {
+                const parts = fullPath.split('/');
+                let cur = root;
+            
+                parts.forEach((part, i) => {
+                  const isFile = i === parts.length - 1;
+                  cur[part] ??= {};
+            
+                  if (isFile) {
+                    cur[part]._isFile = true;
+                    cur[part]._stats = statsByPath[fullPath] ?? { additions: 0, deletions: 0 };
+                  }
+                  cur = cur[part];
+                });
+              }
+              return root;
+            }
+            
+            function formatTree(node, prefix = '') {
+              let out = '';
+            
+              const entries = Object.entries(node)
+                .filter(([k]) => !k.startsWith('_'))
+                .sort(([a, av], [b, bv]) => {
+                  const aIsFile = !!av._isFile;
+                  const bIsFile = !!bv._isFile;
+                  if (aIsFile === bIsFile) return a.localeCompare(b);
+                  return aIsFile ? 1 : -1; // folders first
+                });
+            
+              entries.forEach(([name, value], i) => {
+                const isLast = i === entries.length - 1;
+                const conn = isLast ? '└── ' : '├── ';
+                const nextPrefix = prefix + (isLast ? '    ' : '│   ');
+            
+                if (value._isFile) {
+                  const { additions = 0, deletions = 0 } = value._stats || {};
+                  const label =
+                    additions === 0 && deletions === 0 ? '(binary)' : `(+${additions}/-${deletions})`;
+                  out += `${prefix}${conn}${name} ${label}\n`;
+                } else {
+                  out += `${prefix}${conn}${name}/\n`;
+                  out += formatTree(value, nextPrefix);
+                }
+              });
+            
+              return out;
+            }
+            
+            const tree = formatTree(buildFileTree(Object.keys(fileStats).sort(), fileStats));
+
+            // ===== Commits =====
+            const commitsList = commits
+              .map(c => `- \`${c.sha.slice(0, 7)}\` – ${c.commit.message.split('\n')[0]}`)
+              .join('\n');
+
+            // ===== Architecture =====
+            let architectureSection = '';
+            if (isMerged) {
+              architectureSection = dedent(`
+                ## 🏗️ Architecture (Auto-generated)
+
+                \`\`\`mermaid
+                graph TD
+                  UI --> API
+                  API --> DB
+                \`\`\`
+              `);
+            }
+
+            const autoGenerated = dedent(`
+              <!-- AUTO_GENERATED_START -->
+
+              ## 📁 Changed files
+
+              \`\`\`
+              ${tree.trim()}
+              \`\`\`
+
+              ## 📊 Stats
+
+              | Metric | Value |
+              |--------|------:|
+              | Files changed | ${stats.filesChanged} |
+              | Lines added | +${stats.additions} |
+              | Lines deleted | -${stats.deletions} |
+              | Commits | ${stats.commits} |
+
+              ## 📝 Commits
+
+              ${commitsList}
+              ${architectureSection}
+
+              <!-- AUTO_GENERATED_END -->
+            `);
+
+            const finalBody = dedent(`
+              <!-- USER_CONTENT_START -->
+              ${userContent}
+              <!-- USER_CONTENT_END -->
+
+              ${relatedSection}
+
+              ${autoGenerated}
+            `);
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              body: finalBody
+            });
+
+            core.info(isMerged ? '✅ PR merged – description finalized' : '🔄 PR description updated');
+
+      - name: Comment on PR (only on first run)
+        if: github.event.action == 'opened'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: '🤖 The PR description was updated with detailed stats. It refreshes on each push, and an architecture diagram is generated on merge.'
+            });
