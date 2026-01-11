@@ -103,9 +103,9 @@ jobs:
 
             const botReviews = (reviews ?? [])
               .filter(r => r?.user?.type === "Bot" && r?.submitted_at)
-              .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
 
-            const lastBot = botReviews[botReviews.length - 1]?.user?.login ?? "";
+            const lastBot = botReviews[0]?.user?.login ?? "";
             const fallback = "copilot-pull-request-reviewer[bot]";
             const botLogin = lastBot || fallback;
 
