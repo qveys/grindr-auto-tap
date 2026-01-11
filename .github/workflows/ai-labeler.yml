@@ -164,6 +164,13 @@ jobs:
                 core.warning('AI did not suggest any type: label. Skipping to avoid incomplete labeling.');
                 return;
               }
+
+              // Enforce business rules: exactly one 'status:' label
+              const statusLabelCount = validLabels.filter(l => l.startsWith('status:')).length;
+              if (statusLabelCount !== 1) {
+                core.warning(`AI suggested ${statusLabelCount} status: labels. Expected exactly one. Skipping to avoid incorrect labeling.`);
+                return;
+              }
               
               if (validLabels.length > 0) {
                 core.notice(`Adding labels: ${validLabels.join(', ')}`);
