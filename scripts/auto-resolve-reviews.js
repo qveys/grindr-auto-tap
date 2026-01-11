@@ -551,13 +551,18 @@ for (const partial of results.partial) {
   const body = commitShas
     ? `🛠️ Fixed partially in commits: ${commitShas}.`
     : `🛠️ Fixed partially.`;
-  await octokit.rest.pulls.createReplyForReviewComment({
-    owner,
-    repo,
-    pull_number: prNumber,
-    comment_id: partial.commentId,
-    body: body,
-  });
+  try {
+    await octokit.rest.pulls.createReplyForReviewComment({
+      owner,
+      repo,
+      pull_number: prNumber,
+      comment_id: partial.commentId,
+      body: body,
+    });
+    console.log(`    📬 Posted partial resolution comment for #${partial.commentId}`);
+  } catch (error) {
+    console.error(`    ❌ Failed to post partial resolution for comment ${partial.commentId}:`, error.message);
+  }
 }
 // Low confidence results are included in the summary but we do not post individual replies to avoid noise.
 
