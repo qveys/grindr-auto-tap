@@ -5,6 +5,10 @@ on:
     types: [opened, synchronize, reopened, review_requested]
   pull_request_review:
     types: [submitted, edited, dismissed]
+  workflow_run:
+    workflows: [ "Auto-Resolve Review Comments" ]
+    types:
+      - completed
 
 permissions:
   contents: read
