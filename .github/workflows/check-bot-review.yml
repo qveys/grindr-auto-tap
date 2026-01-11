@@ -116,6 +116,44 @@ jobs:
 
           echo "login=$last_bot_login" >> "$GITHUB_OUTPUT"
 
+      - name: Force bot review when statut review-needed
+        run: |
+          pr_number=${{ github.event.pull_request.number }}
+          last_bot_login='${{ steps.last_bot.outputs.login }}'
+
+          echo "Last bot reviewer: $last_bot_login"
+
+          # get current labels
+          labels_json=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$pr_number/labels")
+
+          has_review_needed=$(echo "$labels_json" | jq -r '
+            any(.[].name == "status: review-needed")')
+
+          if [ "$has_review_needed" != "true" ]; then
+            echo "No status: review-needed label, skipping forced bot review."
+            exit 0
+          fi
+
+          echo "status: review-needed present, triggering bot review from $last_bot_login and failing check."
+
+          if [ "$last_bot_login" == "copilot" ]; then
+            curl -s -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"pull_request_url\": \"https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/$pr_number\",
+                \"reviewer\": \"$last_bot_login\"
+              }" \
+              "https://api.github.com/copilot/code-review"
+          else
+            echo "Would trigger bot review via API for PR #$pr_number by $last_bot_login"
+          fi
+
+          # fail the job to block merge until bot review runs
+          exit 1
+
+
       - name: Check for Bot review
         uses: actions/github-script@v7
         with:
