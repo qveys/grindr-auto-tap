@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "Grindr Auto Tap",
+  "version": "1.0.1",
+  "description": "Extension pour automatiser les actions sur Grindr et envoyer les statistiques vers n8n",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://web.grindr.com/*",
+    "*://*.apple.com/*",
+    "*://*.appleid.apple.com/*",
+    "*://*.idmsa.apple.com/*"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://web.grindr.com/*"
+      ],
+      "js": [
+        "utils/constants.js",
+        "utils/logger.js",
+        "utils/formatters.js",
+        "utils/dom-helpers.js",
+        "modules/auth.js",
+        "modules/profile-opener.js",
+        "modules/stats.js",
+        "modules/auto-tap.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Grindr Auto Tap",
+    "default_icon": {
+      "16": "icons/favicon-16x16.png",
+      "48": "icons/favicon-48x48.png",
+      "128": "icons/favicon-128x128.png",
+      "192": "icons/favicon-192x192.png",
+      "512": "icons/favicon-512x512.png"
+    }
+  },
+  "icons": {
+    "16": "icons/favicon-16x16.png",
+    "48": "icons/favicon-48x48.png",
+    "128": "icons/favicon-128x128.png",
+    "192": "icons/favicon-192x192.png",
+    "512": "icons/favicon-512x512.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "grindr-auto-tap@local",
+      "data_collection_permissions": {
+        "required": [
+          "personallyIdentifyingInfo",
+          "websiteActivity"
+        ],
+        "optional": []
+      }
+    }
+  }
+}
