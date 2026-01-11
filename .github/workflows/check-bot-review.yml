@@ -223,23 +223,26 @@ jobs:
 
               // Only Copilot Code Review has a public endpoint; other bots are usually not triggerable.
                 try {
+                  const botLoginSanitized = preferredBotLogin.replace('[bot]', '');
+                  // Try requesting both forms (with and without [bot]) to be sure
+                  const reviewCandidates = [preferredBotLogin];
+                  if (botLoginSanitized !== preferredBotLogin) {
+                    reviewCandidates.push(botLoginSanitized);
+                  }
+
                   const result = await github.rest.pulls.requestReviewers({
                     owner,
                     repo,
                     pull_number: pull_number,
-                    reviewers: [preferredBotLogin],
-                    team_reviewers: ["github/copilot"]
+                    reviewers: reviewCandidates
                   });
                   
                   const requestedUsers = result.data.requested_reviewers || [];
-                  const requestedTeams = result.data.requested_teams || [];
                   
-                  if (requestedUsers.length > 0 || requestedTeams.length > 0) {
-                    core.info(`✅ Request code review: Success`);
-                    if (requestedUsers.length) core.info(`   Users: ${requestedUsers.map(r => r.login).join(', ')}`);
-                    if (requestedTeams.length) core.info(`   Teams: ${requestedTeams.map(t => t.slug).join(', ')}`);
+                  if (requestedUsers.length > 0) {
+                    core.info(`✅ Request code review: Success (requested ${requestedUsers.map(r => r.login).join(', ')})`);
                   } else {
-                    core.warning(`⚠️ Request Sent, but ignored: GitHub returned empty lists for both users and teams.`);
+                    core.warning(`⚠️ Request Sent to [${reviewCandidates.join(', ')}], but ignored: GitHub returned an empty list of reviewers. The bot might not be a collaborator or cannot be requested.`);
                   }
                 } catch (error) {
                   core.error(`❌ Request code review: Failed to request review from ${preferredBotLogin}`);
