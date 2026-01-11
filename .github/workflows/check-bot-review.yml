@@ -135,12 +135,13 @@ jobs:
 
           # add desired status label (if any)
           if [ -n "$desired_status" ]; then
-            echo "Adding label: $desired_status"
-            curl -s -X PUT \
+            resp=$(curl -s -X PUT \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -H "Content-Type: application/json" \
               -d "{\"labels\": [\"$desired_status\"]}" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$pr_number/labels" > /dev/null
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$pr_number/labels")
+            
+            echo "Label update response: $resp"
           fi
 
       - name: Get last bot reviewer
