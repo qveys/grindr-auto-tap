@@ -27,6 +27,46 @@ jobs:
             const issue = context.payload.issue || context.payload.pull_request;
             const title = issue.title;
             const body = issue.body || '';
+
+            // Handle Merged PRs explicitly
+            if (context.eventName === 'pull_request' && context.payload.pull_request.merged) {
+              core.notice('PR merged. Updating status to "status: closed".');
+              
+              const { data: currentIssue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+              });
+
+              const currentLabels = currentIssue.labels.map(l => typeof l === 'string' ? l : l.name);
+              const statusLabels = currentLabels.filter(l => l.startsWith('status:'));
+
+              // Remove existing status labels that are not 'status: closed'
+              for (const label of statusLabels) {
+                if (label !== 'status: closed') {
+                  core.notice(`Removing old status label: ${label}`);
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: label
+                  });
+                }
+              }
+
+              // Add 'status: closed' if not present
+              if (!currentLabels.includes('status: closed')) {
+                core.notice('Adding "status: closed" label.');
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['status: closed']
+                });
+              }
+
+              return; // Exit after handling merge
+            }
             
             // List of defined labels
             // Fetch all labels from the repository using pagination
