@@ -10,47 +10,134 @@ jobs:
   check-copilot-review:
     name: Verify Bot Review Exists
     runs-on: ubuntu-latest
-    # only run the job if all threads are resolved
-    # and a review bot is required (e.g., label "bot-review-required")
-    if: >
-      github.event.pull_request &&
-      contains(github.event.pull_request.labels.*.name, 'bot-review-required')
+    if: github.event.pull_request
 
     steps:
       - name: Check unresolved review threads via GraphQL
         id: threads
         run: |
+          owner="${GITHUB_REPOSITORY_OWNER}"
+          name="${GITHUB_REPOSITORY#*/}"
+          number=${{ github.event.pull_request.number }}
+
           query='
-          query($owner:String!, $name:String!, $number:Int!) {
+          query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
             repository(owner: $owner, name: $name) {
               pullRequest(number: $number) {
-                reviewThreads(first: 100) {
+                reviewThreads(first: 100, after: $cursor) {
                   nodes {
                     isResolved
+                  }
+                  pageInfo {
+                    hasNextPage
+                    endCursor
                   }
                 }
               }
             }
           }'
-          body=$(jq -n \
-            --arg q "$query" \
-            --arg owner "${GITHUB_REPOSITORY_OWNER}" \
-            --arg name "${GITHUB_REPOSITORY#*/}" \
-            --argjson number "${{ github.event.pull_request.number }}" \
-            '{query: $q, variables: {owner: $owner, name: $name, number: $number}}')
 
-          resp=$(curl -s -H "Authorization: bearer ${{ secrets.GITHUB_TOKEN }}" \
-                       -H "Content-Type: application/json" \
-                       -X POST https://api.github.com/graphql \
-                       -d "$body")
+          cursor=null
+          unresolved=0
 
-          unresolved=$(echo "$resp" \
-            | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length')
+          while : ; do
+            body=$(jq -n \
+              --arg q "$query" \
+              --arg owner "$owner" \
+              --arg name "$name" \
+              --argjson number "$number" \
+              --arg cursor "$cursor" \
+              '{
+                query: $q,
+                variables: {
+                  owner: $owner,
+                  name: $name,
+                  number: $number,
+                  cursor: ($cursor | select(. != "null"))
+                }
+              }')
+
+            resp=$(curl -s \
+              -H "Authorization: bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -X POST https://api.github.com/graphql \
+              -d "$body")
+
+            # ajouter le nombre de threads non résolus
+            delta=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length')
+            unresolved=$((unresolved + delta))
+
+            has_next=$(echo "$resp" | jq '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
+            if [ "$has_next" != "true" ]; then
+              break
+            fi
+
+            cursor=$(echo "$resp" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')
+          done
 
           echo "unresolved=$unresolved" >> "$GITHUB_OUTPUT"
 
+      - name: Update status labels based on unresolved threads
+        if: github.event.pull_request
+        run: |
+          pr_number=${{ github.event.pull_request.number }}
+          unresolved=${{ steps.threads.outputs.unresolved }}
+
+          echo "Unresolved threads: $unresolved"
+
+          labels_json=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$pr_number/labels")
+
+          new_label="status: in-progress"
+
+          # current status:* label (if any)
+          current_status=$(echo "$labels_json" | jq -r '
+            map(select(.name | startswith("status:"))) 
+            | .[0].name // empty')
+
+          echo "Current status label: ${current_status:-<none>}"
+
+          # decide desired status label
+          desired_status=""
+          if [ "$unresolved" -gt 0 ]; then
+            desired_status="$new_label"
+          else
+            # ici tu peux mettre un autre statut voulu quand unresolved == 0
+            desired_status=""
+          fi
+
+          echo "Desired status label: ${desired_status:-<none>}"
+
+          # if no change is needed, do nothing
+          if [ "$current_status" = "$desired_status" ]; then
+            echo "Status label already correct, no change required."
+            exit 0
+          fi
+
+          # remove all status:* labels ONLY if we need to change
+          if [ -n "$current_status" ]; then
+            status_labels=$(echo "$labels_json" | jq -r '.[].name | select(startswith("status:"))')
+            for label in $status_labels; do
+              echo "Removing label: $label"
+              curl -s -X DELETE \
+                -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$pr_number/labels/$label" > /dev/null
+            done
+          fi
+
+          # add desired status label (if any)
+          if [ -n "$desired_status" ]; then
+            echo "Adding label: $desired_status"
+            curl -s -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"labels\": [\"$desired_status\"]}" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$pr_number/labels" > /dev/null
+          fi
+
       - name: Get last bot reviewer
         id: last_bot
+        if: steps.threads.outputs.unresolved == '0'
         run: |
           pr_number=${{ github.event.pull_request.number }}
           reviews=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
