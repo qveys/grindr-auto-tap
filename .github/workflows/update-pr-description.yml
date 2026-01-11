@@ -2,7 +2,7 @@ name: Update PR Description
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review]
+    types: [opened, synchronize, ready_for_review, closed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -17,21 +17,22 @@ permissions:
 jobs:
   update-pr-description:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch'
+    if: (github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch') || (github.event.action == 'closed' && github.event.pull_request.merged == true)
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          ref: ${{ github.event.pull_request.head.ref || github.event.pull_request.base.ref || github.ref }}
 
-      - name: Get PR information
+      - name: Get PR information and parse markers
         id: pr-info
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.payload.pull_request?.number || context.payload.inputs?.pr_number;
+            const isClosed = github.event.action === 'closed' && context.payload.pull_request?.merged === true;
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -50,7 +51,34 @@ jobs:
               pull_number: prNumber
             });
             
-            // Calculate statistics
+            // ============ PRÉSERVER LE CONTENU UTILISATEUR ============
+            let userContent = '';
+            const currentBody = pr.body || '';
+            
+            // Parser les marqueurs USER_CONTENT
+            const userContentMatch = currentBody.match(
+              /<!-- USER_CONTENT_START -->([\s\S]*?)<!-- USER_CONTENT_END -->/
+            );
+            
+            if (userContentMatch) {
+              // Contenu existant trouvé
+              userContent = userContentMatch[1];
+            } else {
+              // Première création : extraire tout ce qui n'est pas AUTO_GENERATED
+              const autoMatch = currentBody.match(
+                /<!-- AUTO_GENERATED_START -->([\s\S]*?)<!-- AUTO_GENERATED_END -->/
+              );
+              if (autoMatch) {
+                userContent = currentBody.substring(0, autoMatch.index).trim();
+              } else {
+                // Aucun marqueur trouvé : c'est un nouveau contenu
+                userContent = currentBody.trim();
+              }
+            }
+            
+            // ============ GÉNÉRER LES SECTIONS AUTO ============
+            
+            // 1. Calculer les statistiques
             const stats = {
               filesChanged: files.length,
               additions: files.reduce((sum, f) => sum + f.additions, 0),
@@ -58,58 +86,180 @@ jobs:
               commits: commits.length
             };
             
-            // Build file tree
-            const fileTree = files.map(f => f.filename).sort();
-            const tree = buildFileTree(fileTree);
+            // 2. Construire l'arbre des fichiers avec les stats
+            const fileMap = {};
+            files.forEach(f => {
+              fileMap[f.filename] = { additions: f.additions, deletions: f.deletions };
+            });
             
-            function buildFileTree(files) {
+            const fileTree = Object.keys(fileMap).sort();
+            
+            function buildFileTree(files, fileStats) {
               const root = {};
+              
               files.forEach(file => {
                 const parts = file.split('/');
                 let current = root;
+                
                 parts.forEach((part, i) => {
+                  const isFile = i === parts.length - 1;
+                  
                   if (!current[part]) {
-                    current[part] = i === parts.length - 1 ? null : {};
+                    current[part] = isFile ? { _isFile: true, _stats: fileStats[file] } : {};
                   }
+                  
+                  if (isFile) {
+                    current[part]._isFile = true;
+                    current[part]._stats = fileStats[file];
+                  }
+                  
                   current = current[part];
                 });
               });
+              
               return formatTree(root);
             }
             
             function formatTree(node, prefix = '', isLast = true) {
               let result = '';
-              const entries = Object.entries(node);
+              const entries = Object.entries(node)
+                .filter(([key]) => !key.startsWith('_'))
+                .sort(([a], [b]) => {
+                  const aIsFile = node[a]._isFile;
+                  const bIsFile = node[b]._isFile;
+                  if (aIsFile === bIsFile) return a.localeCompare(b);
+                  return aIsFile ? 1 : -1; // Dossiers avant fichiers
+                });
+              
               entries.forEach(([key, value], index) => {
                 const isLastEntry = index === entries.length - 1;
                 const connector = isLastEntry ? '└── ' : '├── ';
                 const extension = isLastEntry ? '    ' : '│   ';
                 
-                result += prefix + connector + key + '\n';
-                
-                if (value !== null) {
+                if (value._isFile) {
+                  const { additions = 0, deletions = 0 } = value._stats || {};
+                  const stats = additions === 0 && deletions === 0 ? '(binary)' : `(+${additions}/-${deletions})`;
+                  result += prefix + connector + key + ' ' + stats + '\n';
+                } else {
+                  result += prefix + connector + key + '/\n';
                   result += formatTree(value, prefix + extension, isLastEntry);
                 }
               });
+              
               return result;
             }
             
-            // Format commits list
-            const commitsList = commits.map(c => 
-              `- \`${c.sha.substring(0, 7)}\` – ${c.commit.message.split('\n')[0]}`
-            ).join('\n');
+            const tree = buildFileTree(fileTree, fileMap);
             
-            // Get original description (everything before the stats section)
-            let originalDescription = pr.body || '';
-            const statsMarker = '## 📁 Fichiers ajoutés / modifiés';
-            if (originalDescription.includes(statsMarker)) {
-              originalDescription = originalDescription.substring(0, originalDescription.indexOf(statsMarker)).trim();
+            // 3. Formater la liste des commits
+            const commitsList = commits
+              .map(c => `- \`${c.sha.substring(0, 7)}\` – ${c.commit.message.split('\n')[0]}`)
+              .join('\n');
+            
+            // 4. Générer le schéma Mermaid si PR fermée
+            let architectureDiagram = '';
+            if (isClosed) {
+              architectureDiagram = generateArchitectureDiagram(files);
             }
             
-            // Build updated description
-            const updatedDescription = `${originalDescription}
+            function generateArchitectureDiagram(changedFiles) {
+              // Analyser les fichiers modifiés pour générer un diagramme architectural
+              const categories = {
+                components: [],
+                services: [],
+                utils: [],
+                database: [],
+                api: [],
+                other: []
+              };
+              
+              changedFiles.forEach(f => {
+                const path = f.filename.toLowerCase();
+                if (path.includes('component') || path.includes('view') || path.includes('page')) {
+                  categories.components.push(f.filename.split('/').pop());
+                } else if (path.includes('service') || path.includes('handler')) {
+                  categories.services.push(f.filename.split('/').pop());
+                } else if (path.includes('util') || path.includes('helper')) {
+                  categories.utils.push(f.filename.split('/').pop());
+                } else if (path.includes('db') || path.includes('model') || path.includes('schema')) {
+                  categories.database.push(f.filename.split('/').pop());
+                } else if (path.includes('api') || path.includes('route') || path.includes('middleware')) {
+                  categories.api.push(f.filename.split('/').pop());
+                } else {
+                  categories.other.push(f.filename.split('/').pop());
+                }
+              });
+              
+              let mermaid = 'graph TD\n';
+              let connections = [];
+              
+              // Ajouter les nœuds
+              if (categories.components.length > 0) {
+                mermaid += '    UI["🎨 UI Components<br/>' + categories.components.slice(0, 3).join('<br/>') + '"]::ui\n';
+                connections.push('UI');
+              }
+              
+              if (categories.services.length > 0) {
+                mermaid += '    SERVICES["⚙️ Services<br/>' + categories.services.slice(0, 3).join('<br/>') + '"]::service\n';
+                if (connections.includes('UI')) {
+                  mermaid += '    UI --> SERVICES\n';
+                }
+                connections.push('SERVICES');
+              }
+              
+              if (categories.api.length > 0) {
+                mermaid += '    API["🔌 API/Routes<br/>' + categories.api.slice(0, 3).join('<br/>') + '"]::api\n';
+                if (connections.includes('SERVICES')) {
+                  mermaid += '    SERVICES --> API\n';
+                } else if (connections.includes('UI')) {
+                  mermaid += '    UI --> API\n';
+                }
+                connections.push('API');
+              }
+              
+              if (categories.database.length > 0) {
+                mermaid += '    DB[("🗄️ Database<br/>' + categories.database.slice(0, 3).join('<br/>') + '")]::db\n';
+                if (connections.includes('API')) {
+                  mermaid += '    API --> DB\n';
+                } else if (connections.includes('SERVICES')) {
+                  mermaid += '    SERVICES --> DB\n';
+                }
+              }
+              
+              if (categories.utils.length > 0) {
+                mermaid += '    UTILS["🛠️ Utils<br/>' + categories.utils.slice(0, 2).join('<br/>') + '"]::utils\n';
+                if (categories.services.length > 0) {
+                  mermaid += '    SERVICES -.->|used by| UTILS\n';
+                }
+              }
+              
+              // Ajouter les styles
+              mermaid += '    classDef ui fill:#e1f5ff\n';
+              mermaid += '    classDef service fill:#f3e5f5\n';
+              mermaid += '    classDef api fill:#fce4ec\n';
+              mermaid += '    classDef db fill:#e8f5e9\n';
+              mermaid += '    classDef utils fill:#fff3e0\n';
+              
+              return `\`\`\`mermaid\n${mermaid}\`\`\``;
+            }
+            
+            // 5. Extraire la section Architecture du USER_CONTENT (si présente)
+            let architectureSection = '';
+            const archMatch = userContent.match(
+              /## 🏗️ Architecture.*?\n\n([\s\S]*?)(?=## ✅|$)/
+            );
+            
+            if (archMatch) {
+              architectureSection = `\n## 🏗️ Architecture (Manuel)\n\n${archMatch[1].trim()}\n`;
+            } else if (isClosed) {
+              // Si PR fermée et pas de schéma manuel, ajouter le schéma auto-généré
+              architectureSection = `\n## 🏗️ Architecture (Auto-généré)\n\n${architectureDiagram}\n`;
+            }
+            
+            // 6. Construire la section AUTO_GENERATED
+            const autoGeneratedSection = `<!-- AUTO_GENERATED_START -->
 
-## 📁 Fichiers ajoutés / modifiés
+## 📁 Fichiers modifiés
 
 \`\`\`
 ${tree.trim()}
@@ -117,19 +267,27 @@ ${tree.trim()}
 
 ## 📊 Statistiques
 
-| Métrique               | Valeur |
-|------------------------|--------|
-| Fichiers modifiés      | ${stats.filesChanged}     |
-| Lignes ajoutées        | +${stats.additions}  |
-| Lignes supprimées      | -${stats.deletions}   |
-| Commits                | ${stats.commits}      |
+| Métrique | Valeur |
+|----------|--------|
+| Fichiers modifiés | ${stats.filesChanged} |
+| Lignes ajoutées | +${stats.additions} |
+| Lignes supprimées | -${stats.deletions} |
+| Commits | ${stats.commits} |
 
 ## 📝 Commits
 
-${commitsList}
-`;
+${commitsList}${architectureSection}
+
+<!-- AUTO_GENERATED_END -->`;
             
-            // Update PR description
+            // ============ CONSTRUIRE LA DESCRIPTION FINALE ============
+            const updatedDescription = `<!-- USER_CONTENT_START -->
+${userContent}
+<!-- USER_CONTENT_END -->
+
+${autoGeneratedSection}`;
+            
+            // 7. Mettre à jour la PR
             await github.rest.pulls.update({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -137,17 +295,21 @@ ${commitsList}
               body: updatedDescription
             });
             
-            core.info('✅ PR description updated successfully');
-            return { prNumber, stats };
+            const action = isClosed ? '✅ Merged' : '🔄 Updated';
+            core.info(`${action} PR description successfully`);
+            core.info(`📊 Stats: ${stats.filesChanged} files, +${stats.additions}/-${stats.deletions} lines, ${stats.commits} commits`);
 
-      - name: Comment on PR
+      - name: Comment on PR (only on first run)
         uses: actions/github-script@v7
+        if: github.event.action == 'opened'
         with:
           script: |
-            const prNumber = context.payload.pull_request?.number || context.payload.inputs?.pr_number;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: '🤖 La description de la PR a été mise à jour automatiquement avec les statistiques détaillées.'
-            });
+            const prNumber = context.payload.pull_request?.number;
+            if (prNumber) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '🤖 The PR description has been automatically updated with detailed statistics. This section updates with each commit, and an architectural diagram will be automatically generated upon closure.'
+              });
+            }
