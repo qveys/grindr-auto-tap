@@ -73,7 +73,6 @@ jobs:
 
             if (pr) {
                 try {
-
                     // 1. Count unresolved threads
                     let hasNextPage = true;
                     let cursor = null;
