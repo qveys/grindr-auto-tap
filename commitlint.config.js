@@ -26,14 +26,14 @@ module.exports = {
     'type-case': [2, 'always', 'lower-case'],
     'type-empty': [2, 'never'],
 
-    // Scope: obligatoire en mode strict
+    // Scope: optionnel
     'scope-enum': [
       2,
       'always',
       ['api', 'ui', 'auth', 'database', 'config', 'deps', 'docs', 'core', 'utils', 'tests'],
     ],
     'scope-case': [2, 'always', 'lower-case'],
-    'scope-empty': [2, 'never'], // Scope obligatoire
+    'scope-empty': [0, 'always'], // Scope optionnel pour s'aligner avec le hook Husky
 
     // Subject: description du commit
     'subject-empty': [2, 'never'],
@@ -59,7 +59,7 @@ module.exports = {
     settings: {},
     messages: {
       type: 'Sélectionne le type de commit:',
-      scope: 'Sélectionne le scope (OBLIGATOIRE):',
+      scope: 'Sélectionne le scope (optionnel):',
       subject: 'Écris une description courte et impérative:\\n',
       body: 'Fournis une description détaillée (optionnel). Utilise "|" pour les sauts de ligne:\\n',
       breaking: 'Liste les BREAKING CHANGES (optionnel):\\n',
