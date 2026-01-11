@@ -223,13 +223,14 @@ jobs:
 
               // Only Copilot Code Review has a public endpoint; other bots are usually not triggerable.
                 try {
-                  await github.rest.pulls.requestReviewers({
+                  const result = await github.rest.pulls.requestReviewers({
                     owner,
                     repo,
                     pull_number: pull_number,
                     reviewers: [preferredBotLogin]
                   });
                   core.info(`✅ Request code review: Success (requested ${preferredBotLogin})`);
+                  core.info(`API Response Reviewers: ${JSON.stringify(result.data.requested_reviewers.map(r => r.login))}`);
                 } catch (error) {
                   core.error(`❌ Request code review: Failed to request review from ${preferredBotLogin}`);
                   core.setFailed(error.message);
