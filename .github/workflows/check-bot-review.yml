@@ -13,7 +13,7 @@ jobs:
     if: github.event.pull_request
 
     steps:
-      - name: Check unresolved review threads via GraphQL
+            - name: Check unresolved review threads via GraphQL
         id: threads
         run: |
           owner="${GITHUB_REPOSITORY_OWNER}"
@@ -63,21 +63,29 @@ jobs:
               -X POST https://api.github.com/graphql \
               -d "$body")
 
-            # ajouter le nombre de threads non résolus
-            delta=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length')
+            echo "$resp" | jq '.' >/dev/null || {
+              echo "GraphQL error response:"
+              echo "$resp"
+              exit 1
+            }
+
+            delta=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes // [] | map(select(.isResolved == false))] | length')
             unresolved=$((unresolved + delta))
 
-            has_next=$(echo "$resp" | jq '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
+            has_next=$(echo "$resp" | jq '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
             if [ "$has_next" != "true" ]; then
               break
             fi
 
-            cursor=$(echo "$resp" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')
+            cursor=$(echo "$resp" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
+            if [ -z "$cursor" ]; then
+              break
+            fi
           done
 
           echo "unresolved=$unresolved" >> "$GITHUB_OUTPUT"
 
-      - name: Update status labels based on unresolved threads
+      - name: Update status labels bsed on unresolved threads
         if: github.event.pull_request
         run: |
           pr_number=${{ github.event.pull_request.number }}
