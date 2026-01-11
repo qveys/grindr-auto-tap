@@ -13,39 +13,6 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - name: Remove existing status:* labels
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = context.payload.issue || context.payload.pull_request;
-            const number = issue.number;
-
-            // Retrieve current labels of the issue/PR
-            const { data: current } = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: number,
-            });
-
-            const statusLabels = current.labels
-              .map(l => typeof l === 'string' ? l : l.name)
-              .filter(name => name && name.startsWith('status:'));
-
-            if (statusLabels.length === 0) {
-              core.notice('No existing status: labels to remove');
-            } else {
-              core.notice(`Removing status labels: ${statusLabels.join(', ')}`);
-              for (const name of statusLabels) {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: number,
-                  name,
-                }).catch(err => {
-                  core.warning(`Failed to remove label ${name}: ${err.message}`);
-                });
-              }
-            }
       - name: AI Labeling
         uses: actions/github-script@v7
         env:
@@ -172,6 +139,49 @@ jobs:
                 return;
               }
               
+              // Retrieve current labels of the issue/PR to avoid unnecessary removal/addition
+              const { data: currentIssue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+              });
+              
+              const currentLabels = currentIssue.labels.map(l => typeof l === 'string' ? l : l.name);
+              const currentStatusLabels = currentLabels.filter(l => l.startsWith('status:'));
+              const newStatusLabel = validLabels.find(l => l.startsWith('status:'));
+              
+              // Handle status labels
+              if (newStatusLabel) {
+                  if (currentStatusLabels.includes(newStatusLabel)) {
+                      core.notice(`Status label '${newStatusLabel}' is already present.`);
+                      // Remove any OTHER status labels if they exist (cleanup inconsistent state)
+                      for (const label of currentStatusLabels) {
+                          if (label !== newStatusLabel) {
+                              core.notice(`Removing inconsistent status label: ${label}`);
+                              await github.rest.issues.removeLabel({
+                                  owner: context.repo.owner,
+                                  repo: context.repo.repo,
+                                  issue_number: issue.number,
+                                  name: label
+                              });
+                          }
+                      }
+                  } else {
+                      // Status has changed, remove all old status labels
+                      if (currentStatusLabels.length > 0) {
+                          core.notice(`Removing old status labels: ${currentStatusLabels.join(', ')}`);
+                          for (const label of currentStatusLabels) {
+                              await github.rest.issues.removeLabel({
+                                  owner: context.repo.owner,
+                                  repo: context.repo.repo,
+                                  issue_number: issue.number,
+                                  name: label
+                              });
+                          }
+                      }
+                  }
+              }
+
               if (validLabels.length > 0) {
                 core.notice(`Adding labels: ${validLabels.join(', ')}`);
                 await github.rest.issues.addLabels({
