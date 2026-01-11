@@ -518,9 +518,8 @@ async function main() {
     const resolvedCount = results.resolved.length;
     // Condition to skip posting:
     // 1. No resolutions found (resolvedCount === 0)
-    // 2. No API calls were made (apiCalls === 0)
-    // 3. All analyzed items came from cache (totalAnalyzed === cacheHits)
-    const shouldSkipSummary = resolvedCount === 0 && apiCalls === 0 && totalAnalyzed === cacheHits;
+    // 2. All analyzed items came from cache (totalAnalyzed === cacheHits)
+    const shouldSkipSummary = resolvedCount === 0 && totalAnalyzed === cacheHits;
 
     if (shouldSkipSummary) {
       console.log('✨ Skipping summary comment (No resolutions, all cached, no API calls).');
