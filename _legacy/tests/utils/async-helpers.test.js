@@ -1,83 +1,17 @@
 /**
  * Tests for utils/async-helpers.js
+ *
+ * NOTE: This test file relies on the real implementation being loaded by runner.html
+ * The source file (../utils/async-helpers.js) is loaded before this test file,
+ * which attaches AsyncHelpers to window.AsyncHelpers.
  */
 
-// Mock AsyncHelpers implementation for testing
-const AsyncHelpers = {
-  safeAsync: async (promise, timeoutMs = 5000) => {
-    try {
-      let timeoutId;
-      const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error(`Operation timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-      });
-
-      const result = await Promise.race([promise, timeoutPromise]);
-      clearTimeout(timeoutId);
-
-      return { success: true, data: result };
-    } catch (error) {
-      return { success: false, error };
-    }
-  },
-
-  retry: async (fn, maxRetries = 3, delayMs = 1000) => {
-    let lastError;
-
-    for (let i = 0; i <= maxRetries; i++) {
-      try {
-        return await fn();
-      } catch (error) {
-        lastError = error;
-        if (i < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-        }
-      }
-    }
-
-    throw lastError;
-  },
-
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-
-  parallelLimit: async (tasks, limit) => {
-    const results = [];
-    const executing = [];
-
-    for (const task of tasks) {
-      const p = Promise.resolve().then(() => task());
-      results.push(p);
-
-      if (limit <= tasks.length) {
-        const e = p.then(() => executing.splice(executing.indexOf(e), 1));
-        executing.push(e);
-
-        if (executing.length >= limit) {
-          await Promise.race(executing);
-        }
-      }
-    }
-
-    return Promise.all(results);
-  },
-
-  debounce: (fn, wait) => {
-    let timeout;
-    return (...args) => {
-      return new Promise((resolve) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => resolve(fn(...args)), wait);
-      });
-    };
-  },
-};
-
-// Attach to window for tests
-Object.defineProperty(window, 'AsyncHelpers', {
-  value: AsyncHelpers,
-  writable: true,
-});
+// Ensure AsyncHelpers is available (should be loaded by runner.html)
+if (!window.AsyncHelpers) {
+  throw new Error(
+    'AsyncHelpers not found on window. Make sure ../utils/async-helpers.js is loaded before this test file.'
+  );
+}
 
 describe('AsyncHelpers', () => {
   describe('safeAsync', () => {
@@ -110,7 +44,7 @@ describe('AsyncHelpers', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBeInstanceOf(Error);
-      expect(result.error.message).toContain('timed out');
+      expect(result.error.message).toContain('timeout');
     });
   });
 
