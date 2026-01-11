@@ -473,10 +473,54 @@ async function main() {
       } else {
         results.notResolved.push({
           commentId: comment.id,
+          threadId: comment.threadId, // Pass threadId for GraphQL resolution
           line: comment.line,
           body: comment.body.substring(0, 100)
         });
       }
+    } else if (analysis && analysis.resolves && analysis.confidence > 0) {
+      results.lowConfidence.push({
+        commentId: comment.id,
+        line: comment.line,
+        highestConfidence: analysis.confidence,
+        body: comment.body.substring(0, 100)
+      });
+    } else {
+      results.notResolved.push({
+        commentId: comment.id,
+        line: comment.line,
+        body: comment.body.substring(0, 100)
+      });
+    }
+  }
+
+  // Save updated cache
+  saveCache(cache);
+
+  // Post resolutions to PR
+  for (const resolution of results.resolved) {
+    const commitShas = resolution.commits
+      .map(c => `${c.sha}`)
+      .join(', ');
+
+    try {
+      await octokit.rest.pulls.createReplyForReviewComment({
+        owner,
+        repo,
+        pull_number: prNumber,
+        comment_id: resolution.commentId,
+        body: `🎉 Fixed by commits: ${commitShas}`,
+      });
+      console.log(`    📬 Posted resolution comment for #${resolution.commentId}`);
+
+      // Also mark the thread as resolved using GraphQL
+      if (resolution.threadId) {
+        await resolveReviewThread(resolution.threadId);
+      } else {
+        console.warn(`    ⚠️ Missing threadId for comment #${resolution.commentId}, skipping thread resolution.`);
+      }
+    } catch (error) {
+      console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
     }
   }
 }
