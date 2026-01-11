@@ -30,16 +30,16 @@ jobs:
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
             
-            let number = context.payload.pull_request?.number;
-            if (!number && context.payload.workflow_run) {
+            let pull_number = context.payload.pull_request?.number;
+            if (!pull_number && context.payload.workflow_run) {
               // For workflow_run, finding the PR associated with the triggering workflow run
               const prs = context.payload.workflow_run.pull_requests;
               if (prs && prs.length > 0) {
-                number = prs[0].number;
+                pull_number = prs[0].number;
               }
             }
 
-            if (!number) {
+            if (!pull_number) {
               core.setFailed("Could not determine Pull Request number from context.");
               return;
             }
@@ -71,7 +71,7 @@ jobs:
             const unresolved = [];
 
             while (true) {
-              const data = await github.graphql(query, { owner, repo, number, after });
+              const data = await github.graphql(query, { owner, repo, number: pull_number, after });
               const threads = data.repository.pullRequest.reviewThreads;
 
               for (const t of (threads.nodes ?? [])) {
