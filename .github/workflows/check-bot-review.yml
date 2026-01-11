@@ -7,7 +7,7 @@ on:
     types: [submitted, edited, dismissed]
 
 jobs:
-  check-copilot-review:
+  check-bot-review:
     name: Verify Bot Review Exists
     runs-on: ubuntu-latest
     if: github.event.pull_request
@@ -85,7 +85,7 @@ jobs:
 
           echo "unresolved=$unresolved" >> "$GITHUB_OUTPUT"
 
-      - name: Update status labels bsed on unresolved threads
+      - name: Update status labels based on unresolved threads
         if: github.event.pull_request
         run: |
           pr_number=${{ github.event.pull_request.number }}
@@ -110,7 +110,7 @@ jobs:
           if [ "$unresolved" -gt 0 ]; then
             desired_status="$new_label"
           else
-            # ici tu peux mettre un autre statut voulu quand unresolved == 0
+            # you can set another status when unresolved == 0 if you want
             desired_status=""
           fi
 
@@ -136,7 +136,7 @@ jobs:
           # add desired status label (if any)
           if [ -n "$desired_status" ]; then
             echo "Adding label: $desired_status"
-            curl -s -X POST \
+            curl -s -X PUT \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -H "Content-Type: application/json" \
               -d "{\"labels\": [\"$desired_status\"]}" \
