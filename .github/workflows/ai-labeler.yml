@@ -6,7 +6,7 @@ on:
   pull_request:
     types: [opened, edited, reopened, synchronize, closed]
   workflow_run:
-    workflows: ["check-bot-review"] # le champ `name:` du workflow A
+    workflows: ["Check Bot Review"]
     types:
       - completed
 
