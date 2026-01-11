@@ -446,6 +446,7 @@ async function main() {
       if (resolvingCommits.length > 0) {
         results.resolved.push({
           commentId: comment.id,
+          threadId: comment.threadId, // Pass threadId for GraphQL resolution
           line: comment.line,
           commits: resolvingCommits,
           body: comment.body.substring(0, 100)
