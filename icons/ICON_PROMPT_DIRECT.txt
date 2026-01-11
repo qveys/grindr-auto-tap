@@ -1,0 +1,15 @@
+PROMPT PRINCIPAL (copier-coller directement) :
+
+Crée une icône d'extension de navigateur moderne représentant un outil d'automatisation pour application mobile. L'icône montre un doigt stylisé (vue de profil) qui tape/appuie sur un cercle/bouton orange (#FF6B6B) au centre. En arrière-plan, des engrenages subtils (opacité 30%) suggèrent l'automatisation. En bas, 3-4 barres de graphique de hauteurs différentes (blanc) représentent les statistiques collectées. Style flat design minimaliste, formes géométriques simples, lignes nettes. Fond transparent. Palette : orange corail (#FF6B6B) principal, blanc (#FFFFFF) pour les détails, gris clair (#F5F5F5) pour les engrenages. Optimisé pour être lisible à 16x16 pixels. Pas de texte. Design professionnel et moderne.
+
+---
+
+PROMPT ALTERNATIF (style plus simple) :
+
+Icône minimaliste : cercle orange (#FF6B6B) avec un doigt stylisé pointant vers le bas au centre, et 3 barres horizontales de hauteurs différentes en bas représentant un graphique. Tout en blanc sur fond orange transparent. Style flat design, formes géométriques pures, contraste élevé. Optimisé pour 16x16 pixels.
+
+---
+
+PROMPT ALTERNATIF (style robot) :
+
+Icône montrant un petit robot stylisé (tête ronde, bras) faisant un geste de tap vers un écran rectangulaire affichant des barres de graphique. Robot en orange (#FF6B6B), écran en bleu clair (#4ECDC4), détails en blanc. Style flat design moderne, fond transparent. Optimisé pour petite taille.
