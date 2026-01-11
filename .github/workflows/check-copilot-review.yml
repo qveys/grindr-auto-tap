@@ -1,4 +1,4 @@
-name: Check Copilot Review
+name: Check Bot Review
 
 on:
   pull_request:
@@ -8,10 +8,10 @@ on:
 
 jobs:
   check-copilot-review:
-    name: Verify Copilot Review Exists
+    name: Verify Bot Review Exists
     runs-on: ubuntu-latest
     steps:
-      - name: Check for Copilot review
+      - name: Check for Bot review
         uses: actions/github-script@v7
         with:
           script: |
@@ -24,7 +24,7 @@ jobs:
             
             // Get the latest commit date
             if (!commits || commits.length === 0) {
-              core.info('ℹ️ no commits found in the pull request. Skipping Copilot review freshness check.');
+              core.info('ℹ️ No commits found in the pull request. Skipping Copilot review freshness check.');
               return;
             } 
 
@@ -55,24 +55,29 @@ jobs:
               pull_number: context.issue.number,
             });
             
-            // Find Copilot review
-            const copilotReview = reviews.find(review => 
+            // Find Bot review
+            const botReviews = reviews.filter(review => 
               review.user.login === 'copilot-pull-request-reviewer[bot]' ||
               review.user.type === 'Bot'
             );
+
+            // Sort by submitted_at descending (newest first)
+            botReviews.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+
+            const botReview = botReviews[0];
             
-            if (!copilotReview) {
-              core.setFailed('❌ Copilot review is required but not found. Please wait for Copilot to review this PR.');
+            if (!botReview) {
+              core.setFailed('❌ Bot review is required but not found. Please wait for a bot to review this PR.');
             } else {
-              const reviewDate = new Date(copilotReview.submitted_at);
-              core.info(`✅ Copilot review found!`);
-              core.info(`📄 Review state: ${copilotReview.state}`);
+              const reviewDate = new Date(botReview.submitted_at);
+              core.info(`✅ Bot review found!`);
+              core.info(`📄 Review state: ${botReview.state}`);
               core.info(`📅 Review submitted at: ${reviewDate.toISOString()}`);
               
               // Check if review is older than the latest commit
               if (reviewDate < latestCommitDate) {
-                core.setFailed(`⚠️ Copilot review (${reviewDate.toISOString()}) is older than the latest commit (${latestCommitDate.toISOString()}). A new review is required after code changes.`);
+                core.setFailed(`⚠️ Bot review (${reviewDate.toISOString()}) is older than the latest commit (${latestCommitDate.toISOString()}). A new review is required after code changes.`);
               } else {
-                core.info('✅ Copilot review is up-to-date with the latest commit!');
+                core.info('✅ Bot review is up-to-date with the latest commit!');
               }
             }
