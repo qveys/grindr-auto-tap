@@ -1,6 +1,7 @@
-const fs = require('fs');
-const path = require('path');
-const { Octokit } = require('octokit');
+import fs from 'fs';
+import path from 'path';
+import { Octokit } from 'octokit';
+import { fileURLToPath } from 'url';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -14,6 +15,8 @@ const repo = GITHUB_EVENT.repository.name;
 const prNumber = GITHUB_EVENT.pull_request.number;
 
 // Use __dirname for robust path resolution
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const CACHE_FILE = path.join(__dirname, '..', '.github', 'pr-resolution-cache.json');
 const CONTEXT_LINES = 15;
 
