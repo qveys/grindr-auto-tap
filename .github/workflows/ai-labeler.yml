@@ -14,7 +14,6 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
-      checks: read
       contents: read
     steps:
       - name: AI Labeling
