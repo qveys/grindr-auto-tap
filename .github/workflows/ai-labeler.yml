@@ -31,7 +31,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          BOT_REVIEW_NEEDED: ${{ steps.bot-review.outputs.needs-review }}
+          BOT_REVIEW_NEEDED: ${{ steps.bot-review.outputs.needs-review || 'false' }}
         with:
           script: |
             if (!process.env.OPENAI_API_KEY) {
