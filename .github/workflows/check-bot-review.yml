@@ -125,24 +125,24 @@ jobs:
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
 
-            let number = context.payload.pull_request?.number;
-            if (!number && context.payload.workflow_run) {
+            let pull_number = context.payload.pull_request?.number;
+            if (!pull_number && context.payload.workflow_run) {
                const prs = context.payload.workflow_run.pull_requests;
                if (prs && prs.length > 0) {
-                 number = prs[0].number;
+                 pull_number = prs[0].number;
                }
             }
-            if (!number && context.payload.inputs?.pull_request_number) {
+            if (!pull_number && context.payload.inputs?.pull_request_number) {
               // For workflow_dispatch
-              number = parseInt(context.payload.inputs.pull_request_number, 10);
+              pull_number = parseInt(context.payload.inputs.pull_request_number, 10);
             }
 
-            if (!number) {
+            if (!pull_number) {
               core.setFailed("Could not determine Pull Request number from context.");
               return;
             }
 
-            const { data: reviews } = await github.rest.pulls.listReviews({ owner, repo, pull_number: number });
+            const { data: reviews } = await github.rest.pulls.listReviews({ owner, repo, pull_number: pull_number });
 
             const botReviews = (reviews ?? [])
               .filter(r => r?.user?.type === "Bot" && r?.submitted_at && r?.user?.login !== "github-actions[bot]")
@@ -191,7 +191,7 @@ jobs:
             // 2) Find latest "content-changing" commit
             const { data: commits } = await github.rest.pulls.listCommits({
               owner, repo, pull_number,
-              per_page: 250,
+              per_page: 100,
             });
 
             if (!commits?.length) {
@@ -218,7 +218,7 @@ jobs:
             }
 
             if (!latestCommit) {
-              core.info("ℹ️ All commits are skippable (merge, revert, or [skip review]). strict review check not required.");
+              core.info("ℹ️ All commits are skippable (merge, revert, or [skip review]). Strict review check not required.");
               return;
             }
 
