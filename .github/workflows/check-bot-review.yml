@@ -225,34 +225,20 @@ jobs:
               const isCopilotLike =
                 preferredBotLogin.toLowerCase().includes("copilot");
 
-              if (isCopilotLike) {
-                const pull_request_url = `https://api.github.com/repos/${owner}/${repo}/pulls/${pull_number}`;
-
-                const resp = await fetch("https://api.github.com/copilot/code-review", {
-                  method: "POST",
-                  headers: {
-                    "Authorization": `Bearer ${process.env.GITHUB_TOKEN}`,
-                    "Content-Type": "application/json",
-                    "Accept": "application/vnd.github+json",
-                  },
-                  body: JSON.stringify({
-                    pull_request_url,
-                    // Experimental/undocumented usage: reviewer is not part of any documented public API and may be ignored or change without notice.
-                    reviewer: preferredBotLogin,
-                  }),
-                });
-
-                core.info(`Copilot trigger response: ${resp.status} ${resp.statusText}`);
-                if (resp.ok) {
-                  core.info("✅ Request code review: Success");
-                  const text = await resp.text();
-                  if (text) core.info(`Copilot response body: ${text.slice(0, 1000)}`);
-                } else {
-                  core.error("❌ Request code review: Failed");
-                  core.warning(`Copilot trigger request failed; not logging response body. Status: ${resp.status} ${resp.statusText}`);
+                try {
+                  await github.rest.pulls.requestReviewers({
+                    owner,
+                    repo,
+                    pull_number: pull_number,
+                    reviewers: [preferredBotLogin]
+                  });
+                  core.info(`✅ Request code review: Success (requested ${preferredBotLogin})`);
+                } catch (error) {
+                  core.error(`❌ Request code review: Failed to request review from ${preferredBotLogin}`);
+                  core.setFailed(error.message);
                 }
               } else {
-                core.info(`No known API trigger for bot '${preferredBotLogin}'.`);
+                core.info(`No known API trigger for bot '${preferredBotLogin}' - attempted standard review request.`);
               }
 
               core.setFailed("❌ Bot review required (status: review-needed). Waiting for a fresh bot review.");
