@@ -1,0 +1,32 @@
+name: PR Merge Readiness Check
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  check-merge-readiness:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check for 'status: fixed' label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+
+            const labels = pr.labels.map(label => label.name);
+            const hasFixedLabel = labels.includes('status: fixed');
+
+            core.notice(`PR labels: ${labels.join(', ')}`);
+
+            if (hasFixedLabel) {
+              core.notice('✅ PR is ready to merge - "status: fixed" label is present');
+            } else {
+              core.setFailed('❌ PR is not ready to merge - "status: fixed" label is missing');
+            }
