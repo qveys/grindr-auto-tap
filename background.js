@@ -260,8 +260,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === 'clearLogs') {
     // Supprimer tous les logs
-    chrome.storage.local.set({ extensionLogs: [] }, () => {
-      sendResponse({ success: true });
+    chrome.storage.local.remove(['extensionLogs'], () => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        sendResponse({ success: true });
+      }
     });
     return true;
   }
