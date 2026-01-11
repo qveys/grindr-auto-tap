@@ -188,12 +188,13 @@ Task:
 1. Understand the issue from the review comment.
 2. Check each commit to see if it fixes the issue.
 3. If multiple commits address it, pick the one that fully resolves it.
-4. If NO commit resolves it, return false.
-
+4. If a commit only PARTIALLY resolves it, or attempts to but fails, return "resolves": false and "partial": true.
+5. If NO commit resolves it, return false.
 Respond in JSON:
 {
-  "resolves": true/false,
-  "resolvingConfirmIndices": [1, 3], // List of indices (1-based) of commits that contribute to the fix. Empty if none.
+  "resolves": true/false, // STRICT: Only true if the commit COMPLETELY resolves the comment.
+  "partial": true/false,  // Set to true if the commit addresses the issue but is incomplete or you are unsure.
+  "resolvingConfirmIndices": [1, 3], // List of indices (1-based) of commits that contribute to the fix.
   "confidence": 0-100,
   "reasoning": "Explanation..."
 }`;
@@ -355,6 +356,7 @@ async function main() {
       if (!first) return null;
       return {
         id: first.databaseId, // Use databaseId for REST API compatibility
+        threadId: t.id,       // Capture GraphQL thread ID for resolution
         body: first.body,
         path: first.path,
         line: first.line
@@ -369,6 +371,7 @@ async function main() {
 
   const results = {
     resolved: [],
+    partial: [],
     lowConfidence: [],
     notResolved: [],
   };
@@ -435,23 +438,33 @@ async function main() {
       // Rate limit only on API call
       await new Promise(r => setTimeout(r, 500));
     }
-
-    if (analysis && analysis.resolves && analysis.confidence >= 85) {
+    if (analysis) {
+      // Extract resolving commits for both complete and partial cases
       const resolvingCommits = (analysis.resolvingConfirmIndices || [])
-        .map(idx => validCandidates[idx - 1]) // 1-based index to 0-based
+        .map(idx => validCandidates[idx - 1])
         .filter(c => c)
         .map(c => ({ sha: c.sha.substring(0, 8), confidence: analysis.confidence }));
-
-      if (resolvingCommits.length > 0) {
-        results.resolved.push({
-          commentId: comment.id,
-          line: comment.line,
-          commits: resolvingCommits,
-          body: comment.body.substring(0, 100)
-        });
-        console.log(`   ✅ Resolved by: ${resolvingCommits.map(c => c.sha).join(', ')}`);
+      if (analysis.resolves && analysis.confidence >= 85) {
+        if (resolvingCommits.length > 0) {
+          results.resolved.push({
+            commentId: comment.id,
+            threadId: comment.threadId,
+            line: comment.line,
+            commits: resolvingCommits,
+            body: comment.body.substring(0, 100)
+          });
+          console.log(`   ✅ Resolved by: ${resolvingCommits.map(c => c.sha).join(', ')}`);
+        }
       }
-    } else if (analysis && analysis.resolves && analysis.confidence > 0) {
+    } else if (analysis.partial) {
+      results.partial.push({
+        commentId: comment.id,
+        line: comment.line,
+        highestConfidence: analysis.confidence,
+        commits: resolvingCommits || [],
+        body: comment.body.substring(0, 100)
+      });
+    } else if (analysis.resolves && analysis.confidence > 0) {
       results.lowConfidence.push({
         commentId: comment.id,
         line: comment.line,
@@ -466,74 +479,75 @@ async function main() {
       });
     }
   }
-
-  // Save updated cache
-  saveCache(cache);
-
-  // Post resolutions to PR
-  for (const resolution of results.resolved) {
-    const commitShas = resolution.commits
-      .map(c => `${c.sha}`)
-      .join(', ');
-
-    try {
-      await octokit.rest.pulls.createReplyForReviewComment({
-        owner,
-        repo,
-        pull_number: prNumber,
-        comment_id: resolution.commentId,
-        body: `🎉 Fixed by commits: ${commitShas}`,
-      });
-      console.log(`    📬 Posted resolution comment for #${resolution.commentId}`);
-    } catch (error) {
-      console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
-    }
-  }
-
-  // Post low-confidence notifications
-  for (const lowConf of results.lowConfidence) {
+}
+// Save updated cache
+saveCache(cache);
+// Post resolutions to PR
+for (const resolution of results.resolved) {
+  const commitShas = resolution.commits
+    .map(c => `${c.sha}`)
+    .join(', ');
+  try {
     await octokit.rest.pulls.createReplyForReviewComment({
       owner,
       repo,
       pull_number: prNumber,
-      comment_id: lowConf.commentId,
-      body: `⚠️ Potentially resolved (${lowConf.highestConfidence}% confidence). Please review manually.`,
+      comment_id: resolution.commentId,
+      body: `🎉 Fixed by commits: ${commitShas}`,
     });
+    console.log(`    📬 Posted resolution comment for #${resolution.commentId}`);
+
+  } catch (error) {
+    console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
   }
+}
+// Post partial resolution notifications
+for (const partial of results.partial) {
+  const commitShas = (partial.commits || []).map(c => c.sha).join(', ');
+  const body = `🛠️ Fixed partially in commits: ${commitShas}. Please review remaining issues.`;
+  await octokit.rest.pulls.createReplyForReviewComment({
+    owner,
+    repo,
+    pull_number: prNumber,
+    comment_id: partial.commentId,
+    body: body,
+  });
+}
+// Low confidence results are included in the summary but we do not post individual replies to avoid noise.
 
+// Only post summary comment if there are comments to analyze and work was done
+const totalAnalyzed = results.resolved.length + results.partial.length + results.lowConfidence.length + results.notResolved.length;
 
-  // Only post summary comment if there are comments to analyze and work was done
-  const totalAnalyzed = results.resolved.length + results.lowConfidence.length + results.notResolved.length;
+if (comments.length > 0 && totalAnalyzed > 0) {
+  // Post summary comment
+  const summaryComment = formatSummary(results, apiCalls, cacheHits);
+  await octokit.rest.issues.createComment({
+    owner,
+    repo,
+    issue_number: prNumber,
+    body: summaryComment,
+  });
+}
 
-  if (comments.length > 0 && totalAnalyzed > 0) {
-    // Post summary comment
-    const summaryComment = formatSummary(results, apiCalls, cacheHits);
-    await octokit.rest.issues.createComment({
-      owner,
-      repo,
-      issue_number: prNumber,
-      body: summaryComment,
-    });
-  }
-
-  // Write to job summary
-  if (totalAnalyzed > 0) {
-    const jobSummary = formatJobSummary(results, apiCalls, cacheHits);
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
-    console.log(jobSummary);
-  } else {
-    console.log("\n✨ No new analysis performed. Everything looks up to date.");
-  }
+// Write to job summary
+if (totalAnalyzed > 0) {
+  const jobSummary = formatJobSummary(results, apiCalls, cacheHits);
+  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
+  console.log(jobSummary);
+} else {
+  console.log("\n✨ No new analysis performed. Everything looks up to date.");
 }
 
 function formatSummary(results, apiCalls, cacheHits) {
+  const total = results.resolved.length + results.partial.length + results.lowConfidence.length + results.notResolved.length;
   return `🤖 **Auto-Resolution Summary**
 
-✅ **Resolved:** ${results.resolved.length} review comment(s)
-⚠️ **Low Confidence:** ${results.lowConfidence.length} review comment(s)
-❌ **Not Resolved:** ${results.notResolved.length} review comment(s)
+✅ **Resolved:** ${results.resolved.length}
+🛠️ **Partial:** ${results.partial.length}
+⚠️ **Low Confidence:** ${results.lowConfidence.length}
+❌ **Not Resolved:** ${results.notResolved.length}
 
-📊 **Stats:** ${apiCalls} API calls | ${cacheHits} cache hits | ${results.resolved.length + results.lowConfidence.length + results.notResolved.length} total analyzed`;
+📊 **Stats:** ${apiCalls} API calls | ${cacheHits} cache hits | ${total} total analyzed`;
 }
 
 function formatJobSummary(results, apiCalls, cacheHits) {
@@ -542,6 +556,14 @@ function formatJobSummary(results, apiCalls, cacheHits) {
   if (results.resolved.length > 0) {
     summary += `## ✅ Resolved (${results.resolved.length})\n`;
     results.resolved.forEach(r => {
+      summary += `- Comment #${r.commentId} (line ${r.line}) → ${r.commits.map(c => c.sha).join(', ')}\n`;
+    });
+    summary += '\n';
+  }
+
+  if (results.partial.length > 0) {
+    summary += `## 🛠️ Partial (${results.partial.length})\n`;
+    results.partial.forEach(r => {
       summary += `- Comment #${r.commentId} (line ${r.line}) → ${r.commits.map(c => c.sha).join(', ')}\n`;
     });
     summary += '\n';
@@ -566,7 +588,7 @@ function formatJobSummary(results, apiCalls, cacheHits) {
   summary += `## 📊 Stats\n`;
   summary += `- API Calls: ${apiCalls}\n`;
   summary += `- Cache Hits: ${cacheHits}\n`;
-  summary += `- Total Analyzed: ${results.resolved.length + results.lowConfidence.length + results.notResolved.length}\n`;
+  summary += `- Total Analyzed: ${results.resolved.length + results.partial.length + results.lowConfidence.length + results.notResolved.length}\n`;
 
   return summary;
 }
