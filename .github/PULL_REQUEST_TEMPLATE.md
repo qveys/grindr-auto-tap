@@ -1,18 +1,10 @@
 <!-- USER_CONTENT_START -->
-
 ## 📋 Description
 
 Please provide a clear and concise description of what this pull request does.
 
 - What problem does it solve?
 - What is the scope of the change (feature, refactor, bug fix, docs, etc.)?
-
-## 🔗 Related issues
-
-Link any related issues or tasks (e.g. `Closes #123`, `Relates to #456`).
-
-- Closes:
-- Relates to:
 
 ## 🏷️ Type of change
 
@@ -72,7 +64,14 @@ Please confirm the following before requesting a review:
 Add any other context, notes for reviewers, known limitations, or follow-up work.
 
 <!-- USER_CONTENT_END -->
+<!-- RELATED_ISSUES_START -->
+## 🔗 Related issues
 
+Link any related issues or tasks (e.g. `Closes #123`, `Relates to #456`).
+
+- Closes:
+- Relates to:
+<!-- RELATED_ISSUES_END -->
 <!-- AUTO_GENERATED_START -->
 
 
