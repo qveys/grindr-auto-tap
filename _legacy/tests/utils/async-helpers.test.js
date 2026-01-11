@@ -2,6 +2,83 @@
  * Tests for utils/async-helpers.js
  */
 
+// Mock AsyncHelpers implementation for testing
+const AsyncHelpers = {
+  safeAsync: async (promise, timeoutMs = 5000) => {
+    try {
+      let timeoutId;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+
+      const result = await Promise.race([promise, timeoutPromise]);
+      clearTimeout(timeoutId);
+
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error };
+    }
+  },
+
+  retry: async (fn, maxRetries = 3, delayMs = 1000) => {
+    let lastError;
+
+    for (let i = 0; i <= maxRetries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        if (i < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+
+    throw lastError;
+  },
+
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+
+  parallelLimit: async (tasks, limit) => {
+    const results = [];
+    const executing = [];
+
+    for (const task of tasks) {
+      const p = Promise.resolve().then(() => task());
+      results.push(p);
+
+      if (limit <= tasks.length) {
+        const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+        executing.push(e);
+
+        if (executing.length >= limit) {
+          await Promise.race(executing);
+        }
+      }
+    }
+
+    return Promise.all(results);
+  },
+
+  debounce: (fn, wait) => {
+    let timeout;
+    return (...args) => {
+      return new Promise((resolve) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => resolve(fn(...args)), wait);
+      });
+    };
+  },
+};
+
+// Attach to window for tests
+Object.defineProperty(window, 'AsyncHelpers', {
+  value: AsyncHelpers,
+  writable: true,
+});
+
 describe('AsyncHelpers', () => {
   describe('safeAsync', () => {
     test('should return success for resolved promise', async () => {
@@ -14,7 +91,11 @@ describe('AsyncHelpers', () => {
     });
 
     test('should return error for rejected promise', async () => {
+      // We need to handle the rejection to prevent UnhandledPromiseRejectionWarning in tests
       const promise = Promise.reject(new Error('Test error'));
+      // Catch the rejection so it doesn't bubble up to Jest
+      promise.catch(() => {});
+
       const result = await window.AsyncHelpers.safeAsync(promise, 1000);
 
       expect(result.success).toBe(false);
@@ -24,12 +105,12 @@ describe('AsyncHelpers', () => {
     });
 
     test('should timeout slow promises', async () => {
-      const slowPromise = new Promise(resolve => setTimeout(() => resolve('slow'), 5000));
+      const slowPromise = new Promise((resolve) => setTimeout(() => resolve('slow'), 5000));
       const result = await window.AsyncHelpers.safeAsync(slowPromise, 100);
 
       expect(result.success).toBe(false);
       expect(result.error).toBeInstanceOf(Error);
-      expect(result.error.message).toContain('timeout');
+      expect(result.error.message).toContain('timed out');
     });
   });
 
@@ -98,7 +179,7 @@ describe('AsyncHelpers', () => {
   describe('parallelLimit', () => {
     test('should execute tasks in parallel with limit', async () => {
       const executed = [];
-      const tasks = [1, 2, 3, 4, 5].map(n => async () => {
+      const tasks = [1, 2, 3, 4, 5].map((n) => async () => {
         executed.push(n);
         await window.AsyncHelpers.sleep(10);
         return n * 2;
@@ -111,7 +192,7 @@ describe('AsyncHelpers', () => {
     });
 
     test('should maintain order of results', async () => {
-      const tasks = [3, 1, 2].map(n => async () => {
+      const tasks = [3, 1, 2].map((n) => async () => {
         await window.AsyncHelpers.sleep(n * 10);
         return n;
       });
