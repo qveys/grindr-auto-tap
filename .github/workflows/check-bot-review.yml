@@ -202,8 +202,12 @@ jobs:
                 });
 
                 core.info(`Copilot trigger response: ${resp.status} ${resp.statusText}`);
-                const text = await resp.text();
-                if (text) core.info(`Copilot response body: ${text.slice(0, 1000)}`);
+                if (resp.ok) {
+                  const text = await resp.text();
+                  if (text) core.info(`Copilot response body: ${text.slice(0, 1000)}`);
+                } else {
+                  core.warning(`Copilot trigger request failed; not logging response body. Status: ${resp.status} ${resp.statusText}`);
+                }
               } else {
                 core.info(`No known API trigger for bot '${enforcedBotLogin}'.`);
               }
