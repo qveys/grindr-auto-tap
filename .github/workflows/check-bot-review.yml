@@ -164,7 +164,7 @@ jobs:
             // 3) Get reviews
             const { data: reviews } = await github.rest.pulls.listReviews({
               owner, repo, pull_number,
-              per_page: 250,
+              per_page: 100,
             });
 
             const botReviews = (reviews ?? [])
