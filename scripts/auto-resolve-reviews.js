@@ -1,12 +1,14 @@
-const fs = require('fs');
-const path = require('path');
-const { Octokit } = require('octokit');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { Octokit } from 'octokit';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_EVENT = JSON.parse(
-  fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')
-);
+const GITHUB_EVENT = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 const owner = GITHUB_EVENT.repository.owner.login;
@@ -26,7 +28,10 @@ function loadCache() {
 }
 
 function generateBatchCacheKey(comment, candidates) {
-  const commitShas = candidates.map(c => c.sha).sort().join(',');
+  const commitShas = candidates
+    .map((c) => c.sha)
+    .sort()
+    .join(',');
   return `${comment.id}-${commitShas}`;
 }
 
@@ -35,9 +40,6 @@ function saveCache(cache) {
   fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
   fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
 }
-
-
-
 
 // GraphQL: Fetch review threads to get accurate `isOutdated`/`isResolved`
 // GraphQL: Fetch all review threads
@@ -101,8 +103,6 @@ async function resolveReviewThread(threadId) {
       variables: { threadId },
     });
 
-
-
     const resolved = !!res.data?.data?.resolveReviewThread?.thread?.isResolved;
     if (resolved) {
       console.log(`    ✨ Thread ${threadId} resolved successfully`);
@@ -115,7 +115,6 @@ async function resolveReviewThread(threadId) {
     return false;
   }
 }
-
 
 // Get all commits in PR with diffs
 async function getCommitsWithDiffs() {
@@ -137,12 +136,15 @@ async function getCommitsWithDiffs() {
       });
       filesData = commitDetail.data.files || [];
     } catch (error) {
-      console.error(`  Error fetching details for commit ${commit.sha.substring(0, 8)}:`, error.message);
+      console.error(
+        `  Error fetching details for commit ${commit.sha.substring(0, 8)}:`,
+        error.message
+      );
     }
 
     console.log(`  Commit ${commit.sha.substring(0, 8)}: ${filesData.length} files modified`);
     if (filesData.length > 0) {
-      console.log(`    Files: ${filesData.map(f => f.filename).join(', ')}`);
+      console.log(`    Files: ${filesData.map((f) => f.filename).join(', ')}`);
     } else {
       console.warn(`    ⚠️ No files found for commit ${commit.sha.substring(0, 8)}`);
     }
@@ -162,19 +164,23 @@ async function getCommitsWithDiffs() {
 // Get diff for a specific file in a commit
 async function getFileDiff(commit, filename) {
   // Use the diff information already attached to the commit object by getCommitsWithDiffs
-  const file = commit.files?.find(f => f.filename === filename);
+  const file = commit.files?.find((f) => f.filename === filename);
   return file?.patch || '';
 }
 
 // Call OpenAI to analyze if ANY of the candidate commits resolve the comment
 async function analyzeBatchWithOpenAI(comment, commits) {
-  const commitsContext = commits.map((c, i) => `
+  const commitsContext = commits
+    .map(
+      (c, i) => `
 COMMIT #${i + 1}:
 SHA: ${c.sha}
 MESSAGE: ${c.message}
 DIFF:
 ${c.diff.substring(0, 2000)}
-`).join('\n---\n');
+`
+    )
+    .join('\n---\n');
 
   const prompt = `You are a code review assistant. 
 Review Comment: "${comment.body}"
@@ -200,7 +206,9 @@ Respond in JSON:
 
   try {
     const promptLen = prompt.length;
-    console.log(`\n🧠 OpenAI Batch Analyze -> comment #${comment.id} with ${commits.length} candidates`);
+    console.log(
+      `\n🧠 OpenAI Batch Analyze -> comment #${comment.id} with ${commits.length} candidates`
+    );
     console.log(`   • prompt length=${promptLen} chars`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -246,12 +254,10 @@ function preFilterCommits(comments, commits) {
     const commentFile = comment.path;
     console.log(`\n  📄 Comment file: "${commentFile}"`);
 
-    const matchingCommits = commits.filter(commit => {
-      const hasFile = commit.files.some(
-        file => file.filename === commentFile
-      );
+    const matchingCommits = commits.filter((commit) => {
+      const hasFile = commit.files.some((file) => file.filename === commentFile);
       if (!hasFile && commit.files.length > 0) {
-        console.log(`    Files in commit: ${commit.files.map(f => f.filename).join(', ')}`);
+        console.log(`    Files in commit: ${commit.files.map((f) => f.filename).join(', ')}`);
       }
       return hasFile;
     });
@@ -310,7 +316,7 @@ async function main() {
   const allThreads = await getAllReviewThreads();
 
   // 1. Handle Outdated Threads
-  const outdatedThreads = allThreads.filter(t => t.isOutdated === true && t.isResolved === false);
+  const outdatedThreads = allThreads.filter((t) => t.isOutdated === true && t.isResolved === false);
   console.log(`📊 Found ${outdatedThreads.length} outdated thread(s)\n`);
 
   let resolvedOutdatedCount = 0;
@@ -336,13 +342,13 @@ async function main() {
   // - isResolved = false
   // - No "Fixed by commits: ..." reply from bot
 
-  const unresolvedThreads = allThreads.filter(t => {
+  const unresolvedThreads = allThreads.filter((t) => {
     if (t.isResolved) return false;
     if (t.isOutdated) return false; // Already tried to resolve if it was outdated
 
     // Check for existing bot resolution reply
-    const hasBotResolution = t.comments.nodes.some(c =>
-      c.body.includes('Fixed by commits') || c.body.includes('Fixed by commit')
+    const hasBotResolution = t.comments.nodes.some(
+      (c) => c.body.includes('Fixed by commits') || c.body.includes('Fixed by commit')
     );
 
     return !hasBotResolution;
@@ -350,18 +356,18 @@ async function main() {
 
   // Map to comment objects for analysis (use the first comment in the thread)
   const comments = unresolvedThreads
-    .map(t => {
+    .map((t) => {
       const first = t.comments.nodes[0];
       if (!first) return null;
       return {
         id: first.databaseId, // Use databaseId for REST API compatibility
-        threadId: t.id,       // Capture GraphQL thread ID for resolution
+        threadId: t.id, // Capture GraphQL thread ID for resolution
         body: first.body,
         path: first.path,
-        line: first.line
+        line: first.line,
       };
     })
-    .filter(c => c !== null);
+    .filter((c) => c !== null);
 
   console.log(`📊 Found ${comments.length} unresolved comments and ${commits.length} commits\n`);
 
@@ -382,13 +388,14 @@ async function main() {
   let apiCalls = 0;
   let cacheHits = 0;
 
-
   for (const { comment, candidates } of filtered) {
     const validCandidates = [];
     const hasLine = comment.line != null && !Number.isNaN(Number(comment.line));
 
     if (!hasLine) {
-      console.log(`   ℹ️ Comment #${comment.id} missing line check: checking all ${candidates.length} candidates.`);
+      console.log(
+        `   ℹ️ Comment #${comment.id} missing line check: checking all ${candidates.length} candidates.`
+      );
     }
 
     for (const commit of candidates) {
@@ -409,7 +416,9 @@ async function main() {
     }
   }
 
-  console.log(`\n📉 Optimized Plan: ${commentsToAnalyze.length} OpenAI calls for ${filtered.length} total comments.`);
+  console.log(
+    `\n📉 Optimized Plan: ${commentsToAnalyze.length} OpenAI calls for ${filtered.length} total comments.`
+  );
 
   // Analyze each comment with its batch of valid candidates
   for (const { comment, validCandidates } of commentsToAnalyze) {
@@ -423,7 +432,9 @@ async function main() {
       cacheHits++;
     } else {
       apiCalls++;
-      console.log(`\n⏳ Cache Miss -> OpenAI Batch Call ${apiCalls} / ${commentsToAnalyze.length} (Comment #${comment.id})`);
+      console.log(
+        `\n⏳ Cache Miss -> OpenAI Batch Call ${apiCalls} / ${commentsToAnalyze.length} (Comment #${comment.id})`
+      );
 
       analysis = await analyzeBatchWithOpenAI(comment, validCandidates);
 
@@ -434,14 +445,14 @@ async function main() {
       }
 
       // Rate limit only on API call
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
     }
 
     if (analysis && analysis.resolves && analysis.confidence >= 85) {
       const resolvingCommits = (analysis.resolvingConfirmIndices || [])
-        .map(idx => validCandidates[idx - 1]) // 1-based index to 0-based
-        .filter(c => c)
-        .map(c => ({ sha: c.sha.substring(0, 8), confidence: analysis.confidence }));
+        .map((idx) => validCandidates[idx - 1]) // 1-based index to 0-based
+        .filter((c) => c)
+        .map((c) => ({ sha: c.sha.substring(0, 8), confidence: analysis.confidence }));
 
       if (resolvingCommits.length > 0) {
         results.resolved.push({
@@ -449,22 +460,22 @@ async function main() {
           threadId: comment.threadId, // Pass threadId for GraphQL resolution
           line: comment.line,
           commits: resolvingCommits,
-          body: comment.body.substring(0, 100)
+          body: comment.body.substring(0, 100),
         });
-        console.log(`   ✅ Resolved by: ${resolvingCommits.map(c => c.sha).join(', ')}`);
+        console.log(`   ✅ Resolved by: ${resolvingCommits.map((c) => c.sha).join(', ')}`);
       }
     } else if (analysis && analysis.resolves && analysis.confidence > 0) {
       results.lowConfidence.push({
         commentId: comment.id,
         line: comment.line,
         highestConfidence: analysis.confidence,
-        body: comment.body.substring(0, 100)
+        body: comment.body.substring(0, 100),
       });
     } else {
       results.notResolved.push({
         commentId: comment.id,
         line: comment.line,
-        body: comment.body.substring(0, 100)
+        body: comment.body.substring(0, 100),
       });
     }
   }
@@ -474,9 +485,7 @@ async function main() {
 
   // Post resolutions to PR
   for (const resolution of results.resolved) {
-    const commitShas = resolution.commits
-      .map(c => `${c.sha}`)
-      .join(', ');
+    const commitShas = resolution.commits.map((c) => `${c.sha}`).join(', ');
 
     try {
       await octokit.rest.pulls.createReplyForReviewComment({
@@ -492,10 +501,15 @@ async function main() {
       if (resolution.threadId) {
         await resolveReviewThread(resolution.threadId);
       } else {
-        console.warn(`    ⚠️ Missing threadId for comment #${resolution.commentId}, skipping thread resolution.`);
+        console.warn(
+          `    ⚠️ Missing threadId for comment #${resolution.commentId}, skipping thread resolution.`
+        );
       }
     } catch (error) {
-      console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
+      console.error(
+        `    ❌ Failed to post resolution for comment ${resolution.commentId}:`,
+        error.message
+      );
     }
   }
 
@@ -510,9 +524,9 @@ async function main() {
     });
   }
 
-
   // Only post summary comment if there are comments to analyze and work was done
-  const totalAnalyzed = results.resolved.length + results.lowConfidence.length + results.notResolved.length;
+  const totalAnalyzed =
+    results.resolved.length + results.lowConfidence.length + results.notResolved.length;
 
   if (comments.length > 0 && totalAnalyzed > 0) {
     const resolvedCount = results.resolved.length;
@@ -541,7 +555,7 @@ async function main() {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
     console.log(jobSummary);
   } else {
-    console.log("\n✨ No new analysis performed. Everything looks up to date.");
+    console.log('\n✨ No new analysis performed. Everything looks up to date.');
   }
 }
 
@@ -560,15 +574,15 @@ function formatJobSummary(results, apiCalls, cacheHits) {
 
   if (results.resolved.length > 0) {
     summary += `## ✅ Resolved (${results.resolved.length})\n`;
-    results.resolved.forEach(r => {
-      summary += `- Comment #${r.commentId} (line ${r.line}) → ${r.commits.map(c => c.sha).join(', ')}\n`;
+    results.resolved.forEach((r) => {
+      summary += `- Comment #${r.commentId} (line ${r.line}) → ${r.commits.map((c) => c.sha).join(', ')}\n`;
     });
     summary += '\n';
   }
 
   if (results.lowConfidence.length > 0) {
     summary += `## ⚠️ Low Confidence (${results.lowConfidence.length})\n`;
-    results.lowConfidence.forEach(r => {
+    results.lowConfidence.forEach((r) => {
       summary += `- Comment #${r.commentId} (line ${r.line}) - ${r.highestConfidence}% confidence\n`;
     });
     summary += '\n';
@@ -576,7 +590,7 @@ function formatJobSummary(results, apiCalls, cacheHits) {
 
   if (results.notResolved.length > 0) {
     summary += `## ❌ Not Resolved (${results.notResolved.length})\n`;
-    results.notResolved.forEach(r => {
+    results.notResolved.forEach((r) => {
       summary += `- Comment #${r.commentId} (line ${r.line})\n`;
     });
     summary += '\n';
@@ -590,7 +604,7 @@ function formatJobSummary(results, apiCalls, cacheHits) {
   return summary;
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error('❌ Workflow failed:', error.message);
   process.exit(1);
 });

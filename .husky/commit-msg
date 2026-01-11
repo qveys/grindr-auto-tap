@@ -1,0 +1,101 @@
+# Script de validation personnalisé des commits avec emoji + type
+# Règles:
+# 1. Format: EMOJI TYPE: Description
+# 2. Emoji obligatoire, suivi d'un espace
+# 3. Type obligatoire (feat, fix, docs, refactor, test, chore, build, ci, perf, style, revert)
+# 4. Maximum 25 mots total (emoji + type + description)
+# 5. Une seule ligne (sauf trailers Git ou squash & merge)
+# 6. Emoji différent du commit précédent
+# 7. UTF-8 valide
+# 8. Squash & merge: format "🎉 PR### / type : Description" avec corps
+
+COMMIT_MSG=$(cat "$1")
+COMMIT_SOURCE="${2:-message}"
+
+# Vérifier que c'est un commit normal (pas un merge, rebase, etc.)
+if [ "$COMMIT_SOURCE" != "message" ]; then
+    exit 0
+fi
+
+# Extraire la première ligne (le sujet)
+SUBJECT=$(echo "$COMMIT_MSG" | head -1)
+
+# Vérifier que le commit commence par un emoji suivi d'un espace et d'un type
+# Pattern: emoji + space + type: + description
+if ! echo "$SUBJECT" | grep -qE "^[☀-☿✀-✿❀-❿⚀-⚿💀-💿🏀-🏿👀-👿🌀-🌿🚀-🛿😀-🙏🎀-🎿📀-📿🔀-🔿🕀-🕿🖀-🖿🗀-🗿]+ (feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert): "; then
+    echo "❌ Erreur: Format invalide"
+    echo "Format attendu: ✨ feat: Add dark mode"
+    echo ""
+    echo "Types valides: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+    exit 1
+fi
+
+# Compter le nombre de mots (emoji + type + description = max 25)
+# Utilise awk pour une meilleure portabilité entre macOS (BSD) et Linux (GNU)
+WORD_COUNT=$(echo "$SUBJECT" | awk '{print NF}')
+if [ "$WORD_COUNT" -gt 25 ]; then
+    echo "❌ Erreur: Le commit dépasse 25 mots ($WORD_COUNT mots actuels)"
+    echo "Conseil: Sois plus concis. Maximum 25 mots."
+    echo "Message actuel: $SUBJECT"
+    exit 1
+fi
+
+# Vérifier qu'il n'y a qu'une seule ligne (sauf exceptions)
+# Utilise awk pour une meilleure portabilité entre macOS (BSD) et Linux (GNU)
+LINE_COUNT=$(echo "$COMMIT_MSG" | awk 'END {print NR}')
+
+# Exception 1: Trailers Git (Co-authored-by, Signed-off-by, etc.)
+# Exception 2: Squash & merge avec format "🎉 PR### / type : Description"
+IS_SQUASH_MERGE=false
+if echo "$SUBJECT" | grep -qE "^🎉 PR[0-9]+ / (feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert) : "; then
+    IS_SQUASH_MERGE=true
+fi
+
+if [ "$LINE_COUNT" -gt 1 ] && ! [ "$IS_SQUASH_MERGE" = true ]; then
+    # Vérifier si c'est uniquement des trailers Git
+    TRAILERS=$(echo "$COMMIT_MSG" | tail -n +2 | grep -c "^[A-Za-z-]*:" || true)
+    TOTAL_LINES=$((LINE_COUNT - 1))
+
+    if [ "$TRAILERS" -ne "$TOTAL_LINES" ]; then
+        echo "❌ Erreur: Le sujet du commit doit être sur une seule ligne"
+        echo "✅ Exception: Les trailers Git (Co-authored-by, Signed-off-by) sont autorisés après une ligne vide"
+        echo "✅ Exception: Les squash & merge peuvent avoir un corps avec bullet points"
+        exit 1
+    fi
+fi
+
+# Valider le format Squash & merge s'il y en a un
+if [ "$IS_SQUASH_MERGE" = true ]; then
+    if [ "$LINE_COUNT" -lt 3 ]; then
+        echo "❌ Erreur: Les squash & merge doivent avoir un corps avec des bullet points"
+        echo "Format attendu:"
+        echo "  🎉 PR123 / feat : Description"
+        echo "  "
+        echo "  * Commit 1"
+        echo "  * Commit 2"
+        exit 1
+    fi
+
+    # Vérifier qu'il y a des bullet points
+    if ! echo "$COMMIT_MSG" | tail -n +3 | grep -qE "^\\s*[*-] "; then
+        echo "❌ Erreur: Le corps doit contenir des bullet points (* ou -)"
+        exit 1
+    fi
+fi
+
+# Obtenir le dernier emoji utilisé (depuis le dernier commit)
+if git rev-parse HEAD >/dev/null 2>&1; then
+    LAST_COMMIT=$(git log -1 --format='%B' 2>/dev/null | head -1 || echo "")
+    # Extraire le premier emoji
+    LAST_EMOJI=$(echo "$LAST_COMMIT" | grep -oE "^[☀-☿✀-✿❀-❿⚀-⚿💀-💿🏀-🏿👀-👿🌀-🌿🚀-🛿😀-🙏🎀-🎿📀-📿🔀-🔿🕀-🕿🖀-🖿🗀-🗿]" || echo "")
+    CURRENT_EMOJI=$(echo "$SUBJECT" | grep -oE "^[☀-☿✀-✿❀-❿⚀-⚿💀-💿🏀-🏿👀-👿🌀-🌿🚀-🛿😀-🙏🎀-🎿📀-📿🔀-🔿🕀-🕿🖀-🖿🗀-🗿]")
+
+    if [ -n "$LAST_EMOJI" ] && [ "$LAST_EMOJI" = "$CURRENT_EMOJI" ]; then
+        echo "❌ Erreur: L'emoji doit être différent du commit précédent"
+        echo "Dernier emoji utilisé: $LAST_EMOJI"
+        echo "Utilise un emoji différent pour ce commit"
+        exit 1
+    fi
+fi
+
+exit 0
