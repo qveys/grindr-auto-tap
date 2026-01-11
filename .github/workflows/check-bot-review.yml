@@ -202,13 +202,18 @@ jobs:
             const latestCommitDate = new Date(latestCommit.commit.committer.date);
             core.info(`⏱️ Latest content commit: ${latestCommit.sha.substring(0,7)} at ${latestCommitDate.toISOString()}`);
 
-            // 3) Get reviews
-            const { data: reviews } = await github.rest.pulls.listReviews({
-              owner, repo, pull_number,
-              per_page: 100,
-            });
+            // 3) Get reviews (paginate to ensure we see all reviews, not just the first 100)
+            const allReviews = await github.paginate(
+              github.rest.pulls.listReviews,
+              {
+                owner,
+                repo,
+                pull_number,
+                per_page: 100,
+              }
+            );
 
-            const botReviews = (reviews ?? [])
+            const botReviews = (allReviews ?? [])
               .filter(r =>
                 r?.submitted_at &&
                 (r?.user?.login === preferredBotLogin || r?.user?.type === "Bot")
