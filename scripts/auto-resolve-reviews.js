@@ -455,28 +455,28 @@ async function main() {
           });
           console.log(`   ✅ Resolved by: ${resolvingCommits.map(c => c.sha).join(', ')}`);
         }
+      } else if (analysis.partial) {
+        results.partial.push({
+          commentId: comment.id,
+          line: comment.line,
+          highestConfidence: analysis.confidence,
+          commits: resolvingCommits || [],
+          body: comment.body.substring(0, 100)
+        });
+      } else if (analysis.resolves && analysis.confidence > 0) {
+        results.lowConfidence.push({
+          commentId: comment.id,
+          line: comment.line,
+          highestConfidence: analysis.confidence,
+          body: comment.body.substring(0, 100)
+        });
+      } else {
+        results.notResolved.push({
+          commentId: comment.id,
+          line: comment.line,
+          body: comment.body.substring(0, 100)
+        });
       }
-    } else if (analysis.partial) {
-      results.partial.push({
-        commentId: comment.id,
-        line: comment.line,
-        highestConfidence: analysis.confidence,
-        commits: resolvingCommits || [],
-        body: comment.body.substring(0, 100)
-      });
-    } else if (analysis.resolves && analysis.confidence > 0) {
-      results.lowConfidence.push({
-        commentId: comment.id,
-        line: comment.line,
-        highestConfidence: analysis.confidence,
-        body: comment.body.substring(0, 100)
-      });
-    } else {
-      results.notResolved.push({
-        commentId: comment.id,
-        line: comment.line,
-        body: comment.body.substring(0, 100)
-      });
     }
   }
 }
@@ -504,7 +504,9 @@ for (const resolution of results.resolved) {
 // Post partial resolution notifications
 for (const partial of results.partial) {
   const commitShas = (partial.commits || []).map(c => c.sha).join(', ');
-  const body = `🛠️ Fixed partially in commits: ${commitShas}. Please review remaining issues.`;
+  const body = commitShas
+    ? `🛠️ Fixed partially in commits: ${commitShas}.`
+    : `🛠️ Fixed partially.`;
   await octokit.rest.pulls.createReplyForReviewComment({
     owner,
     repo,
@@ -564,7 +566,10 @@ function formatJobSummary(results, apiCalls, cacheHits) {
   if (results.partial.length > 0) {
     summary += `## 🛠️ Partial (${results.partial.length})\n`;
     results.partial.forEach(r => {
-      summary += `- Comment #${r.commentId} (line ${r.line}) → ${r.commits.map(c => c.sha).join(', ')}\n`;
+      const commitInfo = r.commits.length > 0
+        ? `→ ${r.commits.map(c => c.sha).join(', ')}`
+        : '- no specific commits identified';
+      summary += `- Comment #${r.commentId} (line ${r.line}) ${commitInfo}\n`;
     });
     summary += '\n';
   }
