@@ -12,11 +12,11 @@ describe('Storage', () => {
     it('should get a value from storage', async () => {
       const mockValue = true;
       (chrome.storage.local.get as jest.Mock).mockImplementation(
-        (_key, callback) => {
+        (key, callback) => {
           if (callback) {
-            callback({ [_key as string]: mockValue });
+            callback({ [key as string]: mockValue });
           }
-          return Promise.resolve({ [_key as string]: mockValue });
+          return Promise.resolve({ [key as string]: mockValue });
         }
       );
 
