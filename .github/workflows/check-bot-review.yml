@@ -120,7 +120,7 @@ jobs:
             const repo  = context.repo.repo;
             const pull_number = context.payload.pull_request.number;
 
-            const enforcedBotLogin = "${{ steps.bot.outputs.login }}";
+            const preferredBotLogin = "${{ steps.bot.outputs.login }}";
 
             // 1) Get labels
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
@@ -170,7 +170,7 @@ jobs:
             const botReviews = (reviews ?? [])
               .filter(r =>
                 r?.submitted_at &&
-                (r?.user?.login === enforcedBotLogin || r?.user?.type === "Bot")
+                (r?.user?.login === preferredBotLogin || r?.user?.type === "Bot")
               )
               .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
 
@@ -178,11 +178,11 @@ jobs:
 
             // 4) If label is present, attempt to trigger Copilot review and fail
             if (hasReviewNeeded) {
-              core.warning(`status: review-needed is present → attempting to trigger bot review (${enforcedBotLogin}) and failing check.`);
+              core.warning(`status: review-needed is present → attempting to trigger bot review (${preferredBotLogin}) and failing check.`);
 
               // Only Copilot Code Review has a public endpoint; other bots are usually not triggerable.
               const isCopilotLike =
-                enforcedBotLogin.toLowerCase().includes("copilot");
+                preferredBotLogin.toLowerCase().includes("copilot");
 
               if (isCopilotLike) {
                 const pull_request_url = `https://api.github.com/repos/${owner}/${repo}/pulls/${pull_number}`;
@@ -197,7 +197,7 @@ jobs:
                   body: JSON.stringify({
                     pull_request_url,
                     // Experimental/undocumented usage: reviewer is not part of any documented public API and may be ignored or change without notice.
-                    reviewer: enforcedBotLogin,
+                    reviewer: preferredBotLogin,
                   }),
                 });
 
@@ -209,7 +209,7 @@ jobs:
                   core.warning(`Copilot trigger request failed; not logging response body. Status: ${resp.status} ${resp.statusText}`);
                 }
               } else {
-                core.info(`No known API trigger for bot '${enforcedBotLogin}'.`);
+                core.info(`No known API trigger for bot '${preferredBotLogin}'.`);
               }
 
               core.setFailed("❌ Bot review required (status: review-needed). Waiting for a fresh bot review.");
@@ -218,7 +218,7 @@ jobs:
 
             // 5) Normal freshness enforcement
             if (!latestBotReview) {
-              core.setFailed(`❌ Bot review is required but not found. Please wait for ${enforcedBotLogin} to review this PR.`);
+              core.setFailed(`❌ Bot review is required but not found. Please wait for ${preferredBotLogin} to review this PR.`);
               return;
             }
 
