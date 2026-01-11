@@ -515,14 +515,25 @@ async function main() {
   const totalAnalyzed = results.resolved.length + results.lowConfidence.length + results.notResolved.length;
 
   if (comments.length > 0 && totalAnalyzed > 0) {
-    // Post summary comment
-    const summaryComment = formatSummary(results, apiCalls, cacheHits);
-    await octokit.rest.issues.createComment({
-      owner,
-      repo,
-      issue_number: prNumber,
-      body: summaryComment,
-    });
+    const resolvedCount = results.resolved.length;
+    // Condition to skip posting:
+    // 1. No resolutions found (resolvedCount === 0)
+    // 2. No API calls were made (apiCalls === 0)
+    // 3. All analyzed items came from cache (totalAnalyzed === cacheHits)
+    const shouldSkipSummary = resolvedCount === 0 && apiCalls === 0 && totalAnalyzed === cacheHits;
+
+    if (shouldSkipSummary) {
+      console.log('✨ Skipping summary comment (No resolutions, all cached, no API calls).');
+    } else {
+      // Post summary comment
+      const summaryComment = formatSummary(results, apiCalls, cacheHits);
+      await octokit.rest.issues.createComment({
+        owner,
+        repo,
+        issue_number: prNumber,
+        body: summaryComment,
+      });
+    }
   }
 
   // Write to job summary
