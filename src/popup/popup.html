@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grindr Auto Tap</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🚀 Grindr Auto Tap</h1>
+      </header>
+      
+      <main>
+        <div class="section">
+          <h2>Status</h2>
+          <div class="status-indicator">
+            <span id="status-dot" class="dot"></span>
+            <span id="status-text">Inactive</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Controls</h2>
+          <button id="toggle-btn" class="btn btn-primary">Enable</button>
+        </div>
+
+        <div class="section">
+          <h2>Settings</h2>
+          <div class="setting">
+            <label for="interval">Interval (seconds):</label>
+            <input type="number" id="interval" min="1" max="60" value="5" />
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Statistics</h2>
+          <div class="stats">
+            <div class="stat-item">
+              <span class="stat-label">Taps:</span>
+              <span id="tap-count" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Last tap:</span>
+              <span id="last-tap" class="stat-value">Never</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <p>v1.0.0</p>
+      </footer>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
