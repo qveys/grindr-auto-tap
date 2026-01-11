@@ -81,48 +81,69 @@ jobs:
             // ===== Stats =====
             const stats = {
               filesChanged: files.length,
-              additions: files.reduce((s, f) => s + (f.additions || 0), 0),
-              deletions: files.reduce((s, f) => s + (f.deletions || 0), 0),
+              additions: files.reduce((sum, f) => sum + (f.additions ?? 0), 0),
+              deletions: files.reduce((sum, f) => sum + (f.deletions ?? 0), 0),
               commits: commits.length
             };
-
-            // ===== File tree =====
-            const fileMap = {};
-            files.forEach(f => fileMap[f.filename] = f);
-
-            function buildTree(paths) {
+            
+            // ===== File tree (correct per-file stats) =====
+            const fileStats = {};
+            files.forEach(f => {
+              fileStats[f.filename] = { additions: f.additions ?? 0, deletions: f.deletions ?? 0 };
+            });
+            
+            function buildFileTree(paths, statsByPath) {
               const root = {};
-              for (const p of paths) {
+              for (const fullPath of paths) {
+                const parts = fullPath.split('/');
                 let cur = root;
-                const parts = p.split('/');
+            
                 parts.forEach((part, i) => {
+                  const isFile = i === parts.length - 1;
                   cur[part] ??= {};
-                  if (i === parts.length - 1) cur[part]._file = true;
+            
+                  if (isFile) {
+                    cur[part]._isFile = true;
+                    cur[part]._stats = statsByPath[fullPath] ?? { additions: 0, deletions: 0 };
+                  }
                   cur = cur[part];
                 });
               }
               return root;
             }
-
-            function renderTree(node, prefix = '') {
+            
+            function formatTree(node, prefix = '') {
               let out = '';
-              const entries = Object.keys(node).filter(k => k !== '_file').sort();
-              entries.forEach((k, i) => {
-                const last = i === entries.length - 1;
-                const conn = last ? '└── ' : '├── ';
-                const next = last ? '    ' : '│   ';
-                if (node[k]._file) {
-                  const f = fileMap[k] || {};
-                  out += `${prefix}${conn}${k} (+${f.additions || 0}/-${f.deletions || 0})\n`;
+            
+              const entries = Object.entries(node)
+                .filter(([k]) => !k.startsWith('_'))
+                .sort(([a, av], [b, bv]) => {
+                  const aIsFile = !!av._isFile;
+                  const bIsFile = !!bv._isFile;
+                  if (aIsFile === bIsFile) return a.localeCompare(b);
+                  return aIsFile ? 1 : -1; // folders first
+                });
+            
+              entries.forEach(([name, value], i) => {
+                const isLast = i === entries.length - 1;
+                const conn = isLast ? '└── ' : '├── ';
+                const nextPrefix = prefix + (isLast ? '    ' : '│   ');
+            
+                if (value._isFile) {
+                  const { additions = 0, deletions = 0 } = value._stats || {};
+                  const label =
+                    additions === 0 && deletions === 0 ? '(binary)' : `(+${additions}/-${deletions})`;
+                  out += `${prefix}${conn}${name} ${label}\n`;
                 } else {
-                  out += `${prefix}${conn}${k}/\n`;
-                  out += renderTree(node[k], prefix + next);
+                  out += `${prefix}${conn}${name}/\n`;
+                  out += formatTree(value, nextPrefix);
                 }
               });
+            
               return out;
             }
-
-            const tree = renderTree(buildTree(Object.keys(fileMap)));
+            
+            const tree = formatTree(buildFileTree(Object.keys(fileStats).sort(), fileStats));
 
             // ===== Commits =====
             const commitsList = commits
