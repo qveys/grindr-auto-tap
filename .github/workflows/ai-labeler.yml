@@ -179,6 +179,53 @@ jobs:
 
                     core.notice(`PR Context: ${JSON.stringify(prContext)}`);
 
+                    // CRITICAL: Force "status: fixed" when conditions are met for status check
+                    // This is required for downstream status checks to pass
+                    if (prContext.allThreadsResolved &&
+                        !prContext.hasNewCommitsAfterReview &&
+                        prContext.botReviewCommentCount === 0 &&
+                        prContext.latestBotReviewDate !== null) {
+
+                        core.notice('FORCED STATUS: All conditions met for "status: fixed"');
+
+                        // Apply the fixed status immediately
+                        const { data: currentIssue } = await github.rest.issues.get({
+                            owner: context.repo.owner,
+                            repo: context.repo.repo,
+                            issue_number: pr.number,
+                        });
+
+                        const currentStatusLabels = currentIssue.labels
+                            .map(l => typeof l === 'string' ? l : l.name)
+                            .filter(l => l.startsWith('status:'));
+
+                        // Remove old status labels if different
+                        if (!currentStatusLabels.includes('status: fixed')) {
+                            for (const label of currentStatusLabels) {
+                                core.notice(`Removing old status label: ${label}`);
+                                await github.rest.issues.removeLabel({
+                                    owner: context.repo.owner,
+                                    repo: context.repo.repo,
+                                    issue_number: pr.number,
+                                    name: label
+                                });
+                            }
+
+                            // Add the fixed status
+                            core.notice('Adding status: fixed');
+                            await github.rest.issues.addLabels({
+                                owner: context.repo.owner,
+                                repo: context.repo.repo,
+                                issue_number: pr.number,
+                                labels: ['status: fixed']
+                            });
+                        } else {
+                            core.notice('status: fixed already present');
+                        }
+
+                        return; // Skip AI labeling since we forced the status
+                    }
+
                 } catch (e) {
                     core.warning(`Error collecting PR context: ${e.message}`);
                     // Continue without PR context; AI labeling can still run.
