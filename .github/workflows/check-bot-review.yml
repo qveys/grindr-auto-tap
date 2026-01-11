@@ -115,20 +115,20 @@ jobs:
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
             
-            let pull_number = context.payload.pull_request?.number;
-            if (!pull_number && context.payload.workflow_run) {
+            let number = context.payload.pull_request?.number;
+            if (!number && context.payload.workflow_run) {
                const prs = context.payload.workflow_run.pull_requests;
                if (prs && prs.length > 0) {
-                 pull_number = prs[0].number;
+                 number = prs[0].number;
                }
             }
             
-            if (!pull_number) {
+            if (!number) {
               core.setFailed("Could not determine Pull Request number from context.");
               return;
             }
 
-            const { data: reviews } = await github.rest.pulls.listReviews({ owner, repo, pull_number });
+            const { data: reviews } = await github.rest.pulls.listReviews({ owner, repo, pull_number: number });
 
             const botReviews = (reviews ?? [])
               .filter(r => r?.user?.type === "Bot" && r?.submitted_at && r?.user?.login !== "github-actions[bot]")
