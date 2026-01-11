@@ -526,70 +526,72 @@ async function main() {
       console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
     }
   }
-}
-// Save updated cache
-saveCache(cache);
-// Post resolutions to PR
-for (const resolution of results.resolved) {
-  const commitShas = resolution.commits
-    .map(c => `${c.sha}`)
-    .join(', ');
-  try {
-    await octokit.rest.pulls.createReplyForReviewComment({
+
+  // Save updated cache
+  saveCache(cache);
+  // Post resolutions to PR
+  for (const resolution of results.resolved) {
+    const commitShas = resolution.commits
+      .map(c => `${c.sha}`)
+      .join(', ');
+    try {
+      await octokit.rest.pulls.createReplyForReviewComment({
+        owner,
+        repo,
+        pull_number: prNumber,
+        comment_id: resolution.commentId,
+        body: `🎉 Fixed by commits: ${commitShas}`,
+      });
+      console.log(`    📬 Posted resolution comment for #${resolution.commentId}`);
+
+    } catch (error) {
+      console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
+    }
+  }
+  // Post partial resolution notifications
+  for (const partial of results.partial) {
+    const commitShas = (partial.commits || []).map(c => c.sha).join(', ');
+    const body = commitShas
+      ? `🛠️ Fixed partially in commits: ${commitShas}.`
+      : `🛠️ Fixed partially.`;
+    try {
+      await octokit.rest.pulls.createReplyForReviewComment({
+        owner,
+        repo,
+        pull_number: prNumber,
+        comment_id: partial.commentId,
+        body: body,
+      });
+      console.log(`    📬 Posted partial resolution comment for #${partial.commentId}`);
+    } catch (error) {
+      console.error(`    ❌ Failed to post partial resolution for comment ${partial.commentId}:`, error.message);
+    }
+  }
+  // Low confidence results are included in the summary but we do not post individual replies to avoid noise.
+
+  // Only post summary comment if there are comments to analyze and work was done
+  const totalAnalyzed = results.resolved.length + results.partial.length + results.lowConfidence.length + results.notResolved.length;
+
+  if (comments.length > 0 && totalAnalyzed > 0) {
+    // Post summary comment
+    const summaryComment = formatSummary(results, apiCalls, cacheHits);
+    await octokit.rest.issues.createComment({
       owner,
       repo,
-      pull_number: prNumber,
-      comment_id: resolution.commentId,
-      body: `🎉 Fixed by commits: ${commitShas}`,
+      issue_number: prNumber,
+      body: summaryComment,
     });
-    console.log(`    📬 Posted resolution comment for #${resolution.commentId}`);
-
-  } catch (error) {
-    console.error(`    ❌ Failed to post resolution for comment ${resolution.commentId}:`, error.message);
   }
-}
-// Post partial resolution notifications
-for (const partial of results.partial) {
-  const commitShas = (partial.commits || []).map(c => c.sha).join(', ');
-  const body = commitShas
-    ? `🛠️ Fixed partially in commits: ${commitShas}.`
-    : `🛠️ Fixed partially.`;
-  try {
-    await octokit.rest.pulls.createReplyForReviewComment({
-      owner,
-      repo,
-      pull_number: prNumber,
-      comment_id: partial.commentId,
-      body: body,
-    });
-    console.log(`    📬 Posted partial resolution comment for #${partial.commentId}`);
-  } catch (error) {
-    console.error(`    ❌ Failed to post partial resolution for comment ${partial.commentId}:`, error.message);
+
+  // Write to job summary
+  if (totalAnalyzed > 0) {
+    const jobSummary = formatJobSummary(results, apiCalls, cacheHits);
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
+    console.log(jobSummary);
+  } else {
+    console.log("\n✨ No new analysis performed. Everything looks up to date.");
   }
-}
-// Low confidence results are included in the summary but we do not post individual replies to avoid noise.
 
-// Only post summary comment if there are comments to analyze and work was done
-const totalAnalyzed = results.resolved.length + results.partial.length + results.lowConfidence.length + results.notResolved.length;
-
-if (comments.length > 0 && totalAnalyzed > 0) {
-  // Post summary comment
-  const summaryComment = formatSummary(results, apiCalls, cacheHits);
-  await octokit.rest.issues.createComment({
-    owner,
-    repo,
-    issue_number: prNumber,
-    body: summaryComment,
-  });
-}
-
-// Write to job summary
-if (totalAnalyzed > 0) {
-  const jobSummary = formatJobSummary(results, apiCalls, cacheHits);
-  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, jobSummary);
-  console.log(jobSummary);
-} else {
-  console.log("\n✨ No new analysis performed. Everything looks up to date.");
 }
 
 function formatSummary(results, apiCalls, cacheHits) {
