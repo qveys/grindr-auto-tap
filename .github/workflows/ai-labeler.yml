@@ -47,7 +47,9 @@ jobs:
             let forcedStatus = null;
             const pr = context.payload.pull_request || context.payload.pull_request_review?.pull_request;
             
-            if (pr) {
+            if (issue.state === 'closed' || (pr && pr.merged)) {
+                forcedStatus = 'status: closed';
+            } else if (pr) {
                 try {
                     // 1. Count unresolved threads
                     let hasNextPage = true;
