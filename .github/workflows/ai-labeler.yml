@@ -38,11 +38,19 @@ jobs:
             if (pr) {
                 try {
                     // 1. Count unresolved threads
+                    let hasNextPage = true;
+                    let cursor = null;
+                    let allThreads = [];
+
                     const query = `
-                        query($owner: String!, $repo: String!, $number: Int!) {
+                        query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
                             repository(owner: $owner, name: $repo) {
                                 pullRequest(number: $number) {
-                                    reviewThreads(first: 100) {
+                                    reviewThreads(first: 100, after: $cursor) {
+                                        pageInfo {
+                                            hasNextPage
+                                            endCursor
+                                        }
                                         nodes {
                                             isResolved
                                         }
@@ -51,13 +59,21 @@ jobs:
                             }
                         }
                     `;
-                    const graphqlResponse = await github.graphql(query, {
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        number: pr.number
-                    });
-                    const threads = graphqlResponse.repository.pullRequest.reviewThreads.nodes;
-                    const unresolvedThreads = threads.filter(t => !t.isResolved).length;
+
+                    while (hasNextPage) {
+                        const graphqlResponse = await github.graphql(query, {
+                            owner: context.repo.owner,
+                            repo: context.repo.repo,
+                            number: pr.number,
+                            cursor: cursor
+                        });
+                        const reviewThreads = graphqlResponse.repository.pullRequest.reviewThreads;
+                        allThreads = allThreads.concat(reviewThreads.nodes);
+                        hasNextPage = reviewThreads.pageInfo.hasNextPage;
+                        cursor = reviewThreads.pageInfo.endCursor;
+                    }
+
+                    const unresolvedThreads = allThreads.filter(t => !t.isResolved).length;
                     core.notice(`Unresolved threads: ${unresolvedThreads}`);
 
                     if (unresolvedThreads > 0) {
