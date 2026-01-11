@@ -5,6 +5,8 @@ on:
     types: [opened, edited, reopened, closed]
   pull_request:
     types: [opened, edited, reopened, synchronize, closed]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
 
 jobs:
   label:
@@ -12,6 +14,8 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
+      checks: read
+      contents: read
     steps:
       - name: AI Labeling
         uses: actions/github-script@v7
@@ -27,6 +31,98 @@ jobs:
             const issue = context.payload.issue || context.payload.pull_request;
             const title = issue.title;
             const body = issue.body || '';
+            
+            // Logic to determine forced status
+            let forcedStatus = null;
+            const pr = context.payload.pull_request;
+            
+            if (pr) {
+                try {
+                    // 1. Count unresolved threads
+                    const query = `
+                        query($owner: String!, $repo: String!, $number: Int!) {
+                            repository(owner: $owner, name: $repo) {
+                                pullRequest(number: $number) {
+                                    reviewThreads(first: 100) {
+                                        nodes {
+                                            isResolved
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    `;
+                    const graphqlResponse = await github.graphql(query, {
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        number: pr.number
+                    });
+                    const threads = graphqlResponse.repository.pullRequest.reviewThreads.nodes;
+                    const unresolvedThreads = threads.filter(t => !t.isResolved).length;
+                    core.notice(`Unresolved threads: ${unresolvedThreads}`);
+
+                    if (unresolvedThreads > 0) {
+                        forcedStatus = 'status: in-progress';
+                    } else {
+                        // 2. Check for Bot Review
+                        // Replicating logic from check-bot-review to ensure consistency
+                        
+                        // Get all commits
+                        const commits = await github.paginate(github.rest.pulls.listCommits, {
+                            owner: context.repo.owner,
+                            repo: context.repo.repo,
+                            pull_number: pr.number,
+                            per_page: 100
+                        });
+                        
+                        if (commits.length > 0) {
+                            // Find latest content-changing commit
+                            let latestCommit = commits[commits.length - 1];
+                            for (let i = commits.length - 1; i >= 0; i--) {
+                                const c = commits[i];
+                                const message = c.commit.message;
+                                const isMerge = message.startsWith('Merge branch') || message.startsWith('Merge pull request');
+                                const isRevert = message.startsWith('Revert "');
+                                const isSkip = message.includes('[skip review]');
+                                if (!isMerge && !isRevert && !isSkip) {
+                                    latestCommit = c;
+                                    break;
+                                }
+                            }
+                            
+                            const latestCommitDate = new Date(latestCommit.commit.committer.date);
+                            
+                            // Get reviews
+                            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                                owner: context.repo.owner,
+                                repo: context.repo.repo,
+                                pull_number: pr.number,
+                                per_page: 100
+                            });
+                            
+                            // Find bot reviews
+                            const botReviews = reviews.filter(review => review.user.type === 'Bot');
+                            botReviews.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+                            const latestBotReview = botReviews[0];
+                            
+                            if (!latestBotReview) {
+                                forcedStatus = 'status: review-needed';
+                            } else {
+                                const reviewDate = new Date(latestBotReview.submitted_at);
+                                if (reviewDate < latestCommitDate) {
+                                    forcedStatus = 'status: review-needed';
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    core.warning(`Error determining forced status: ${e.message}`);
+                }
+            }
+
+            if (forcedStatus) {
+                core.notice(`Forced status determined: ${forcedStatus}`);
+            }
             
             // List of defined labels
             // Fetch all labels from the repository using pagination
@@ -122,8 +218,16 @@ jobs:
               }
 
               // Filter valid labels (only those from our whitelist)
-              const validLabels = suggestedLabels
+              let validLabels = suggestedLabels
                 .filter(l => typeof l === 'string' && labels.includes(l))
+              
+              // Apply forced status if any
+              if (forcedStatus) {
+                  // Remove any status labels suggested by AI
+                  validLabels = validLabels.filter(l => !l.startsWith('status:'));
+                  // Add the forced status
+                  validLabels.push(forcedStatus);
+              }
               
               // Enforce business rules: at least one 'type:' label
               const hasTypeLabel = validLabels.some(l => l.startsWith('type:'));
