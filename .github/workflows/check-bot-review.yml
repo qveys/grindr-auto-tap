@@ -282,15 +282,35 @@ jobs:
               // Method 2: If API request failed, post a comment to trigger Copilot
               if (!success && preferredBotLogin.includes('copilot')) {
                 try {
-                  core.info('Attempting to trigger Copilot by posting a comment...');
-                  await github.rest.issues.createComment({
+                  // First, check if we already posted this comment recently (last 10 comments)
+                  core.info('Checking for recent @copilot review comments...');
+                  const { data: recentComments } = await github.rest.issues.listComments({
                     owner,
                     repo,
                     issue_number: pull_number,
-                    body: '@copilot review'
+                    per_page: 10,
+                    sort: 'created',
+                    direction: 'desc'
                   });
-                  core.info('✅ Posted @copilot review comment to trigger review');
-                  success = true;
+
+                  const copilotCommentExists = recentComments.some(comment =>
+                    comment.body?.trim() === '@copilot review'
+                  );
+
+                  if (copilotCommentExists) {
+                    core.info('ℹ️ @copilot review comment already exists, skipping duplicate');
+                    success = true;
+                  } else {
+                    core.info('Attempting to trigger Copilot by posting a comment...');
+                    await github.rest.issues.createComment({
+                      owner,
+                      repo,
+                      issue_number: pull_number,
+                      body: '@copilot review'
+                    });
+                    core.info('✅ Posted @copilot review comment to trigger review');
+                    success = true;
+                  }
                 } catch (error) {
                   core.warning(`⚠️ Could not post comment: ${error.message}`);
                 }
