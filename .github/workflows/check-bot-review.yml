@@ -196,7 +196,7 @@ jobs:
                   },
                   body: JSON.stringify({
                     pull_request_url,
-                    // reviewer is optional/ignored depending on API behavior; keep for clarity.
+                    // Experimental/undocumented usage: reviewer is not part of any documented public API and may be ignored or change without notice.
                     reviewer: enforcedBotLogin,
                   }),
                 });
