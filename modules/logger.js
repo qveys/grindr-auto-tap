@@ -3,7 +3,9 @@
  * Centralized logging system that stores logs with timestamps
  */
 
-const MAX_LOGS = 1000;
+// Note: MAX_LOGS is now defined in shared-constants.js as LOGGING.MAX_LOGS
+// This constant is kept for backwards compatibility but should use LOGGING.MAX_LOGS instead
+const MAX_LOGS = typeof LOGGING !== 'undefined' ? LOGGING.MAX_LOGS : 1000;
 const LOG_LEVELS = {
   INFO: 'info',
   WARN: 'warn',
@@ -46,7 +48,11 @@ function addLog(level, location, message, data = null) {
   consoleMethod(`[${logEntry.location}] ${logEntry.message}`, data || '');
 
   // Send to background script to store
-  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+  // Use centralized messaging utility if available
+  if (typeof window !== 'undefined' && window.sendLog) {
+    window.sendLog(logEntry);
+  } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    // Fallback to direct chrome.runtime.sendMessage if messaging utility not loaded
     chrome.runtime.sendMessage({
       action: 'addLog',
       logEntry: logEntry

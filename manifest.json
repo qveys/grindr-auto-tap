@@ -17,7 +17,14 @@
   ],
   "background": {
     "scripts": [
-      "background.js"
+      "shared-constants.js",
+      "utils/logger.js",
+      "background/handlers/log-handler.js",
+      "background/handlers/storage-handler.js",
+      "background/handlers/webhook-handler.js",
+      "background/handlers/apple-handler.js",
+      "background/handlers/tab-handler.js",
+      "background/background.js"
     ]
   },
   "content_scripts": [
@@ -26,21 +33,28 @@
         "*://web.grindr.com/*"
       ],
       "js": [
-        "utils/constants.js",
+        "shared-constants.js",
+        "utils/state-manager.js",
+        "utils/messaging.js",
         "utils/logger.js",
         "utils/formatters.js",
         "utils/dom-helpers.js",
+        "utils/async-helpers.js",
         "modules/auth.js",
         "modules/profile-opener.js",
         "modules/stats.js",
         "modules/auto-tap.js",
-        "content.js"
+        "content/handlers/script-lifecycle.js",
+        "content/handlers/message-handler.js",
+        "content/handlers/error-handler.js",
+        "content/handlers/auto-start.js",
+        "content/content.js"
       ],
       "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/popup.html",
     "default_title": "Grindr Auto Tap",
     "default_icon": {
       "16": "icons/favicon-16x16.png",
@@ -60,6 +74,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "grindr-auto-tap@local",
+      "update_url": "https://raw.githubusercontent.com/qveys/grindr-auto-tap/main/updates.json",
       "data_collection_permissions": {
         "required": [
           "personallyIdentifyingInfo",

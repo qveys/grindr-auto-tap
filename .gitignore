@@ -4,6 +4,10 @@
 *.crx
 *.pem
 
+# Scripts de nettoyage
+*.sh
+*.ps1
+
 # Fichiers système
 .DS_Store
 .DS_Store?

@@ -1,135 +1,197 @@
-# Extension Firefox - Grindr Auto Tap
+# 🦊 Firefox Extension - Grindr Auto Tap
 
-Extension Firefox pour automatiser les actions sur Grindr et envoyer les statistiques vers n8n.
+Firefox extension to automate actions on Grindr and send statistics to n8n.
 
-## Fonctionnalités
+## ✨ Features
 
-- ✅ Détection automatique des onglets web.grindr.com
-- ✅ Authentification automatique avec identifiants sauvegardés (email, Apple, Facebook, Google)
-- ✅ Exécution automatique du script de tap
-- ✅ Envoi des statistiques vers n8n (contourne la CSP)
-- ✅ Interface de configuration via popup
-- ✅ Gestion sécurisée des identifiants (stockage local)
+- ✅ Automatic detection of web.grindr.com tabs
+- 🔐 Automatic authentication with saved credentials (email, Apple, Facebook, Google)
+- ⚡ Automatic execution of the tap script
+- 📊 Statistics sent to n8n (CSP bypass)
+- 🎛️ Configuration interface via popup
+- 🔒 Secure credential management (local storage)
 
-## Installation
+## 📦 Installation
 
-1. Ouvrir Firefox
-2. Aller dans `about:debugging`
-3. Cliquer sur "Ce Firefox" dans le menu de gauche
-4. Cliquer sur "Charger un module complémentaire temporaire"
-5. Sélectionner le fichier `manifest.json` dans le dossier `extension`
+1. Open Firefox
+2. Navigate to `about:debugging`
+3. Click on "This Firefox" in the left menu
+4. Click on "Load Temporary Add-on"
+5. Select the `manifest.json` file in the `extension` folder
 
-## Configuration
+## ⚙️ Configuration
 
-### 1. Ajouter les identifiants
+### 1️⃣ Adding Credentials
 
-1. Cliquer sur l'icône de l'extension dans la barre d'outils
-2. Entrer votre email et mot de passe (ou choisir une autre méthode de connexion)
-3. Cocher "Connexion automatique" si souhaité
-4. Cliquer sur "Sauvegarder les identifiants"
+1. Click on the extension icon in the toolbar
+2. Enter your email and password (or choose another login method)
+3. Check "Auto login" if desired
+4. Click on "Save Credentials"
 
-### 2. Configurer l'URL du webhook n8n
+### 2️⃣ Configuring the n8n Webhook URL
 
-1. Dans le popup, aller à l'onglet "Webhook"
-2. Entrer l'URL de votre webhook n8n
-3. Cliquer sur "Sauvegarder l'URL"
+1. In the popup, go to the "Webhook" tab
+2. Enter your n8n webhook URL
+3. Click on "Save URL"
 
-## Utilisation
+## 🚀 Usage
 
-### Automatique
+### 🤖 Automatic Mode
 
-L'extension démarre automatiquement quand vous ouvrez web.grindr.com si :
-- La connexion automatique est activée
-- Les identifiants sont configurés
-- Vous êtes connecté ou la connexion automatique réussit
+The extension starts automatically when you open web.grindr.com if:
+- Auto login is enabled
+- Credentials are configured
+- You are logged in or auto login succeeds
 
-### Manuel
+### 👆 Manual Mode
 
-1. Ouvrir web.grindr.com
-2. Cliquer sur l'icône de l'extension
-3. Cliquer sur "Démarrer le script" ou "Arrêter le script"
+1. Open web.grindr.com
+2. Click on the extension icon
+3. Click on "Start Script" or "Stop Script"
 
-### Depuis la console
+### 💻 From the Console
 
-Vous pouvez aussi contrôler le script depuis la console du navigateur :
+You can also control the script from the browser console:
 
 ```javascript
-// Démarrer le script
+// Start the script
 window.grindrAutoTap.start();
 
-// Arrêter le script
+// Stop the script
 window.grindrAutoTap.stop();
 
-// Vérifier l'état de connexion
+// Check connection status
 window.grindrAutoTap.checkStatus();
 ```
 
-## Structure des fichiers
+## 📁 File Structure
 
 ```
 extension/
-├── manifest.json          # Configuration de l'extension
-├── background.js          # Service worker (gestion onglets, webhooks n8n, storage)
-├── content.js             # Point d'entrée principal (orchestration)
+├── manifest.json          # Extension configuration
+├── shared-constants.js    # Shared constants (service worker + content scripts)
 │
-├── utils/                 # Utilitaires partagés
-│   ├── constants.js       # Constantes (délais, timeouts, selectors, etc.)
-│   ├── logger.js          # Système de logging centralisé
-│   ├── formatters.js      # Formatage de dates et durées
-│   └── dom-helpers.js     # Helpers DOM (delay, getTextNodes, etc.)
+├── background/            # Background script handlers
+│   └── background.js           # Service worker (orchestration)
+│   └── handlers/
+│       ├── apple-handler.js    # Apple authentication popup handling
+│       ├── log-handler.js      # Log management
+│       ├── storage-handler.js  # Storage operations
+│       ├── tab-handler.js      # Tab detection and management
+│       └── webhook-handler.js  # n8n webhook requests
 │
-├── modules/               # Modules fonctionnels
-│   ├── auth.js            # Module d'authentification (email, Apple, Facebook, Google)
-│   ├── profile-opener.js  # Ouverture du premier profil
-│   ├── stats.js           # Gestion des statistiques et envoi webhook
-│   └── auto-tap.js        # Boucle principale de tap automatique
+├── content/               # Content script handlers
+│   └── content.js              # Main entry point (orchestration)
+│   └── handlers/
+│       ├── auto-start.js       # Automatic script startup
+│       ├── error-handler.js    # Error handling
+│       ├── message-handler.js  # Message routing
+│       └── script-lifecycle.js # Script lifecycle management
 │
-├── popup.html             # Interface utilisateur
-├── popup.js               # Logique du popup
-└── icons/                 # Icônes de l'extension
+├── utils/                 # Shared utilities
+│   ├── async-helpers.js   # Async utilities (retry, timeout, etc.)
+│   ├── dom-helpers.js     # DOM helpers (delay, getTextNodes, etc.)
+│   ├── formatters.js      # Date and duration formatting
+│   ├── logger.js          # Centralized logging system
+│   ├── messaging.js       # Centralized messaging utilities
+│   ├── state-manager.js   # State management
+│   └── storage.js         # Storage utilities
+│
+├── modules/               # Functional modules
+│   ├── auth.js            # Authentication module (email, Apple, Facebook, Google)
+│   ├── profile-opener.js  # First profile opening
+│   ├── stats.js           # Statistics management and webhook sending
+│   └── auto-tap.js        # Main automatic tap loop
+│
+├── popup/                 # Popup interface
+│   ├── edit-mode.js       # Edit/display mode system
+│   ├── managers/
+│   │   ├── log-manager.js      # Log management
+│   │   ├── script-manager.js   # Script control
+│   │   ├── storage-manager.js  # Storage operations
+│   │   └── tab-manager.js      # Tab operations
+│   └── ui/
+│       └── status-display.js   # Status display component
+│
+├── popup.html             # User interface
+├── popup.js               # Popup logic
+│
+├── docs/                  # Documentation
+│   ├── ARCHITECTURAL_ANALYSIS.md
+│   ├── REFACTORING_PROGRESS.md
+│   ├── REFACTORING_OPPORTUNITIES.md
+│   ├── REFACTORING_SESSION_2026-01-05.md
+│   ├── REFACTORING_TODO.md
+│   └── release-notes/     # Release notes
+│       ├── RELEASE_NOTE_1.0.0.md
+│       └── RELEASE_NOTE_1.0.1.md
+│
+├── tests/                 # Test suite
+│   ├── README.md
+│   ├── runner.html        # Test runner interface
+│   ├── test-framework.js  # Custom test framework
+│   └── utils/             # Test utilities
+│
+└── icons/                 # Extension icons
 ```
 
-### Architecture modulaire
+### 🏗️ Modular Architecture
 
-Le code est organisé en modules séparés pour une meilleure maintenabilité :
-- **Utils** : Fonctions utilitaires réutilisables
-- **Modules** : Logique métier organisée par responsabilité (SOLID)
-- **Content.js** : Point d'entrée qui orchestre les modules
+The code is organized into separate modules for better maintainability:
+- **Handlers** : Organized by component (background/content/popup) for separation of concerns
+- **Utils** : Reusable utility functions (logging, messaging, formatting, async helpers)
+- **Modules** : Business logic organized by responsibility (SOLID principles)
+- **Entry Points** : `background/background.js` and `content/content.js` orchestrate handlers and modules
 
-Les modules sont chargés dans l'ordre de dépendance via `manifest.json`.
+All components are loaded in dependency order via `manifest.json`. The architecture follows a handler-based pattern where:
+- Background handlers manage storage, webhooks, tabs, and logs
+- Content handlers manage script lifecycle, messaging, errors, and auto-start
+- Popup managers handle UI operations and state synchronization
 
-## Sécurité
+## 🔐 Security
 
-- Les identifiants sont stockés localement dans `chrome.storage.local`
-- Les identifiants ne sont jamais synchronisés avec le cloud
-- Les identifiants ne sont jamais exposés dans les logs
-- L'extension ne fonctionne que sur web.grindr.com
-- Les requêtes webhook passent par le background script (contourne CSP)
+- 🔒 Credentials are stored locally in `chrome.storage.local`
+- ☁️ Credentials are never synced with the cloud
+- 📝 Credentials are never exposed in logs
+- 🌐 The extension only works on web.grindr.com
+- 🛡️ Webhook requests pass through the background script (CSP bypass)
 
-## Dépannage
+## 🐛 Troubleshooting
 
-### L'extension ne se charge pas
-- Vérifier que tous les fichiers sont présents
-- Vérifier la console d'erreur dans `about:debugging`
-- Vérifier que les icônes sont présentes dans le dossier `icons/`
+### ❌ Extension Won't Load
 
-### Le script ne démarre pas automatiquement
-- Vérifier que "Connexion automatique" est cochée dans le popup
-- Vérifier que les identifiants sont sauvegardés
-- Vérifier la console du navigateur pour les erreurs (F12)
+- Verify that all files are present
+- Check the error console in `about:debugging`
+- Verify that icons are present in the `icons/` folder
 
-### Les requêtes vers n8n échouent
-- Vérifier que l'URL du webhook est correcte (onglet Webhook dans le popup)
-- Vérifier que le webhook n8n est actif
-- Vérifier la console du background script dans `about:debugging`
+### ⚠️ Script Doesn't Start Automatically
 
-### L'authentification échoue
-- Vérifier que les identifiants sont corrects
-- Vérifier s'il y a un captcha (nécessite action manuelle)
-- Vérifier la console pour les messages d'erreur détaillés
+- Verify that "Auto login" is checked in the popup
+- Verify that credentials are saved
+- Check the browser console for errors (F12)
 
-## Notes
+### 🔗 n8n Requests Fail
 
-- L'extension nécessite les permissions `tabs`, `scripting`, `storage` et `activeTab`
-- L'extension fonctionne uniquement sur `*://web.grindr.com/*`
-- Architecture modulaire compatible Manifest V3 (partage via `window.*`)
+- Verify that the webhook URL is correct (Webhook tab in the popup)
+- Verify that the n8n webhook is active
+- Check the background script console in `about:debugging`
+
+### 🔑 Authentication Fails
+
+- Verify that credentials are correct
+- Check if there's a captcha (requires manual action)
+- Check the console for detailed error messages
+
+## 📝 Notes
+
+- 🔑 The extension requires `tabs`, `scripting`, `storage` and `activeTab` permissions
+- 🌐 The extension only works on `*://web.grindr.com/*`
+- 🏗️ Modular architecture compatible with Manifest V3 (sharing via `window.*`)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is provided as-is for educational purposes.

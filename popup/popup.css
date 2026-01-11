@@ -640,3 +640,145 @@ body {
   color: var(--color-accent);
   flex-shrink: 0;
 }
+
+/* Section Actions Buttons */
+.section-actions-buttons {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+/* Logs Container */
+#logsContainer {
+  max-height: 200px;
+  min-height: 100px;
+  overflow-y: auto;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) var(--color-bg);
+}
+
+/* Custom scrollbar for WebKit browsers */
+#logsContainer::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+#logsContainer::-webkit-scrollbar-track {
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+#logsContainer::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+#logsContainer::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Log Entry */
+.log-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-entry:hover {
+  background: var(--color-bg);
+  margin: 0 calc(-1 * var(--spacing-sm));
+  padding-left: var(--spacing-sm);
+  padding-right: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+/* Log Timestamp */
+.log-timestamp {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Log Level */
+.log-level {
+  font-weight: var(--font-weight-semibold);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.log-level.info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.log-level.warn,
+.log-level.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.log-level.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.log-level.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.log-level.debug {
+  background: #f3f4f6;
+  color: var(--color-text-secondary);
+}
+
+/* Log Location */
+.log-location {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  flex-shrink: 0;
+}
+
+/* Log Message */
+.log-message {
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* Log Data */
+.log-data {
+  width: 100%;
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-bg);
+  border-left: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}

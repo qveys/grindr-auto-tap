@@ -13,11 +13,35 @@
 
   /**
    * Send statistics to n8n webhook via background script
-   * @param {Object} stats - Statistics object
-   * @param {number} retries - Number of retries
-   * @returns {Promise<boolean>} True if sent successfully
+   * Uses centralized messaging utility (window.sendStatsToWebhook) with fallback
+   * to direct chrome.runtime.sendMessage if messaging utility not loaded.
+   * The background script handles the actual HTTP request to bypass CSP restrictions.
+   *
+   * @param {{startTime: number, endTime: number, duration: number, alreadyTappedCount: number, tappedCount: number, totalCount: number, error?: boolean, errorMessage?: string}} stats - Statistics object with run metrics
+   * @param {number} [retries=LIMITS.DEFAULT_RETRIES] - Number of retries for webhook request
+   * @returns {Promise<boolean>} True if sent successfully, false otherwise
+   *
+   * @example
+   * const stats = createStatsFromState(startTime, endTime, 10, 5);
+   * const sent = await sendToN8NWebhook(stats);
+   * if (sent) {
+   *   logger('info', 'Content', 'Stats sent successfully');
+   * }
    */
   async function sendToN8NWebhook(stats, retries = LIMITS.DEFAULT_RETRIES) {
+    // Use centralized messaging utility if available
+    if (typeof window !== 'undefined' && window.sendStatsToWebhook) {
+      const response = await window.sendStatsToWebhook(stats, retries);
+      if (response && response.success) {
+        logger('info', 'Content', '📤 Récapitulatif envoyé à n8n avec succès');
+        return true;
+      } else {
+        logger('error', 'Content', '❌ Erreur lors de l\'envoi du webhook: ' + (response?.error || 'Erreur inconnue'));
+        return false;
+      }
+    }
+
+    // Fallback to direct chrome.runtime.sendMessage if messaging utility not loaded
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({
         action: 'sendToN8N',
@@ -42,7 +66,15 @@
 
   /**
    * Display statistics in console
-   * @param {Object} stats - Statistics object
+   * Logs formatted statistics including start/end times, duration,
+   * tap counts, and success rate. Shows error information if present.
+   *
+   * @param {{startTime: number, endTime: number, duration: number, alreadyTappedCount: number, tappedCount: number, totalCount: number, error?: boolean, errorMessage?: string}} stats - Statistics object to display
+   *
+   * @example
+   * const stats = createStatsFromState(startTime, endTime, 10, 5);
+   * displayStats(stats);
+   * // Logs: 📊 RÉCAPITULATIF - Début: 01/01/2024 12:00:00, Fin: 01/01/2024 12:05:30...
    */
   function displayStats(stats) {
     const successRate = stats.totalCount > 0 ? ((stats.tappedCount / stats.totalCount) * 100).toFixed(1) : 0;
@@ -56,9 +88,18 @@
 
   /**
    * Create error statistics object
-   * @param {Object} baseStats - Base statistics object
-   * @param {Error|*} error - Error object or error message
-   * @returns {Object} Statistics object with error information
+   * Adds error flag and error message to existing stats object.
+   * Handles both Error objects and string error messages.
+   *
+   * @param {{startTime: number, endTime: number, duration: number, alreadyTappedCount: number, tappedCount: number, totalCount: number}} baseStats - Base statistics object
+   * @param {Error|string} error - Error object or error message
+   * @returns {{startTime: number, endTime: number, duration: number, alreadyTappedCount: number, tappedCount: number, totalCount: number, error: boolean, errorMessage: string}} Statistics object with error information
+   *
+   * @example
+   * const baseStats = createStatsFromState(startTime, endTime, 10, 5);
+   * const errorStats = createErrorStats(baseStats, new Error('Profile button not found'));
+   * // errorStats.error === true
+   * // errorStats.errorMessage === 'Profile button not found'
    */
   function createErrorStats(baseStats, error) {
     return {
@@ -69,12 +110,22 @@
   }
 
   /**
-   * Create statistics from global state
-   * @param {number} startTime - Start timestamp
-   * @param {number} endTime - End timestamp
-   * @param {number} alreadyTappedCount - Number of already tapped profiles
-   * @param {number} tappedCount - Number of tapped profiles
-   * @returns {Object} Statistics object
+   * Create statistics from provided parameters
+   * Calculates duration and total count from the provided values.
+   *
+   * @param {number} startTime - Start timestamp in milliseconds
+   * @param {number} endTime - End timestamp in milliseconds
+   * @param {number} alreadyTappedCount - Number of profiles that were already tapped
+   * @param {number} tappedCount - Number of profiles that were tapped in this run
+   * @returns {{startTime: number, endTime: number, duration: number, alreadyTappedCount: number, tappedCount: number, totalCount: number}} Statistics object
+   *
+   * @example
+   * const startTime = Date.now();
+   * // ... run script ...
+   * const endTime = Date.now();
+   * const stats = createStatsFromState(startTime, endTime, 10, 5);
+   * // stats.duration === (endTime - startTime)
+   * // stats.totalCount === 15
    */
   function createStatsFromState(startTime, endTime, alreadyTappedCount, tappedCount) {
     const duration = endTime - startTime;
@@ -92,8 +143,19 @@
 
   /**
    * Create statistics from global window state
-   * @param {number} endTime - End timestamp (defaults to now)
-   * @returns {Object} Statistics object
+   * Reads statistics from window.__grindrStats and creates a stats object.
+   * This is a convenience function for creating stats from the running script.
+   *
+   * @param {number} [endTime=Date.now()] - End timestamp in milliseconds (defaults to current time)
+   * @returns {{startTime: number, endTime: number, duration: number, alreadyTappedCount: number, tappedCount: number, totalCount: number}} Statistics object
+   * @throws {Error} If window.__grindrStats is not available
+   *
+   * @example
+   * // During script execution
+   * window.__grindrStats = { startTime: Date.now(), alreadyTappedCount: 0, tappedCount: 0 };
+   * // Later...
+   * const stats = createStatsFromGlobalState();
+   * // stats contains all calculated values
    */
   function createStatsFromGlobalState(endTime = Date.now()) {
     if (!window.__grindrStats) {
@@ -110,9 +172,24 @@
 
   /**
    * Send final statistics (with optional error)
-   * @param {Object} stats - Statistics object
-   * @param {boolean} isError - Whether an error occurred
-   * @returns {Promise<void>}
+   * Displays stats in console and sends them to the webhook.
+   * Automatically adds error flag and default message if isError is true
+   * and stats doesn't already have error information.
+   *
+   * @param {{startTime: number, endTime: number, duration: number, alreadyTappedCount: number, tappedCount: number, totalCount: number, error?: boolean, errorMessage?: string}} stats - Statistics object
+   * @param {boolean} [isError=false] - Whether an error occurred during execution
+   * @returns {Promise<void>} Resolves after stats are displayed and sent
+   *
+   * @example
+   * // Normal completion
+   * const stats = createStatsFromState(startTime, endTime, 10, 5);
+   * await sendFinalStats(stats, false);
+   *
+   * @example
+   * // Error completion
+   * const stats = createStatsFromState(startTime, endTime, 10, 5);
+   * await sendFinalStats(stats, true);
+   * // stats.error will be set to true automatically
    */
   async function sendFinalStats(stats, isError = false) {
     const statsToSend = { ...stats };

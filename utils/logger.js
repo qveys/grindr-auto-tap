@@ -1,47 +1,80 @@
 /**
- * Logger utility for Grindr Auto Tap extension
- * Centralized logging that sends logs to background script and console
+ * @fileoverview Universal Logger for Grindr Auto Tap extension
+ * Factory pattern logger that works in all contexts (background, content, popup).
+ * Logs to console and persists via background script's chrome.storage handler.
+ *
+ * Usage:
+ * - Background: const logger = createLogger('Background');
+ * - Content: const logger = window.logger; // or createLogger('Content')
+ * - Popup: const logger = createLogger('Popup');
+ *
+ * @module Logger
  */
 
 (function() {
   'use strict';
 
   /**
-   * Log a message with level, location, and optional data
-   * @param {string} level - Log level: 'info', 'warn', 'error', 'debug'
-   * @param {string} location - Location/module name
-   * @param {string} message - Log message
-   * @param {*} data - Optional data to log
+   * Create a logger function with default location
+   * @param {string} [defaultLocation='unknown'] - Default location if none provided
+   * @returns {Function} Logger function with signature (level, location, message, data)
+   *
+   * @example
+   * const logger = createLogger('MyModule');
+   * logger('info', 'MyModule', 'Hello world');
+   * logger('error', 'MyModule', 'Something failed', { error: 'details' });
    */
-  function logger(level, location, message, data = null) {
-    const logEntry = {
-      timestamp: Date.now(),
-      level: level,
-      location: location || 'unknown',
-      message: message,
-      data: data
-    };
+  function createLogger(defaultLocation = 'unknown') {
+    return function logger(level, location, message, data = null) {
+      const logEntry = {
+        timestamp: Date.now(),
+        level: level,
+        location: location || defaultLocation,
+        message: message,
+        data: data
+      };
 
-    // Log to console as well
-    const consoleMethod = level === 'error' ? console.error :
-      level === 'warn' ? console.warn :
+      // Console output with appropriate method
+      const consoleMethod =
+        level === 'error' ? console.error :
+        level === 'warn' ? console.warn :
         level === 'debug' ? console.debug :
-          console.log;
-    consoleMethod(`[${location}] ${message}`, data || '');
+        console.log;
 
-    // Send to background script to store
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({
-        action: 'addLog',
-        logEntry: logEntry
-      }).catch(err => {
-        // Silently fail if background script is not available
-      });
-    }
+      consoleMethod(`[${logEntry.location}] ${message}`, data || '');
+
+      // Send to background for persistence
+      // Background handler 'addLog' will store in chrome.storage.local
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          action: 'addLog',
+          logEntry: logEntry
+        }).catch(() => {
+          // Silently fail if background not available
+          // This is normal when extension is reloading or background is busy
+        });
+      }
+    };
   }
 
-  // Export to global scope
-  window.Logger = { logger };
-  window.logger = logger;
+  // Export factory function to global scope
+  if (typeof window !== 'undefined') {
+    window.createLogger = createLogger;
+  }
+  if (typeof self !== 'undefined' && typeof window === 'undefined') {
+    // Service worker context
+    self.createLogger = createLogger;
+  }
+
+  // Export default logger instance
+  const defaultLogger = createLogger();
+  if (typeof window !== 'undefined') {
+    window.logger = defaultLogger;
+    window.Logger = { logger: defaultLogger };
+  }
+  if (typeof self !== 'undefined' && typeof window === 'undefined') {
+    self.logger = defaultLogger;
+    self.Logger = { logger: defaultLogger };
+  }
 })();
 

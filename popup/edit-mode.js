@@ -148,19 +148,18 @@ function createEditModeManagers() {
       displayElement: authDisplay,
       editElement: authEdit,
       saveCallback: () => {
-        // Will be set by popup.js
-        if (window.saveCredentials) {
-          window.saveCredentials();
+        if (window.PopupStorageManager && window.PopupStorageManager.saveCredentials) {
+          window.PopupStorageManager.saveCredentials();
         }
       },
       loadDisplayCallback: () => {
-        if (window.loadAuthDisplay) {
-          window.loadAuthDisplay();
+        if (window.PopupStorageManager && window.PopupStorageManager.loadAuthDisplay) {
+          window.PopupStorageManager.loadAuthDisplay();
         }
       },
       loadEditCallback: () => {
-        if (window.loadAuthToEdit) {
-          window.loadAuthToEdit();
+        if (window.PopupStorageManager && window.PopupStorageManager.loadAuthToEdit) {
+          window.PopupStorageManager.loadAuthToEdit();
         }
       }
     }),
@@ -170,18 +169,18 @@ function createEditModeManagers() {
       displayElement: webhookDisplay,
       editElement: webhookEdit,
       saveCallback: () => {
-        if (window.saveWebhook) {
-          window.saveWebhook();
+        if (window.PopupStorageManager && window.PopupStorageManager.saveWebhook) {
+          window.PopupStorageManager.saveWebhook();
         }
       },
       loadDisplayCallback: () => {
-        if (window.loadWebhookDisplay) {
-          window.loadWebhookDisplay();
+        if (window.PopupStorageManager && window.PopupStorageManager.loadWebhookDisplay) {
+          window.PopupStorageManager.loadWebhookDisplay();
         }
       },
       loadEditCallback: () => {
-        if (window.loadWebhookToEdit) {
-          window.loadWebhookToEdit();
+        if (window.PopupStorageManager && window.PopupStorageManager.loadWebhookToEdit) {
+          window.PopupStorageManager.loadWebhookToEdit();
         }
       }
     }),
@@ -192,18 +191,18 @@ function createEditModeManagers() {
       editElement: minDelayEdit,
       displayRow: minDelayDisplayRow,
       saveCallback: () => {
-        if (window.saveMinDelay) {
-          window.saveMinDelay();
+        if (window.PopupStorageManager && window.PopupStorageManager.saveMinDelay) {
+          window.PopupStorageManager.saveMinDelay();
         }
       },
       loadDisplayCallback: () => {
-        if (window.loadMinDelayDisplay) {
-          window.loadMinDelayDisplay();
+        if (window.PopupStorageManager && window.PopupStorageManager.loadMinDelayDisplay) {
+          window.PopupStorageManager.loadMinDelayDisplay();
         }
       },
       loadEditCallback: () => {
-        if (window.loadMinDelayToEdit) {
-          window.loadMinDelayToEdit();
+        if (window.PopupStorageManager && window.PopupStorageManager.loadMinDelayToEdit) {
+          window.PopupStorageManager.loadMinDelayToEdit();
         }
       }
     })
