@@ -12,7 +12,7 @@ describe('MessageHandler', () => {
     it('should send a message and return response', async () => {
       const mockResponse = { success: true };
       (chrome.runtime.sendMessage as jest.Mock).mockImplementation(
-        (message, callback) => {
+        (_message, callback) => {
           callback(mockResponse);
         }
       );
@@ -26,8 +26,9 @@ describe('MessageHandler', () => {
     it('should reject on error', async () => {
       const error = { message: 'Test error' };
       (chrome.runtime.sendMessage as jest.Mock).mockImplementation(
-        (message, callback) => {
-          (chrome.runtime as { lastError?: { message: string } }).lastError = error;
+        (_message, callback) => {
+          (chrome.runtime as { lastError?: { message: string } }).lastError =
+            error;
           callback(null);
         }
       );
@@ -36,7 +37,8 @@ describe('MessageHandler', () => {
         MessageHandler.sendMessage({ type: MessageType.GET_STATUS })
       ).rejects.toThrow('Test error');
 
-      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      (chrome.runtime as { lastError?: { message: string } }).lastError =
+        undefined;
     });
   });
 
@@ -44,7 +46,7 @@ describe('MessageHandler', () => {
     it('should send a message to a tab', async () => {
       const mockResponse = { success: true };
       (chrome.tabs.sendMessage as jest.Mock).mockImplementation(
-        (tabId, message, callback) => {
+        (_tabId, _message, callback) => {
           callback(mockResponse);
         }
       );

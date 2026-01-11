@@ -15,7 +15,7 @@ class ContentScript {
   }
 
   private setupMessageListener(): void {
-    MessageHandler.onMessage((message, sender, sendResponse) => {
+    MessageHandler.onMessage((message, _sender, sendResponse) => {
       if (message.type === MessageType.PERFORM_TAP) {
         this.performTap()
           .then((response) => sendResponse(response))
@@ -25,10 +25,11 @@ class ContentScript {
           });
         return true; // Keep message channel open
       }
+      return false;
     });
   }
 
-  private async performTap(): Promise<TapResponse> {
+  private performTap(): Promise<TapResponse> {
     try {
       // Find clickable elements (buttons, links, etc.)
       const clickableElements = document.querySelectorAll(
@@ -36,7 +37,10 @@ class ContentScript {
       );
 
       if (clickableElements.length === 0) {
-        return { success: false, message: 'No clickable elements found' };
+        return Promise.resolve({
+          success: false,
+          message: 'No clickable elements found',
+        });
       }
 
       // Click the first visible element
@@ -44,14 +48,20 @@ class ContentScript {
         if (this.isElementVisible(element as HTMLElement)) {
           (element as HTMLElement).click();
           logger.info('Element clicked successfully');
-          return { success: true, message: 'Tap performed' };
+          return Promise.resolve({ success: true, message: 'Tap performed' });
         }
       }
 
-      return { success: false, message: 'No visible elements found' };
+      return Promise.resolve({
+        success: false,
+        message: 'No visible elements found',
+      });
     } catch (error) {
       logger.error('Tap error', error as Error);
-      return { success: false, message: (error as Error).message };
+      return Promise.resolve({
+        success: false,
+        message: (error as Error).message,
+      });
     }
   }
 
@@ -64,8 +74,7 @@ class ContentScript {
       rect.left >= 0 &&
       rect.bottom <=
         (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.right <=
-        (window.innerWidth || document.documentElement.clientWidth)
+      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
     );
   }
 }

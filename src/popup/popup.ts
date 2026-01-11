@@ -2,7 +2,11 @@
  * Popup UI logic
  */
 import { Storage } from '../utils/storage';
-import { MessageHandler, MessageType, StatusResponse } from '../utils/messaging';
+import {
+  MessageHandler,
+  MessageType,
+  StatusResponse,
+} from '../utils/messaging';
 import { logger } from '../utils/logger';
 
 class PopupUI {
@@ -14,7 +18,7 @@ class PopupUI {
   private lastTapEl: HTMLElement | null = null;
 
   constructor() {
-    this.init();
+    void this.init();
   }
 
   private async init(): Promise<void> {
@@ -32,7 +36,9 @@ class PopupUI {
     this.toggleBtn = document.getElementById('toggle-btn') as HTMLButtonElement;
     this.statusDot = document.getElementById('status-dot');
     this.statusText = document.getElementById('status-text');
-    this.intervalInput = document.getElementById('interval') as HTMLInputElement;
+    this.intervalInput = document.getElementById(
+      'interval'
+    ) as HTMLInputElement;
     this.tapCountEl = document.getElementById('tap-count');
     this.lastTapEl = document.getElementById('last-tap');
   }
@@ -87,7 +93,9 @@ class PopupUI {
       await Storage.set('interval', interval);
       await MessageHandler.sendMessage({
         type: MessageType.UPDATE_INTERVAL,
-        payload: { interval },
+        payload: {
+          interval,
+        },
       });
       logger.info(`Interval updated to ${interval}s`);
     } catch (error) {

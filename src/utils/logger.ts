@@ -50,28 +50,29 @@ export class Logger {
     return levels.indexOf(level) <= levels.indexOf(this.logLevel);
   }
 
-  private logToStorage(
-    level: string,
-    message: string,
-    error?: Error
-  ): void {
-    const logEntry = {
-      level,
-      message,
-      error: error?.message,
-      stack: error?.stack,
-      timestamp: new Date().toISOString(),
-    };
+  private logToStorage(level: string, message: string, error?: Error): void {
+    try {
+      const logEntry = {
+        level,
+        message,
+        error: error?.message,
+        stack: error?.stack,
+        timestamp: new Date().toISOString(),
+      };
 
-    chrome.storage.local.get(['logs'], (result) => {
-      const logs = (result.logs as typeof logEntry[]) || [];
-      logs.push(logEntry);
-      // Keep only last 100 logs
-      const recentLogs = logs.slice(-100);
-      chrome.storage.local.set({ logs: recentLogs }).catch((err) => {
-        console.error('Failed to save logs:', err);
+      chrome.storage.local.get(['logs'], (result) => {
+        const logs = (result['logs'] as (typeof logEntry)[]) || [];
+        logs.push(logEntry);
+        // Keep only last 100 logs
+        const recentLogs = logs.slice(-100);
+        chrome.storage.local.set({ logs: recentLogs }).catch((err) => {
+          console.error('Failed to save logs:', err);
+        });
       });
-    });
+    } catch (err) {
+      // Silently fail if storage is not available
+      console.error('Failed to log to storage:', err);
+    }
   }
 
   public async getLogs(): Promise<
@@ -86,7 +87,7 @@ export class Logger {
     return new Promise((resolve) => {
       chrome.storage.local.get(['logs'], (result) => {
         resolve(
-          (result.logs as Array<{
+          (result['logs'] as Array<{
             level: string;
             message: string;
             error?: string;

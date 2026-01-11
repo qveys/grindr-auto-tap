@@ -10,7 +10,7 @@ describe('Logger', () => {
     jest.clearAllMocks();
     logger = Logger.getInstance();
     (chrome.storage.local.get as jest.Mock).mockImplementation(
-      (key, callback) => {
+      (_key, callback) => {
         callback({ logs: [] });
       }
     );
@@ -30,10 +30,7 @@ describe('Logger', () => {
     const error = new Error('Test error');
 
     logger.error('Test message', error);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[ERROR] Test message',
-      error
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('[ERROR] Test message', error);
 
     consoleErrorSpy.mockRestore();
   });
@@ -51,7 +48,7 @@ describe('Logger', () => {
   });
 
   it('should clear logs', () => {
-    logger.clearLogs();
+    void logger.clearLogs();
     expect(chrome.storage.local.set).toHaveBeenCalledWith({ logs: [] });
   });
 });

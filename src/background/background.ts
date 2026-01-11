@@ -1,7 +1,7 @@
 /**
  * Background service worker
  */
-import { Storage, StorageData } from '../utils/storage';
+import { Storage } from '../utils/storage';
 import {
   MessageHandler,
   MessageType,
@@ -19,7 +19,7 @@ class BackgroundService {
 
   private init(): void {
     this.setupMessageListener();
-    this.restoreState();
+    void this.restoreState();
     logger.info('Background service initialized');
   }
 
@@ -35,7 +35,7 @@ class BackgroundService {
 
   private async handleMessage(
     message: Message,
-    sender: chrome.runtime.MessageSender,
+    _sender: chrome.runtime.MessageSender,
     sendResponse: (response?: unknown) => void
   ): Promise<void> {
     logger.debug(`Received message: ${message.type}`);
@@ -47,7 +47,11 @@ class BackgroundService {
         break;
 
       case MessageType.UPDATE_INTERVAL:
-        if (message.payload && typeof message.payload === 'object' && 'interval' in message.payload) {
+        if (
+          message.payload &&
+          typeof message.payload === 'object' &&
+          'interval' in message.payload
+        ) {
           await this.updateInterval(message.payload.interval as number);
         }
         sendResponse(await this.getStatus());
@@ -123,7 +127,7 @@ class BackgroundService {
         currentWindow: true,
       });
 
-      if (!tab.id) {
+      if (!tab || !tab.id) {
         logger.warn('No active tab found');
         return;
       }

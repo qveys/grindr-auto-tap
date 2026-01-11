@@ -25,11 +25,6 @@
       "js": ["content.js"]
     }
   ],
-  "permissions": [
-    "storage",
-    "activeTab"
-  ],
-  "host_permissions": [
-    "<all_urls>"
-  ]
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["<all_urls>"]
 }

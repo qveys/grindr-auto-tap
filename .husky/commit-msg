@@ -48,15 +48,18 @@ const SPECIAL_PATTERNS = [
 ];
 
 function validateCommit(message) {
+  // Get only the first line (subject) for validation
+  const firstLine = message.split('\n')[0].trim();
+
   // Check special patterns
   for (const pattern of SPECIAL_PATTERNS) {
-    if (pattern.test(message)) {
+    if (pattern.test(firstLine)) {
       return { valid: true };
     }
   }
 
   // Check emoji pattern
-  if (!COMMIT_PATTERN.test(message)) {
+  if (!COMMIT_PATTERN.test(firstLine)) {
     const validEmojis = Object.entries(VALID_EMOJIS)
       .map(([emoji, desc]) => `  ${emoji}  ${desc}`)
       .join('\n');
@@ -67,7 +70,7 @@ function validateCommit(message) {
 ❌ Invalid commit message format!
 
 Your commit message:
-"${message}"
+"${firstLine}"
 
 Expected format: <emoji> <message>
 

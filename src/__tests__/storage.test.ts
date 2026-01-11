@@ -12,11 +12,11 @@ describe('Storage', () => {
     it('should get a value from storage', async () => {
       const mockValue = true;
       (chrome.storage.local.get as jest.Mock).mockImplementation(
-        (key, callback) => {
+        (_key, callback) => {
           if (callback) {
-            callback({ [key]: mockValue });
+            callback({ [_key as string]: mockValue });
           }
-          return Promise.resolve({ [key]: mockValue });
+          return Promise.resolve({ [_key as string]: mockValue });
         }
       );
 
@@ -26,7 +26,7 @@ describe('Storage', () => {
 
     it('should return default value if key not found', async () => {
       (chrome.storage.local.get as jest.Mock).mockImplementation(
-        (key, callback) => {
+        (_key, callback) => {
           if (callback) {
             callback({});
           }
@@ -42,6 +42,21 @@ describe('Storage', () => {
       (chrome.storage.local.get as jest.Mock).mockRejectedValue(
         new Error('Storage error')
       );
+      // Ensure logger's storage.get for logging works (it uses callbacks)
+      (chrome.storage.local.get as jest.Mock).mockImplementation(
+        (keys: string | string[] | null, callback) => {
+          // If keys is ['logs'], it's the logger trying to save logs
+          if (Array.isArray(keys) && keys.includes('logs')) {
+            if (callback) {
+              callback({ logs: [] });
+            }
+            return Promise.resolve({ logs: [] });
+          }
+          // Otherwise, it's the test case - reject
+          return Promise.reject(new Error('Storage error'));
+        }
+      );
+      (chrome.storage.local.set as jest.Mock).mockResolvedValue(undefined);
 
       const result = await Storage.get('enabled');
       expect(result).toBe(false);
@@ -73,7 +88,7 @@ describe('Storage', () => {
         interval: 10,
       };
       (chrome.storage.local.get as jest.Mock).mockImplementation(
-        (key, callback) => {
+        (_key, callback) => {
           if (callback) {
             callback(mockData);
           }

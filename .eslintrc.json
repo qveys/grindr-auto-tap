@@ -29,5 +29,20 @@
     "node": true,
     "webextensions": true
   },
-  "ignorePatterns": ["dist", "node_modules", "coverage", "webpack.config.js", "jest.config.js"]
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "coverage",
+    "webpack.config.js",
+    "jest.config.js"
+  ],
+  "overrides": [
+    {
+      "files": ["**/__tests__/**/*.ts", "**/*.test.ts"],
+      "rules": {
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/unbound-method": "off"
+      }
+    }
+  ]
 }

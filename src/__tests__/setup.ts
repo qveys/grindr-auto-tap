@@ -13,9 +13,24 @@ global.chrome = {
   },
   storage: {
     local: {
-      get: jest.fn(),
-      set: jest.fn(),
-      clear: jest.fn(),
+      get: jest.fn((_keys, callback) => {
+        if (callback) {
+          callback({});
+        }
+        return Promise.resolve({});
+      }),
+      set: jest.fn((_data, callback) => {
+        if (callback) {
+          callback();
+        }
+        return Promise.resolve();
+      }),
+      clear: jest.fn((callback) => {
+        if (callback) {
+          callback();
+        }
+        return Promise.resolve();
+      }),
     },
   },
   tabs: {
