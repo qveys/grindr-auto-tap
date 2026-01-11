@@ -44,3 +44,41 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: node scripts/auto-resolve-reviews.js
+
+      - name: Trigger check-bot-review workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Wait a moment to ensure review thread updates are propagated in GitHub's backend
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            // Get the PR's head branch to trigger the workflow on the correct ref
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number
+            });
+
+            const headBranch = pr.head.ref;
+
+            try {
+              // Trigger the check-bot-review workflow via workflow_dispatch
+              await github.rest.actions.createWorkflowDispatch({
+                owner,
+                repo,
+                workflow_id: 'check-bot-review.yml',
+                ref: headBranch,
+                inputs: {
+                  pull_request_number: String(pull_number)
+                }
+              });
+
+              core.info(`✅ Successfully triggered check-bot-review workflow for PR #${pull_number} on branch ${headBranch}`);
+            } catch (error) {
+              core.warning(`⚠️ Could not trigger check-bot-review workflow: ${error.message}`);
+              core.info('The check-bot-review workflow will run on the next PR event');
+            }
