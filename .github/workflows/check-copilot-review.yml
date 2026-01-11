@@ -22,7 +22,7 @@ jobs:
               pull_number: context.issue.number,
             });
             
-            // Get the latest commit date
+            // Get all commits and find the latest content-changing commit
             if (!commits || commits.length === 0) {
               core.info('ℹ️ No commits found in the pull request. Skipping Copilot review freshness check.');
               return;
