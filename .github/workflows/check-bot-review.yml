@@ -24,7 +24,7 @@ jobs:
           owner="${GITHUB_REPOSITORY_OWNER}"
           name="${GITHUB_REPOSITORY#*/}"
           number=${{ github.event.pull_request.number }}
-
+      
           query='
           query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
             repository(owner: $owner, name: $name) {
@@ -42,11 +42,11 @@ jobs:
               }
             }
           }'
-
+      
           cursor=null
           unresolved=0
-          unresolved_ids="[]"
-
+          unresolved_ids='[]'
+      
           while : ; do
             body=$(jq -n \
               --arg q "$query" \
@@ -63,47 +63,45 @@ jobs:
                   cursor: ($cursor | select(. != "null"))
                 }
               }')
-
+      
             resp=$(curl -s \
               -H "Authorization: bearer ${{ secrets.GITHUB_TOKEN }}" \
               -H "Content-Type: application/json" \
               -X POST https://api.github.com/graphql \
               -d "$body")
-
+      
             echo "$resp" | jq '.' >/dev/null || {
               echo "GraphQL error response:"
               echo "$resp"
               exit 1
             }
-
-            # nombre de threads non résolus dans cette page
+      
             delta=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes // [] | map(select(.isResolved == false))] | length')
             unresolved=$((unresolved + delta))
-
-            # IDs des threads non résolus de cette page
+      
             page_ids=$(echo "$resp" | jq '[.data.repository.pullRequest.reviewThreads.nodes // [] | map(select(.isResolved == false) | .id)]')
-
-            # concaténer avec la liste globale
+      
             unresolved_ids=$(jq -n --argjson a "$unresolved_ids" --argjson b "$page_ids" '$a + $b')
-
+      
             has_next=$(echo "$resp" | jq '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
             if [ "$has_next" != "true" ]; then
               break
             fi
-
+      
             cursor=$(echo "$resp" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
             if [ -z "$cursor" ]; then
               break
             fi
           done
-
+      
           echo "unresolved=$unresolved" >> "$GITHUB_OUTPUT"
           echo "Unresolved thread IDs: $unresolved_ids"
-
+      
           if [ "$unresolved" != "0" ]; then
             echo "❌ There are still $unresolved unresolved review threads. Bot review check cannot pass."
             exit 1
           fi
+
 
       - name: Get last bot reviewer
         id: last_bot
