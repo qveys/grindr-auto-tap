@@ -6,22 +6,49 @@ import prettier from 'eslint-config-prettier';
 import prettierPlugin from 'eslint-plugin-prettier';
 
 export default [
-  // Ignorer certains dossiers
+  // Ignorer certains dossiers et fichiers de config
   {
     ignores: [
       'node_modules/**',
       'dist/**',
       'build/**',
       'coverage/**',
-      '*.config.js',
       '_legacy/**',
       'scripts/**',
+      '*.config.js',
+      '*.config.mjs',
+      'commitlint.config.js',
+      'jest.config.js',
+      'lint-staged.config.js',
     ],
   },
 
-  // Configuration de base pour tous les fichiers JS/TS
+  // Configuration pour les fichiers de config JS (sans type-checking)
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
+    files: ['*.config.js', '*.config.mjs', 'commitlint.config.js'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      prettier: prettierPlugin,
+    },
+    rules: {
+      ...eslint.configs.recommended.rules,
+      ...tseslint.configs.recommended.rules,
+      'prettier/prettier': 'error',
+      'no-console': 'off',
+    },
+  },
+
+  // Configuration de base pour tous les fichiers JS/TS (avec type-checking)
+  // Exclut les fichiers de config qui sont gérés par la config ci-dessus
+  {
+    files: ['**/*.{js,jsx,ts,tsx}', '!*.config.js', '!*.config.mjs', '!commitlint.config.js'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
