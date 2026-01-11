@@ -231,7 +231,7 @@ jobs:
             if (hasReviewNeeded) {
               core.warning(`status: review-needed is present → attempting to trigger bot review (${preferredBotLogin}) and failing check.`);
 
-              // Only Copilot Code Review has a public endpoint; other bots are usually not triggerable.
+              // Attempt to request a review from the preferred bot via the standard GitHub REST API; success depends on whether the bot account can be requested as a reviewer.
                 const botLoginSanitized = preferredBotLogin.replace('[bot]', '');
                 const candidates = [botLoginSanitized, preferredBotLogin];
                 const uniqueCandidates = [...new Set(candidates)];
