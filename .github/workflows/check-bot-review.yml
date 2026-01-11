@@ -222,31 +222,36 @@ jobs:
               core.warning(`status: review-needed is present → attempting to trigger bot review (${preferredBotLogin}) and failing check.`);
 
               // Only Copilot Code Review has a public endpoint; other bots are usually not triggerable.
-                try {
-                  const botLoginSanitized = preferredBotLogin.replace('[bot]', '');
-                  // Try requesting both forms (with and without [bot]) to be sure
-                  const reviewCandidates = [preferredBotLogin];
-                  if (botLoginSanitized !== preferredBotLogin) {
-                    reviewCandidates.push(botLoginSanitized);
+                const botLoginSanitized = preferredBotLogin.replace('[bot]', '');
+                const candidates = [botLoginSanitized, preferredBotLogin];
+                const uniqueCandidates = [...new Set(candidates)];
+                
+                let success = false;
+                for (const reviewer of uniqueCandidates) {
+                  try {
+                    core.info(`Attempting to request reviewer: ${reviewer}`);
+                    const result = await github.rest.pulls.requestReviewers({
+                      owner,
+                      repo,
+                      pull_number: pull_number,
+                      reviewers: [reviewer]
+                    });
+                    
+                    const requestedUsers = result.data.requested_reviewers || [];
+                    if (requestedUsers.length > 0) {
+                      core.info(`✅ Request code review: Success (requested ${requestedUsers.map(r => r.login).join(', ')})`);
+                      success = true;
+                      break; 
+                    } else {
+                       core.warning(`⚠️ Request for '${reviewer}' was sent but ignored (returned empty list).`);
+                    }
+                  } catch (error) {
+                    core.info(`⚠️ Failed to request '${reviewer}': ${error.message}`);
                   }
+                }
 
-                  const result = await github.rest.pulls.requestReviewers({
-                    owner,
-                    repo,
-                    pull_number: pull_number,
-                    reviewers: reviewCandidates
-                  });
-                  
-                  const requestedUsers = result.data.requested_reviewers || [];
-                  
-                  if (requestedUsers.length > 0) {
-                    core.info(`✅ Request code review: Success (requested ${requestedUsers.map(r => r.login).join(', ')})`);
-                  } else {
-                    core.warning(`⚠️ Request Sent to [${reviewCandidates.join(', ')}], but ignored: GitHub returned an empty list of reviewers. The bot might not be a collaborator or cannot be requested.`);
-                  }
-                } catch (error) {
-                  core.error(`❌ Request code review: Failed to request review from ${preferredBotLogin}`);
-                  core.setFailed(error.message);
+                if (!success) {
+                  core.setFailed("❌ Could not request any bot reviewer. Please ensure 'copilot-pull-request-reviewer' is added as a collaborator to the repository.");
                 }
 
               core.setFailed("❌ Bot review required (status: review-needed). Waiting for a fresh bot review.");
