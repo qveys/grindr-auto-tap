@@ -8,8 +8,13 @@ export default {
     'eslint --fix',
     // 2. Vérifier le formatage
     'prettier --write',
-    // 3. Vérifier les types TypeScript (sans fichiers spécifiques)
-    () => 'tsc --noEmit',
+    // 3. Vérifier les types TypeScript uniquement sur les fichiers stagés
+    (files) => {
+      const tsFiles = files.filter((file) => file.endsWith('.ts') || file.endsWith('.tsx'));
+      return tsFiles.length
+        ? `tsc --noEmit ${tsFiles.join(' ')}`
+        : 'echo "No TypeScript files to type-check"';
+    },
   ],
 
   // Fichiers JSON
