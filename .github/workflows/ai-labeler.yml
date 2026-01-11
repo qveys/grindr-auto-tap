@@ -33,7 +33,7 @@ jobs:
             
             // Logic to determine forced status
             let forcedStatus = null;
-            const pr = context.payload.pull_request;
+            const pr = context.payload.pull_request || context.payload.review?.pull_request;
             
             if (pr) {
                 try {
