@@ -85,7 +85,15 @@ jobs:
             let relatedContent = relatedMatch ? relatedMatch[1].trim() : '';
 
             if (!relatedMatch && isFirstRun) {
-                relatedContent = '## 🔗 Related issues\n\n';
+                relatedContent = [
+                  '## 🔗 Related issues',
+                  '',
+                  'Link any related issues or PRs that provide context for this change.',
+                  '',
+                  '- Closes: <!-- e.g. #123 -->',
+                  '- Relates to: <!-- e.g. #456 -->',
+                  ''
+                ].join('\n');
             }
             
             // Formatting the related section if it exists
