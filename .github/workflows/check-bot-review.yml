@@ -245,108 +245,63 @@ jobs:
 
             const latestBotReview = botReviews[0];
 
-            // 4) If label is present, check if we already have a bot review
+            // 4) If label is present, trigger a new bot review
             if (hasReviewNeeded) {
-              core.warning(`status: review-needed is present → checking for existing bot review before requesting new one.`);
+              core.warning(`status: review-needed is present → triggering new bot review (${preferredBotLogin}).`);
 
-              // If we already have a bot review after the latest commit, remove the label and continue
-              if (latestBotReview) {
-                const reviewDate = new Date(latestBotReview.submitted_at);
-                if (reviewDate >= latestCommitDate) {
-                  core.info(`✅ Bot review already exists and is up-to-date. Removing the 'status: review-needed' label.`);
+              let success = false;
 
-                  try {
-                    await github.rest.issues.removeLabel({
-                      owner,
-                      repo,
-                      issue_number: pull_number,
-                      name: 'status: review-needed'
-                    });
-                    core.info(`✅ Successfully removed 'status: review-needed' label.`);
-                  } catch (error) {
-                    core.warning(`⚠️ Could not remove label: ${error.message}`);
+              // Method 1: Try to request reviewer via API (works if bot is a collaborator)
+              const botLoginSanitized = preferredBotLogin.replace('[bot]', '');
+              const candidates = [botLoginSanitized, preferredBotLogin];
+              const uniqueCandidates = [...new Set(candidates)];
+
+              for (const reviewer of uniqueCandidates) {
+                try {
+                  core.info(`Attempting to request reviewer: ${reviewer}`);
+                  const result = await github.rest.pulls.requestReviewers({
+                    owner,
+                    repo,
+                    pull_number: pull_number,
+                    reviewers: [reviewer]
+                  });
+
+                  const requestedUsers = result.data.requested_reviewers || [];
+                  if (requestedUsers.length > 0) {
+                    core.info(`✅ Request code review: Success (requested ${requestedUsers.map(r => r.login).join(', ')})`);
+                    success = true;
+                    break;
+                  } else {
+                     core.warning(`⚠️ Request for '${reviewer}' was sent but ignored (returned empty list).`);
                   }
-
-                  // Continue with normal flow - don't fail
-                  core.info("Continuing with normal review freshness check.");
-                } else {
-                  // Bot review exists but is outdated - attempt to trigger a new one
-                  core.warning(`Bot review exists but is outdated. Attempting to trigger new bot review (${preferredBotLogin}).`);
-
-                  const botLoginSanitized = preferredBotLogin.replace('[bot]', '');
-                  const candidates = [botLoginSanitized, preferredBotLogin];
-                  const uniqueCandidates = [...new Set(candidates)];
-
-                  let success = false;
-                  for (const reviewer of uniqueCandidates) {
-                    try {
-                      core.info(`Attempting to request reviewer: ${reviewer}`);
-                      const result = await github.rest.pulls.requestReviewers({
-                        owner,
-                        repo,
-                        pull_number: pull_number,
-                        reviewers: [reviewer]
-                      });
-
-                      const requestedUsers = result.data.requested_reviewers || [];
-                      if (requestedUsers.length > 0) {
-                        core.info(`✅ Request code review: Success (requested ${requestedUsers.map(r => r.login).join(', ')})`);
-                        success = true;
-                        break;
-                      } else {
-                         core.warning(`⚠️ Request for '${reviewer}' was sent but ignored (returned empty list).`);
-                      }
-                    } catch (error) {
-                      core.info(`⚠️ Failed to request '${reviewer}': ${error.message}`);
-                    }
-                  }
-
-                  if (!success) {
-                    core.setFailed("❌ Could not request any bot reviewer. Please ensure 'copilot-pull-request-reviewer' is added as a collaborator to the repository.");
-                  }
-
-                  core.setFailed("❌ Bot review required (status: review-needed). Waiting for a fresh bot review.");
-                  return;
+                } catch (error) {
+                  core.info(`⚠️ Failed to request '${reviewer}': ${error.message}`);
                 }
-              } else {
-                // No bot review exists at all - attempt to trigger one
-                core.warning(`No bot review found. Attempting to trigger bot review (${preferredBotLogin}).`);
-
-                const botLoginSanitized = preferredBotLogin.replace('[bot]', '');
-                const candidates = [botLoginSanitized, preferredBotLogin];
-                const uniqueCandidates = [...new Set(candidates)];
-
-                let success = false;
-                for (const reviewer of uniqueCandidates) {
-                  try {
-                    core.info(`Attempting to request reviewer: ${reviewer}`);
-                    const result = await github.rest.pulls.requestReviewers({
-                      owner,
-                      repo,
-                      pull_number: pull_number,
-                      reviewers: [reviewer]
-                    });
-
-                    const requestedUsers = result.data.requested_reviewers || [];
-                    if (requestedUsers.length > 0) {
-                      core.info(`✅ Request code review: Success (requested ${requestedUsers.map(r => r.login).join(', ')})`);
-                      success = true;
-                      break;
-                    } else {
-                       core.warning(`⚠️ Request for '${reviewer}' was sent but ignored (returned empty list).`);
-                    }
-                  } catch (error) {
-                    core.info(`⚠️ Failed to request '${reviewer}': ${error.message}`);
-                  }
-                }
-
-                if (!success) {
-                  core.setFailed("❌ Could not request any bot reviewer. Please ensure 'copilot-pull-request-reviewer' is added as a collaborator to the repository.");
-                }
-
-                core.setFailed("❌ Bot review required (status: review-needed). Waiting for a fresh bot review.");
-                return;
               }
+
+              // Method 2: If API request failed, post a comment to trigger Copilot
+              if (!success && preferredBotLogin.includes('copilot')) {
+                try {
+                  core.info('Attempting to trigger Copilot by posting a comment...');
+                  await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: pull_number,
+                    body: '@copilot review'
+                  });
+                  core.info('✅ Posted @copilot review comment to trigger review');
+                  success = true;
+                } catch (error) {
+                  core.warning(`⚠️ Could not post comment: ${error.message}`);
+                }
+              }
+
+              if (!success) {
+                core.setFailed("❌ Could not request any bot reviewer. Please ensure 'copilot-pull-request-reviewer' is added as a collaborator to the repository, or that Copilot is enabled for this repo.");
+              }
+
+              core.setFailed("❌ Bot review required (status: review-needed). Waiting for a fresh bot review.");
+              return;
             }
 
             // 5) Normal freshness enforcement
