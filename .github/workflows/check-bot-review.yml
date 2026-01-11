@@ -13,7 +13,7 @@ jobs:
     if: github.event.pull_request
 
     steps:
-            - name: Check unresolved review threads via GraphQL
+      - name: Check unresolved review threads via GraphQL
         id: threads
         run: |
           owner="${GITHUB_REPOSITORY_OWNER}"
