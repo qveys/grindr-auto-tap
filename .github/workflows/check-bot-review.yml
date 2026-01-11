@@ -229,8 +229,13 @@ jobs:
                     pull_number: pull_number,
                     reviewers: [preferredBotLogin]
                   });
-                  core.info(`✅ Request code review: Success (requested ${preferredBotLogin})`);
-                  core.info(`API Response Reviewers: ${JSON.stringify(result.data.requested_reviewers.map(r => r.login))}`);
+                  
+                  const requested = result.data.requested_reviewers || [];
+                  if (requested.length > 0) {
+                    core.info(`✅ Request code review: Success (requested ${requested.map(r => r.login).join(', ')})`);
+                  } else {
+                    core.warning(`⚠️ Request Sent, but ignored: GitHub returned an empty list of reviewers. The bot '${preferredBotLogin}' might not be a collaborator or cannot be requested.`);
+                  }
                 } catch (error) {
                   core.error(`❌ Request code review: Failed to request review from ${preferredBotLogin}`);
                   core.setFailed(error.message);
