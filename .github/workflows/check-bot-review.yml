@@ -105,18 +105,16 @@ jobs:
 
           echo "Current status label: ${current_status:-<none>}"
 
-          # decide desired status label
           desired_status=""
           if [ "$unresolved" -gt 0 ]; then
             desired_status="$new_label"
           else
-            # you can set another status when unresolved == 0 if you want
             desired_status=""
           fi
 
           echo "Desired status label: ${desired_status:-<none>}"
 
-          # if no change is needed, do nothing
+          # if no change needed, bail out
           if [ "$current_status" = "$desired_status" ]; then
             echo "Status label already correct, no change required."
             exit 0
@@ -133,14 +131,15 @@ jobs:
             done
           fi
 
-          # add desired status label (if any)
+          # add desired status label (if any) using POST (append)
           if [ -n "$desired_status" ]; then
-            resp=$(curl -s -X PUT \
+            echo "Adding label: $desired_status"
+            resp=$(curl -s -X POST \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -H "Content-Type: application/json" \
               -d "{\"labels\": [\"$desired_status\"]}" \
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/$pr_number/labels")
-            
+
             echo "Label update response: $resp"
           fi
 
