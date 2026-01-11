@@ -29,7 +29,20 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
-            const number = context.payload.pull_request.number;
+            
+            let number = context.payload.pull_request?.number;
+            if (!number && context.payload.workflow_run) {
+              // For workflow_run, finding the PR associated with the triggering workflow run
+              const prs = context.payload.workflow_run.pull_requests;
+              if (prs && prs.length > 0) {
+                number = prs[0].number;
+              }
+            }
+
+            if (!number) {
+              core.setFailed("Could not determine Pull Request number from context.");
+              return;
+            }
 
             const query = /* GraphQL */ `
               query($owner:String!, $repo:String!, $number:Int!, $after:String) {
@@ -101,12 +114,24 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
-            const pull_number = context.payload.pull_request.number;
+            
+            let pull_number = context.payload.pull_request?.number;
+            if (!pull_number && context.payload.workflow_run) {
+               const prs = context.payload.workflow_run.pull_requests;
+               if (prs && prs.length > 0) {
+                 pull_number = prs[0].number;
+               }
+            }
+            
+            if (!pull_number) {
+              core.setFailed("Could not determine Pull Request number from context.");
+              return;
+            }
 
             const { data: reviews } = await github.rest.pulls.listReviews({ owner, repo, pull_number });
 
             const botReviews = (reviews ?? [])
-              .filter(r => r?.user?.type === "Bot" && r?.submitted_at)
+              .filter(r => r?.user?.type === "Bot" && r?.submitted_at && r?.user?.login !== "github-actions[bot]")
               .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
 
             const lastBot = botReviews[0]?.user?.login ?? "";
@@ -122,7 +147,19 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
-            const pull_number = context.payload.pull_request.number;
+            
+            let pull_number = context.payload.pull_request?.number;
+            if (!pull_number && context.payload.workflow_run) {
+               const prs = context.payload.workflow_run.pull_requests;
+               if (prs && prs.length > 0) {
+                 pull_number = prs[0].number;
+               }
+            }
+
+            if (!pull_number) {
+              core.setFailed("Could not determine Pull Request number from context.");
+              return;
+            }
 
             const preferredBotLogin = "${{ steps.bot.outputs.login }}";
 
