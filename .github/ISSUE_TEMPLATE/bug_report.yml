@@ -1,0 +1,136 @@
+name: "🐛 Bug Report"
+description: Report a bug to help us improve
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+        
+        Please provide as much detail as possible to help us understand and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: |
+        Please provide a clear and concise description of the bug.
+        - What is the issue?
+        - What behavior did you observe?
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: input
+    id: related_issues
+    attributes:
+      label: Related Issues
+      description: Link any related issues (e.g., #123)
+      placeholder: "#123, #456"
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Describe the steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: Describe what you expected to happen
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      description: Describe what actually happened instead
+      placeholder: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs
+      description: If applicable, paste any error logs or console output
+      placeholder: |
+        Paste error logs here...
+      render: shell
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - macOS
+        - Windows
+        - Linux (Ubuntu)
+        - Linux (Other)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      description: What browser are you using?
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js Version
+      description: What version of Node.js are you using?
+      placeholder: "e.g., 20.10.0"
+
+  - type: input
+    id: extension_version
+    attributes:
+      label: Extension Version
+      description: What version of the extension are you using?
+      placeholder: "e.g., 1.2.3"
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem
+      placeholder: Drag and drop images here or paste URLs
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context about the problem:
+        - When did this start happening?
+        - Does it happen consistently or intermittently?
+        - Any workarounds you've tried?
+      placeholder: Any additional information...
+
+  - type: textarea
+    id: possible_solution
+    attributes:
+      label: Possible Solution (Optional)
+      description: If you have ideas on how to fix this issue, please share them here
+      placeholder: Your ideas for fixing this...
