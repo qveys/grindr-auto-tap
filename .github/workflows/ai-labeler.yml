@@ -157,7 +157,6 @@ jobs:
               // Filter valid labels (only those from our whitelist)
               const validLabels = suggestedLabels
                 .filter(l => typeof l === 'string' && labels.includes(l))
-                
               
               // Enforce business rules: at least one 'type:' label
               const hasTypeLabel = validLabels.some(l => l.startsWith('type:'));
