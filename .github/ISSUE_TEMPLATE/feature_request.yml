@@ -1,0 +1,144 @@
+name: "✨ Feature Request"
+description: Suggest an idea for this project
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a new feature!
+        
+        Please provide as much detail as possible to help us understand the value and feasibility of your request.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: |
+        Please provide a clear and concise description of the feature you'd like to see.
+        - What problem does this feature solve?
+        - What value does it bring to users?
+      placeholder: Describe the feature...
+    validations:
+      required: true
+
+  - type: input
+    id: related_issues
+    attributes:
+      label: Related Issues
+      description: Link any related issues (e.g., #123)
+      placeholder: "#123, #456"
+
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Problem Statement
+      description: |
+        Describe the problem or limitation you're experiencing:
+        - What is the current situation?
+        - Why is this a problem?
+        - Who does this affect?
+      placeholder: Describe the problem...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: |
+        Describe the solution you'd like to see implemented:
+        - What should the feature do?
+        - How should it work from a user perspective?
+        - What would be the expected behavior?
+      placeholder: Describe your solution...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternative_solutions
+    attributes:
+      label: Alternative Solutions
+      description: Describe any alternative solutions or features you've considered
+      placeholder: |
+        - Alternative 1: ...
+        - Alternative 2: ...
+        - Why these alternatives might not be ideal...
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: Benefits
+      description: |
+        Explain the benefits of implementing this feature:
+        - User experience improvements
+        - Performance improvements
+        - New capabilities enabled
+        - Impact on adoption or retention
+      placeholder: Describe the benefits...
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_cases
+    attributes:
+      label: Use Cases
+      description: Provide concrete examples of how this feature would be used
+      placeholder: |
+        1. [Use case 1 – scenario description]
+        2. [Use case 2]
+        3. [Expected outcome]
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation_considerations
+    attributes:
+      label: Implementation Considerations (Optional)
+      description: |
+        If you have technical insights, share them here:
+        - Potential technical approach
+        - Dependencies or prerequisites
+        - Breaking changes or migration needs
+      placeholder: Your technical insights...
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Estimated Complexity
+      description: How complex do you think this feature would be to implement?
+      options:
+        - Low
+        - Medium
+        - High
+        - Unknown
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Critical – blocks important workflows
+        - High – significantly improves experience
+        - Medium – nice to have
+        - Low – minor improvement
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / Mockups (Optional)
+      description: If you have visual representations of the feature, add them here
+      placeholder: Drag and drop images here or paste URLs
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context, research, or references:
+        - Links to similar features in other projects
+        - User feedback or requests
+        - Market research or competitive analysis
+      placeholder: Any additional information...
