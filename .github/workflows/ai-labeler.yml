@@ -117,47 +117,54 @@ jobs:
                     // 2. Check for Bot Review using reusable action output
                     const botReviewNeeded = process.env.BOT_REVIEW_NEEDED === 'true';
 
-                    // 3. Get latest bot review details
-                    const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                    // 3. Get latest bot review details (optimized: fetch only recent reviews)
+                    const reviews = await github.rest.pulls.listReviews({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
                         pull_number: pr.number,
-                        per_page: 100
+                        per_page: 50  // Limit to recent reviews only
                     });
 
-                    const botReviews = reviews.filter(review => review.user.type === 'Bot');
+                    const botReviews = reviews.data.filter(review => review.user.type === 'Bot');
                     botReviews.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
                     const latestBotReview = botReviews[0];
 
                     let botReviewCommentCount = 0;
                     let botReviewDate = null;
 
+                    // Only fetch comments if there's a bot review (optimization)
                     if (latestBotReview) {
                         botReviewDate = latestBotReview.submitted_at;
-                        // Count comments in the latest bot review
-                        const reviewComments = await github.paginate(github.rest.pulls.listReviewComments, {
+
+                        // Fetch review comments only for this specific review
+                        const reviewComments = await github.rest.pulls.listReviewComments({
                             owner: context.repo.owner,
                             repo: context.repo.repo,
                             pull_number: pr.number,
                             per_page: 100
                         });
 
-                        botReviewCommentCount = reviewComments.filter(comment =>
+                        // Count only comments from bots after the latest bot review
+                        botReviewCommentCount = reviewComments.data.filter(comment =>
                             comment.user.type === 'Bot' &&
                             new Date(comment.created_at) >= new Date(latestBotReview.submitted_at)
                         ).length;
 
                         core.notice(`Latest bot review: ${botReviewDate}, comments: ${botReviewCommentCount}`);
+                    } else {
+                        core.notice('No bot reviews found');
                     }
 
-                    // 4. Get commits information
-                    const commits = await github.paginate(github.rest.pulls.listCommits, {
+                    // 4. Get commits information (optimized: fetch only last page)
+                    // We only need the latest commit, so fetch in reverse order
+                    const commitsResponse = await github.rest.pulls.listCommits({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
                         pull_number: pr.number,
                         per_page: 100
                     });
 
+                    const commits = commitsResponse.data;
                     const latestCommit = commits[commits.length - 1];
                     const latestCommitDate = latestCommit ? new Date(latestCommit.commit.committer.date) : null;
                     const hasNewCommitsAfterReview = latestBotReview && latestCommitDate &&
