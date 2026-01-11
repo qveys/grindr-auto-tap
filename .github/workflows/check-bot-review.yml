@@ -189,7 +189,7 @@ jobs:
               return isMerge || isRevert || isSkip;
             }
 
-            let latestCommit = commits[commits.length - 1];
+            let latestCommit = null;
             for (let i = commits.length - 1; i >= 0; i--) {
               const c = commits[i];
               const msg = c?.commit?.message ?? "";
@@ -197,6 +197,11 @@ jobs:
                 latestCommit = c;
                 break;
               }
+            }
+
+            if (!latestCommit) {
+              core.info("ℹ️ All commits are skippable (merge, revert, or [skip review]). strict review check not required.");
+              return;
             }
 
             const latestCommitDate = new Date(latestCommit.commit.committer.date);
