@@ -20,7 +20,7 @@ jobs:
             const issue = context.payload.issue || context.payload.pull_request;
             const number = issue.number;
 
-            // Récupère les labels actuels de l’issue/PR
+            // Retrieve current labels of the issue/PR
             const { data: current } = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
