@@ -14,8 +14,8 @@
         },
         {
           "version": "1.0.2",
-          "update_link": "https://github.com/qveys/grindr-auto-tap/releases/download/v1.0.2/grindr-auto-tap-1.0.2.xpi",
-          "update_hash": ""
+          "update_link": "https://github.com/qveys/grindr-auto-tap/releases/download/v1.0.2/grindr_auto_tap-1.0.2.xpi",
+          "update_hash": "sha256:95941903c8f4464996ab8a7afad7cdb258f81878abacee4c13342ec82e163c67"
         }
       ]
     }
