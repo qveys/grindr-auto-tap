@@ -73,41 +73,57 @@ jobs:
 
             if (pr) {
                 try {
-                    // 1. Count unresolved threads
-                    let hasNextPage = true;
-                    let cursor = null;
-                    let allThreads = [];
+                    // Fetch current PR state to ensure we have up-to-date information
+                    // (especially important for pull_request_review events where payload may be stale)
+                    const { data: currentPR } = await github.rest.pulls.get({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: pr.number
+                    });
 
-                    const query = `
-                        query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
-                            repository(owner: $owner, name: $repo) {
-                                pullRequest(number: $number) {
-                                    reviewThreads(first: 100, after: $cursor) {
-                                        pageInfo {
-                                            hasNextPage
-                                            endCursor
-                                        }
-                                        nodes {
-                                            isResolved
+                    // 1. Check if PR is closed or merged (takes priority)
+                    if (currentPR.state === 'closed') {
+                        forcedStatus = 'status: closed';
+                        const closeType = currentPR.merged ? 'merged' : 'closed without merge';
+                        core.notice(`PR is ${closeType}, forcing status: closed`);
+                    }
+
+                    // 2. Count unresolved threads (only if PR is still open)
+                    if (!forcedStatus) {
+                        let hasNextPage = true;
+                        let cursor = null;
+                        let allThreads = [];
+
+                        const query = `
+                            query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                                repository(owner: $owner, name: $repo) {
+                                    pullRequest(number: $number) {
+                                        reviewThreads(first: 100, after: $cursor) {
+                                            pageInfo {
+                                                hasNextPage
+                                                endCursor
+                                            }
+                                            nodes {
+                                                isResolved
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    `;
+                        `;
 
-                    while (hasNextPage) {
-                        const graphqlResponse = await github.graphql(query, {
-                            owner: context.repo.owner,
-                            repo: context.repo.repo,
-                            number: pr.number,
-                            cursor: cursor
-                        });
-                        const reviewThreads = graphqlResponse.repository.pullRequest.reviewThreads;
-                        allThreads = allThreads.concat(reviewThreads.nodes);
-                        hasNextPage = reviewThreads.pageInfo.hasNextPage;
-                        cursor = reviewThreads.pageInfo.endCursor;
-                    }
+                        while (hasNextPage) {
+                            const graphqlResponse = await github.graphql(query, {
+                                owner: context.repo.owner,
+                                repo: context.repo.repo,
+                                number: pr.number,
+                                cursor: cursor
+                            });
+                            const reviewThreads = graphqlResponse.repository.pullRequest.reviewThreads;
+                            allThreads = allThreads.concat(reviewThreads.nodes);
+                            hasNextPage = reviewThreads.pageInfo.hasNextPage;
+                            cursor = reviewThreads.pageInfo.endCursor;
+                        }
 
                     const unresolvedThreads = allThreads.filter(t => !t.isResolved).length;
                     const totalThreads = allThreads.length;
