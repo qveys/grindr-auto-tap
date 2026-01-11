@@ -1,0 +1,19 @@
+# Dépendances
+node_modules/
+
+# Build
+dist/
+build/
+out/
+.next/
+
+# Coverage
+coverage/
+
+# Configuration
+*.config.js
+!eslint.config.js
+
+# Fichiers générés
+*.min.js
+*.bundle.js
