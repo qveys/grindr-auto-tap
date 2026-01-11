@@ -116,6 +116,8 @@ jobs:
                     }
                 } catch (e) {
                     core.warning(`Error determining forced status: ${e.message}`);
+                    core.setFailed('Failed to determine forced status for pull request; aborting AI labeling.');
+                    return;
                 }
             }
 
