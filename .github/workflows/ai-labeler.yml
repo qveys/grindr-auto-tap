@@ -212,13 +212,21 @@ jobs:
                         core.notice('FORCED STATUS: on-hold (bot review with comments, awaiting fixes)');
                     }
                     // Priority 4: status: fixed (CRITICAL for status checks)
-                    // All threads resolved + no new commits + 0 bot comments
+                    // All threads resolved + no new commits + bot reviewed with 0 comments
                     else if (prContext.allThreadsResolved &&
                              !prContext.hasNewCommitsAfterReview &&
                              prContext.botReviewCommentCount === 0 &&
                              prContext.latestBotReviewDate !== null) {
                         forcedStatus = 'status: fixed';
-                        core.notice('FORCED STATUS: fixed (all resolved, no issues found)');
+                        core.notice('FORCED STATUS: fixed (bot verified, no issues found)');
+                    }
+                    // Priority 5: status: ready
+                    // All threads resolved + no bot review yet + clean state
+                    else if (prContext.allThreadsResolved &&
+                             prContext.latestBotReviewDate === null &&
+                             !prContext.botReviewNeeded) {
+                        forcedStatus = 'status: ready';
+                        core.notice('FORCED STATUS: ready (clean PR, awaiting bot review)');
                     }
 
                     // Apply forced status if determined
@@ -325,10 +333,11 @@ jobs:
             - "status: review-needed" - Auto-applied when all threads resolved + new commits
             - "status: in-progress" - Auto-applied when unresolved threads exist
             - "status: on-hold" - Auto-applied when bot review completed with comments
-            - "status: fixed" - Auto-applied when all resolved + no new commits + 0 bot comments
+            - "status: fixed" - Auto-applied when bot reviewed with 0 comments (verified clean)
+            - "status: ready" - Auto-applied when clean but not yet bot reviewed
 
             Your role for PRs without auto-status:
-            - "status: open" - For newly opened PRs without any reviews yet
+            - "status: open" - For newly opened PRs without any reviews yet (but with bot review pending)
             - "status: approved" - If the PR has been explicitly approved by reviewers
             - "status: needs-triage" - If the PR needs initial assessment
             - Other appropriate status labels based on the specific context
