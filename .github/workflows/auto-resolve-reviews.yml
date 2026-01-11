@@ -1,0 +1,46 @@
+name: Auto-Resolve Review Comments
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths-ignore:
+      - '.github/pr-resolution-cache.json'
+
+jobs:
+  auto-resolve:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all commits for proper diff analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install octokit
+
+      - name: Restore/Save Cache
+        uses: actions/cache@v4
+        with:
+          path: .github/pr-resolution-cache.json
+          # Use run_id in the key to force a new cache entry save every run (if changed)
+          key: pr-resolution-cache-${{ github.run_id }}
+          # Restore from the latest available cache with this prefix
+          restore-keys: |
+            pr-resolution-cache-
+
+      - name: Run auto-resolution
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: node scripts/auto-resolve-reviews.js
