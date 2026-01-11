@@ -1,0 +1,2 @@
+# Exécuter lint-staged sur les fichiers stagés
+npx lint-staged
