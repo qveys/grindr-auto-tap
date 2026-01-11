@@ -5,6 +5,8 @@ on:
     types: [opened, edited, reopened, closed]
   pull_request:
     types: [opened, edited, reopened, synchronize, closed]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
 
 jobs:
   label:
@@ -12,11 +14,24 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
+      contents: read
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Check bot review status
+        id: bot-review
+        if: github.event.pull_request || github.event.pull_request_review
+        uses: ./.github/actions/check-bot-review
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number || github.event.pull_request_review.pull_request.number }}
+      
       - name: AI Labeling
         uses: actions/github-script@v7
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BOT_REVIEW_NEEDED: ${{ steps.bot-review.outputs.needs-review || 'false' }}
         with:
           script: |
             if (!process.env.OPENAI_API_KEY) {
@@ -27,6 +42,71 @@ jobs:
             const issue = context.payload.issue || context.payload.pull_request;
             const title = issue.title;
             const body = issue.body || '';
+            
+            // Logic to determine forced status
+            let forcedStatus = null;
+            const pr = context.payload.pull_request || context.payload.pull_request_review?.pull_request;
+            
+            if (pr) {
+                try {
+                    // 1. Count unresolved threads
+                    let hasNextPage = true;
+                    let cursor = null;
+                    let allThreads = [];
+
+                    const query = `
+                        query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                            repository(owner: $owner, name: $repo) {
+                                pullRequest(number: $number) {
+                                    reviewThreads(first: 100, after: $cursor) {
+                                        pageInfo {
+                                            hasNextPage
+                                            endCursor
+                                        }
+                                        nodes {
+                                            isResolved
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    `;
+
+                    while (hasNextPage) {
+                        const graphqlResponse = await github.graphql(query, {
+                            owner: context.repo.owner,
+                            repo: context.repo.repo,
+                            number: pr.number,
+                            cursor: cursor
+                        });
+                        const reviewThreads = graphqlResponse.repository.pullRequest.reviewThreads;
+                        allThreads = allThreads.concat(reviewThreads.nodes);
+                        hasNextPage = reviewThreads.pageInfo.hasNextPage;
+                        cursor = reviewThreads.pageInfo.endCursor;
+                    }
+
+                    const unresolvedThreads = allThreads.filter(t => !t.isResolved).length;
+                    core.notice(`Unresolved threads: ${unresolvedThreads}`);
+
+                    if (unresolvedThreads > 0) {
+                        forcedStatus = 'status: in-progress';
+                    } else {
+                        // 2. Check for Bot Review using reusable action output
+                        const botReviewNeeded = process.env.BOT_REVIEW_NEEDED === 'true';
+                        if (botReviewNeeded) {
+                            forcedStatus = 'status: review-needed';
+                        }
+                    }
+                } catch (e) {
+                    core.warning(`Error determining forced status: ${e.message}`);
+                    // Continue without a forced status; AI labeling can still run.
+                    forcedStatus = null;
+                }
+            }
+
+            if (forcedStatus) {
+                core.notice(`Forced status determined: ${forcedStatus}`);
+            }
             
             // List of defined labels
             // Fetch all labels from the repository using pagination
@@ -122,8 +202,16 @@ jobs:
               }
 
               // Filter valid labels (only those from our whitelist)
-              const validLabels = suggestedLabels
+              let validLabels = suggestedLabels
                 .filter(l => typeof l === 'string' && labels.includes(l))
+              
+              // Apply forced status if any
+              if (forcedStatus) {
+                  // Remove any status labels suggested by AI
+                  validLabels = validLabels.filter(l => !l.startsWith('status:'));
+                  // Add the forced status
+                  validLabels.push(forcedStatus);
+              }
               
               // Enforce business rules: at least one 'type:' label
               const hasTypeLabel = validLabels.some(l => l.startsWith('type:'));
