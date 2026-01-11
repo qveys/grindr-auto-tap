@@ -244,9 +244,11 @@ jobs:
 
                 core.info(`Copilot trigger response: ${resp.status} ${resp.statusText}`);
                 if (resp.ok) {
+                  core.info("✅ Request code review: Success");
                   const text = await resp.text();
                   if (text) core.info(`Copilot response body: ${text.slice(0, 1000)}`);
                 } else {
+                  core.error("❌ Request code review: Failed");
                   core.warning(`Copilot trigger request failed; not logging response body. Status: ${resp.status} ${resp.statusText}`);
                 }
               } else {
