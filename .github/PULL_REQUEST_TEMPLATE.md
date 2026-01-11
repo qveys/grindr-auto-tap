@@ -1,3 +1,5 @@
+<!-- USER_CONTENT_START -->
+
 ## Description
 
 Please provide a clear and concise description of what this pull request does.
@@ -68,3 +70,10 @@ Please confirm the following before requesting a review:
 ## Additional context
 
 Add any other context, notes for reviewers, known limitations, or follow-up work.
+
+<!-- USER_CONTENT_END -->
+
+<!-- AUTO_GENERATED_START -->
+
+
+<!-- AUTO_GENERATED_END -->
