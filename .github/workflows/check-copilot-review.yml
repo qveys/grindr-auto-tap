@@ -55,7 +55,7 @@ jobs:
               pull_number: context.issue.number,
             });
             
-            // Find Bot review
+            // Find all Bot reviews
             const botReviews = reviews.filter(review => 
               review.user.login === 'copilot-pull-request-reviewer[bot]' ||
               review.user.type === 'Bot'
