@@ -171,7 +171,7 @@ jobs:
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  issue_number: context.issue.number,
+                  issue_number: issue.number,
                   labels: validLabels
                 });
               } else {
